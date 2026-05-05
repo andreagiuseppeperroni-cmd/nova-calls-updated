@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { AuthStatus } from '@/components/auth-status';
+import { ProfileOrb } from '@/components/profile-store';
 
 export function Button({
   children,
@@ -71,14 +73,15 @@ export function Navbar() {
         <Logo />
 
         <nav className="hidden items-center gap-7 text-sm font-black text-slate-300 md:flex">
-          <Link href="/dashboard" className="hover:text-white">Dashboard</Link>
+          <Link href="/profile" className="hover:text-white">Profilo</Link>
           <Link href="/calls/new" className="hover:text-white">Apri Call</Link>
-          <Link href="/login" className="hover:text-white">Login</Link>
+          <AuthStatus />
         </nav>
 
-        <Button href="/calls/new" variant="lime" className="hidden md:inline-flex">
-          ＋ Apri una Call
-        </Button>
+        <div className="hidden items-center gap-3 md:flex">
+          <Button href="/calls/new" variant="lime">＋ Apri una Call</Button>
+          <ProfileOrb className="h-11 w-11" />
+        </div>
       </div>
     </header>
   );
