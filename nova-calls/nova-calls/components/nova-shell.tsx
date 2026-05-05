@@ -229,11 +229,11 @@ export function NovaHome() {
           position: relative;
           z-index: 1;
           display: grid;
-          grid-template-columns: 232px minmax(0, 1fr) minmax(520px, 640px);
-          gap: 26px;
+          grid-template-columns: 232px minmax(680px, 1fr) 460px;
+          gap: 24px;
           width: 100%;
           min-height: 100vh;
-          padding: 30px 26px 24px;
+          padding: 30px 26px 44px;
         }
 
         .brand {
@@ -326,11 +326,11 @@ export function NovaHome() {
           display: flex;
           align-items: center;
           gap: 15px;
-          height: 48px;
-          padding: 0 13px;
+          height: 52px;
+          padding: 0 14px;
           border-radius: 16px;
           color: rgba(255,255,255,.82);
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 750;
           text-decoration: none;
         }
@@ -704,8 +704,8 @@ export function NovaHome() {
         }
 
         .call-action {
-          min-width: 132px;
-          height: 49px;
+          min-width: 140px;
+          height: 52px;
           border-radius: 999px;
           border: 1px solid rgba(255,255,255,.11);
           background: rgba(7,13,31,.64);
@@ -720,8 +720,8 @@ export function NovaHome() {
 
         .primary-cta {
           margin-left: auto;
-          width: 280px;
-          height: 55px;
+          width: 300px;
+          height: 58px;
           border-radius: 999px;
           border: 0;
           color: white;
@@ -895,24 +895,25 @@ export function NovaHome() {
         .right {
           padding-top: 76px;
           display: grid;
-          grid-template-rows: 1fr .78fr .82fr;
-          gap: 16px;
+          gap: 18px;
+          align-content: start;
           min-height: 0;
         }
 
         .panel {
           border-radius: 22px;
-          padding: 20px;
+          padding: 22px;
           overflow: hidden;
           position: relative;
+          min-height: 250px;
         }
 
         .panel-title {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 16px;
-          font-size: 27px;
+          margin-bottom: 18px;
+          font-size: 28px;
           font-weight: 850;
           letter-spacing: -.03em;
         }
@@ -928,7 +929,7 @@ export function NovaHome() {
           display: grid;
           grid-template-columns: 1.05fr .95fr;
           gap: 14px;
-          height: calc(100% - 50px);
+          height: auto;
         }
 
         .inner {
@@ -947,13 +948,13 @@ export function NovaHome() {
 
         .insight {
           display: grid;
-          grid-template-columns: 34px 1fr;
-          gap: 12px;
+          grid-template-columns: 38px 1fr;
+          gap: 13px;
           align-items: start;
-          margin-bottom: 17px;
+          margin-bottom: 18px;
           color: rgba(255,255,255,.87);
-          font-size: 14px;
-          line-height: 1.35;
+          font-size: 15px;
+          line-height: 1.45;
           font-weight: 650;
         }
 
@@ -1187,22 +1188,75 @@ export function NovaHome() {
           height: 100%;
         }
 
-        @media (max-width: 1500px) {
+        @media (max-width: 1780px) {
           .nova-app {
-            grid-template-columns: 210px minmax(0, 1fr);
-            height: auto;
+            grid-template-columns: 232px minmax(0, 1fr);
+            gap: 26px;
+            padding-right: 26px;
           }
 
           .right {
             grid-column: 2;
-            grid-template-columns: 1fr;
-            grid-template-rows: auto;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             padding-top: 0;
+          }
+
+          .panel {
+            min-height: 280px;
+          }
+
+          .echo-body {
+            display: flex;
+            flex-direction: column;
+            height: auto;
+          }
+
+          .outcome {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .result-orb {
+            width: 128px;
+            height: 128px;
+            font-size: 50px;
+            align-self: center;
+            order: -1;
+          }
+
+          .pulse {
+            display: flex;
+            flex-direction: column;
+            height: auto;
+          }
+
+          .radial {
+            width: 170px;
+            height: 170px;
+          }
+
+          .radial::before {
+            inset: 32px;
+          }
+
+          .chart {
+            height: 76px;
           }
 
           .sidebar {
             height: auto;
             min-height: calc(100vh - 142px);
+          }
+        }
+
+        @media (max-width: 1280px) {
+          .nova-app {
+            grid-template-columns: 210px minmax(0, 1fr);
+          }
+
+          .right {
+            grid-template-columns: 1fr;
           }
         }
 
