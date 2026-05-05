@@ -55,7 +55,7 @@ export function AuthStatus() {
 
   return (
     <div className="flex items-center gap-3">
-      <Link href="/dashboard" className="max-w-[150px] truncate text-cyan-100 hover:text-white">
+      <Link href="/profile" className="max-w-[150px] truncate text-cyan-100 hover:text-white">
         {label}
       </Link>
       <button type="button" onClick={signOut} className="text-slate-400 hover:text-white">

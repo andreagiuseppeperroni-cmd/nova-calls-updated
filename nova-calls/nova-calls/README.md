@@ -51,3 +51,16 @@ Se il sito Netlify ha un altro dominio, sostituisci `https://novacalls.netlify.a
 - `/dashboard`: mostra stato utente se autenticato.
 - `/calls/new`: apertura Call con fallback locale.
 - `/c/[slug]`: stanza Call demo con Echo, Pulse e Outcome.
+
+## Aggiornamento profilo e navigazione
+
+Questa versione sposta il punteggio Nova dentro la pagina personale `/profile`.
+
+Funzioni aggiunte:
+
+- pagina personale con immagine profilo, biografia, città, passioni e interessi;
+- sfera profilo cliccabile in alto a destra con miniatura dell'immagine caricata;
+- punteggio Nova personale che parte da zero e cresce con i contributi in Call;
+- pagine funzionanti per Echo, Outcome, Persone, Spazi, Notifiche, Messaggi, Cerca e Salvati;
+- nessuna funzione di follow o aggiunta persone: i profili sono solo visualizzabili;
+- i pulsanti principali della Home portano a pagine coerenti o alla stanza Call.

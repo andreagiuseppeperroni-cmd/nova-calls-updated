@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { demoCalls, type NovaCall } from '@/lib/local-call';
+import { addNovaContribution, ProfileOrb } from '@/components/profile-store';
 
 const STORAGE_KEY = 'nova:calls';
 
@@ -58,10 +59,12 @@ export function CallRoom({ slug }: { slug: string }) {
     const text = input.trim();
     if (!text) return;
     setMessages((current) => [...current, { author: 'Tu', text, kind: 'guest' }]);
+    addNovaContribution(10, 'contributions');
     setInput('');
   }
 
   function generateOutcome() {
+    addNovaContribution(25, 'outcomesHelped');
     setOutcome(`Decisione proposta: ${call?.type === 'Decidere' ? 'scegli una prova reversibile entro 14 giorni' : 'trasforma la Call in tre prossime azioni'}. Step: 1) definisci il vincolo più forte, 2) chiedi feedback a due persone esperte, 3) fissa una scadenza chiara.`);
   }
 
@@ -71,7 +74,7 @@ export function CallRoom({ slug }: { slug: string }) {
     <main className="min-h-screen px-4 py-6 text-white md:px-7">
       <div className="mx-auto flex w-[min(1180px,100%)] items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3 text-xl font-black tracking-[.18em]">NOVA</Link>
-        <Link href="/calls/new" className="rounded-full bg-lime-300 px-5 py-3 text-sm font-black text-slate-950">＋ Apri Call</Link>
+        <div className="flex items-center gap-3"><Link href="/calls/new" className="rounded-full bg-lime-300 px-5 py-3 text-sm font-black text-slate-950">＋ Apri Call</Link><ProfileOrb className="h-11 w-11" /></div>
       </div>
 
       <section className="mx-auto mt-8 grid w-[min(1180px,100%)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -81,8 +84,8 @@ export function CallRoom({ slug }: { slug: string }) {
             <h1 className="max-w-4xl text-5xl font-black leading-[.95] tracking-[-.06em] md:text-7xl">{call.title}</h1>
             <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-300">{call.description}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button onClick={() => setJoined(true)} className={`rounded-full px-5 py-3 text-sm font-black ${joined ? 'bg-emerald-300 text-slate-950' : 'border border-white/15 bg-white/10'}`}>{joined ? 'Dentro la Call' : 'Entra nella Call'}</button>
-              <button onClick={() => setReactions((value) => value + 1)} className="rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black">☆ Reagisci</button>
+              <button onClick={() => { if (!joined) addNovaContribution(5, 'callsJoined'); setJoined(true); }} className={`rounded-full px-5 py-3 text-sm font-black ${joined ? 'bg-emerald-300 text-slate-950' : 'border border-white/15 bg-white/10'}`}>{joined ? 'Dentro la Call' : 'Entra nella Call'}</button>
+              <button onClick={() => { setReactions((value) => value + 1); addNovaContribution(2); }} className="rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black">☆ Reagisci</button>
               <button onClick={generateOutcome} className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-300 px-5 py-3 text-sm font-black">Genera Outcome</button>
             </div>
           </header>

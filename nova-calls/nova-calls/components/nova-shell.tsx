@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { demoCalls, makeSlug, type NovaCall } from '@/lib/local-call';
+import { ProfileOrb } from '@/components/profile-store';
 
 const STORAGE_KEY = 'nova:calls';
 
@@ -10,13 +11,13 @@ const callTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare or
 const navItems = [
   ['⌂', 'Home', '/'],
   ['◷', 'Call', '/calls/new'],
-  ['⌁', 'Echo', '#echo'],
-  ['◇', 'Outcome', '#outcome'],
-  ['♙', 'Persone', '#people'],
-  ['⬡', 'Spazi', '#spaces'],
-  ['♧', 'Notifiche', '#notifications'],
-  ['▱', 'Messaggi', '#messages'],
-  ['◎', 'Profilo', '/dashboard'],
+  ['⌁', 'Echo', '/echo'],
+  ['◇', 'Outcome', '/outcome'],
+  ['♙', 'Persone', '/people'],
+  ['⬡', 'Spazi', '/spaces'],
+  ['♧', 'Notifiche', '/notifications'],
+  ['▱', 'Messaggi', '/messages'],
+  ['◎', 'Profilo', '/profile'],
 ];
 
 function readStoredCalls() {
@@ -36,6 +37,7 @@ function saveCall(call: NovaCall) {
 export function NovaHome() {
   const [text, setText] = useState('');
   const [type, setType] = useState('Decidere');
+  const [attachmentName, setAttachmentName] = useState('');
   const [calls, setCalls] = useState<NovaCall[]>(demoCalls);
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function NovaHome() {
             />
             <div className="relative z-10 mt-3 flex items-center gap-3 pr-20">
               <button onClick={openCall} className="grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-white/10 text-2xl font-bold">+</button>
-              <span className="rounded-full border border-white/15 bg-slate-950/40 px-4 py-2 text-sm font-black">⌘ Allega</span>
+              <label className="cursor-pointer rounded-full border border-white/15 bg-slate-950/40 px-4 py-2 text-sm font-black hover:bg-white/10">⌘ {attachmentName || 'Allega'}<input type="file" className="hidden" onChange={(event) => setAttachmentName(event.target.files?.[0]?.name || '')} /></label>
               <button onClick={() => setType(type === 'Anonima' ? 'Decidere' : 'Anonima')} className="rounded-full border border-white/15 bg-slate-950/40 px-4 py-2 text-sm font-black">◒ Anonima</button>
             </div>
             <button onClick={openCall} className="absolute bottom-4 right-4 grid h-[72px] w-[72px] place-items-center rounded-full border border-white/15 bg-slate-950/55 text-2xl shadow-[0_0_28px_rgba(139,92,246,.38)]">🎙</button>
@@ -120,12 +122,9 @@ function TopChrome() {
       <Link href="/" className="relative z-20 mx-auto mt-5 flex w-fit items-center gap-4 text-3xl font-normal tracking-[.52em] text-slate-50 drop-shadow-[0_0_20px_rgba(34,211,238,.45)] lg:fixed lg:left-10 lg:top-8 lg:mx-0 lg:mt-0">
         N<span className="-ml-3 h-6 w-6 rounded-full border-[5px] border-transparent bg-[linear-gradient(#020617,#020617)_padding-box,conic-gradient(from_0deg,#22d3ee,#8b5cf6,#ec4899,#22d3ee)_border-box] shadow-[0_0_22px_rgba(34,211,238,.62)]" />VA
       </Link>
-      <div className="nova-glass relative z-20 mx-auto mt-3 flex h-10 w-[min(395px,calc(100%-28px))] items-center gap-4 rounded-full px-5 text-xs font-bold text-white/80 lg:fixed lg:left-1/2 lg:top-8 lg:mt-0 lg:-translate-x-1/2">
-        <span>✦ Livello Nova 4</span><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"><span className="block h-full w-[62%] rounded-full bg-gradient-to-r from-violet-500 to-cyan-300" /></span><span>2.460 punti</span>
-      </div>
       <div className="absolute right-4 top-5 z-30 flex items-center gap-2 lg:fixed lg:right-8 lg:top-7">
-        {['⌕', '☆', '♙'].map((icon) => <button key={icon} className="hidden h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-slate-950/60 text-lg lg:grid">{icon}</button>)}
-        <div className="h-10 w-10 rounded-full bg-[radial-gradient(circle_at_30%_20%,#f8b4ff,#7c3aed_38%,#0f172a_70%)] lg:h-12 lg:w-12" />
+        {[['⌕','/search'], ['☆','/saved'], ['♙','/people']].map(([icon, href]) => <Link key={icon} href={href} className="hidden h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-slate-950/60 text-lg lg:grid hover:bg-white/10">{icon}</Link>)}
+        <ProfileOrb className="h-10 w-10 lg:h-12 lg:w-12" />
       </div>
     </>
   );
@@ -161,7 +160,7 @@ function FeaturedCall({ call }: { call: NovaCall }) {
           <div className="flex items-center"><span className="h-9 w-9 rounded-full border-2 border-slate-950 bg-gradient-to-br from-cyan-300 to-pink-400" /><span className="-ml-2 h-9 w-9 rounded-full border-2 border-slate-950 bg-gradient-to-br from-pink-400 to-violet-500" /><span className="-ml-2 h-9 w-9 rounded-full border-2 border-slate-950 bg-gradient-to-br from-emerald-400 to-cyan-400" /><span className="ml-3 rounded-full bg-white/10 px-4 py-2 text-sm font-black">+{Math.max(call.participants - 4, 12)}</span></div>
           <div className="text-sm font-bold text-white/90"><b className="text-xl">{call.participants}</b> partecipanti attivi <span className="block text-slate-300">24 stanno parlando</span></div>
         </div>
-        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-4"><button className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-sm font-black">▥ Audio</button><button className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-sm font-black">▣ Video</button><button className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-sm font-black">▱ Chat</button><Link href={`/c/${call.slug}`} className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 py-3 text-center text-lg font-black">Apri la Call →</Link></div>
+        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-4"><Link href={`/c/${call.slug}?mode=audio`} className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-center text-sm font-black">▥ Audio</Link><Link href={`/c/${call.slug}?mode=video`} className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-center text-sm font-black">▣ Video</Link><Link href={`/c/${call.slug}?mode=chat`} className="rounded-full border border-white/10 bg-slate-950/45 py-3 text-center text-sm font-black">▱ Chat</Link><Link href={`/c/${call.slug}`} className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 py-3 text-center text-lg font-black">Apri la Call →</Link></div>
       </div>
     </article>
   );
@@ -185,7 +184,7 @@ function LiveStrip({ calls }: { calls: NovaCall[] }) {
 function RightPanels() {
   return (
     <aside className="grid min-h-0 gap-4 pt-0 lg:grid-rows-[1fr_.78fr_.82fr] lg:pt-20">
-      <section id="echo" className="nova-glass rounded-[22px] p-5"><div className="mb-4 flex items-center justify-between text-2xl font-black">✣ Echo <small className="text-sm text-slate-300">● In tempo reale</small></div><div className="grid gap-4 md:grid-cols-2 lg:h-[calc(100%-50px)]"><div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4"><h4 className="mb-4 text-sm font-black text-white/45">Insight dell'AI</h4>{['Hai bisogno di stabilità finanziaria nei primi mesi.', 'Il tuo network a Milano potrebbe accelerare tutto.', 'Il 68% vede in te il profilo giusto per il cambio.'].map((item, i) => <p key={item} className="mb-4 grid grid-cols-[34px_1fr] gap-3 text-sm font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full border border-cyan-300/20 bg-cyan-300/10 text-cyan-300">{i === 0 ? '◎' : i === 1 ? '♙' : '◉'}</span>{item}</p>)}<span className="text-sm font-black text-slate-300">Analisi completa →</span></div><div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4"><h4 className="mb-4 text-sm font-black text-white/45">Clima della stanza</h4><div className="grid place-items-center py-5"><div className="grid h-[139px] w-[160px] place-items-center rounded-[45%_55%_52%_48%/46%_38%_62%_54%] bg-[radial-gradient(circle_at_28%_30%,rgba(34,211,238,.95),transparent_31%),radial-gradient(circle_at_75%_35%,rgba(236,72,153,.9),transparent_32%),radial-gradient(circle_at_60%_70%,rgba(139,92,246,.92),transparent_42%)] text-center"><b className="text-xl">Fiducioso</b><span className="text-xs text-white/70">Energia positiva</span></div></div></div></div></section>
+      <section id="echo" className="nova-glass rounded-[22px] p-5"><div className="mb-4 flex items-center justify-between text-2xl font-black">✣ Echo <small className="text-sm text-slate-300">● In tempo reale</small></div><div className="grid gap-4 md:grid-cols-2 lg:h-[calc(100%-50px)]"><div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4"><h4 className="mb-4 text-sm font-black text-white/45">Insight dell'AI</h4>{['Hai bisogno di stabilità finanziaria nei primi mesi.', 'Il tuo network a Milano potrebbe accelerare tutto.', 'Il 68% vede in te il profilo giusto per il cambio.'].map((item, i) => <p key={item} className="mb-4 grid grid-cols-[34px_1fr] gap-3 text-sm font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full border border-cyan-300/20 bg-cyan-300/10 text-cyan-300">{i === 0 ? '◎' : i === 1 ? '♙' : '◉'}</span>{item}</p>)}<Link href="/echo" className="text-sm font-black text-slate-300 hover:text-white">Analisi completa →</Link></div><div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4"><h4 className="mb-4 text-sm font-black text-white/45">Clima della stanza</h4><div className="grid place-items-center py-5"><div className="grid h-[139px] w-[160px] place-items-center rounded-[45%_55%_52%_48%/46%_38%_62%_54%] bg-[radial-gradient(circle_at_28%_30%,rgba(34,211,238,.95),transparent_31%),radial-gradient(circle_at_75%_35%,rgba(236,72,153,.9),transparent_32%),radial-gradient(circle_at_60%_70%,rgba(139,92,246,.92),transparent_42%)] text-center"><b className="text-xl">Fiducioso</b><span className="text-xs text-white/70">Energia positiva</span></div></div></div></div></section>
       <section id="outcome" className="nova-glass grid gap-5 rounded-[22px] p-5 md:grid-cols-[1fr_220px] md:items-center"><div><div className="mb-3 flex items-center gap-3 text-2xl font-black">🏆 Outcome <small className="rounded-full bg-lime-300/10 px-3 py-1 text-xs text-lime-300">Completata</small></div><div className="text-sm font-semibold text-white/45">Decisione della stanza</div><div className="mt-3 text-xl font-black"><span className="mr-2 text-lime-300">✓</span>Vai. È il momento.</div><p className="mt-1 text-sm font-bold text-white/45">Approvato dal 76% dei partecipanti</p><div className="mt-4 grid gap-2 sm:grid-cols-3">{['Piano finanziario 90 giorni', 'Visita esplorativa 2 settimane', 'Costruisci rete locale subito'].map((step, index) => <div key={step} className="rounded-xl border border-white/10 bg-cyan-300/5 p-3 text-xs text-white/70"><b className="mr-1 text-base text-cyan-300">{index + 1}</b>{step}</div>)}</div></div><div className="mx-auto grid h-36 w-36 place-items-center rounded-full bg-[radial-gradient(circle_at_65%_55%,rgba(139,92,246,.75),transparent_38%),radial-gradient(circle_at_40%_60%,rgba(34,211,238,.85),transparent_40%)] text-6xl text-blue-500">✓</div></section>
       <section className="nova-glass rounded-[22px] p-5"><div className="mb-4 flex items-center justify-between text-2xl font-black">〽 Pulse <small className="text-sm text-slate-300">Energia della stanza</small></div><div className="grid gap-5 md:grid-cols-2 md:items-center"><div className="mx-auto grid h-[210px] w-[210px] place-items-center rounded-full bg-[repeating-radial-gradient(circle,transparent_0_12px,rgba(34,211,238,.16)_13px_14px),conic-gradient(from_-15deg,transparent_0_18deg,#22d3ee_38deg,#bef264_120deg,#ec4899_240deg,transparent_310deg)]"><div className="grid h-32 w-32 place-items-center rounded-full bg-slate-950/85 text-center text-4xl font-black">92<span className="block text-sm text-slate-300">Alta</span></div></div><div><h4 className="font-black">Momentum in crescita</h4><p className="mb-5 text-sm font-semibold text-slate-300">+28% negli ultimi 10 minuti</p><div className="h-24 rounded-xl bg-white/5"><svg viewBox="0 0 280 100" preserveAspectRatio="none" className="h-full w-full"><path d="M0 79 L34 53 L66 72 L96 49 L130 52 L162 29 L195 36 L225 15 L280 9" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-cyan-300" /></svg></div></div></div></section>
     </aside>
