@@ -249,8 +249,8 @@ export function NovaHome() {
         }
 
         .brand-logo-box {
-          width: 20px;
-          height: 20px;
+          width: 56px;
+          height: 56px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -263,8 +263,8 @@ export function NovaHome() {
         }
 
         .brand-logo-image {
-          width: 18px;
-          height: 18px;
+          width: 44px;
+          height: 44px;
           object-fit: contain;
           display: block;
         }
@@ -1303,14 +1303,14 @@ export function NovaHome() {
           }
 
           .brand-logo-box {
-            width: 18px;
-            height: 18px;
+            width: 46px;
+            height: 46px;
             border-radius: 16px;
           }
 
           .brand-logo-image {
-            width: 18px;
-            height: 18px;
+            width: 36px;
+            height: 36px;
           }
 
           .brand-word {
