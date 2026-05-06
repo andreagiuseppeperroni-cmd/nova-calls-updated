@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { makeSlug } from '@/lib/local-call';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 const STORAGE_KEY = 'nova:calls';
 
@@ -17,6 +18,23 @@ const callTypes = [
 
 function getCallTypeLabel(value: string) {
   return callTypes.find((item) => item.value === value)?.label.replace(/^[^ ]+ /, '') || value;
+}
+
+function getUserName(user: any) {
+  const metadata = user?.user_metadata || {};
+  const fullName = metadata.full_name || metadata.name || metadata.display_name;
+
+  if (typeof fullName === 'string' && fullName.trim()) return fullName.trim();
+  if (user?.email) return user.email.split('@')[0];
+
+  return 'Host Nova';
+}
+
+function getUserAvatar(user: any) {
+  const metadata = user?.user_metadata || {};
+  const avatar = metadata.avatar_url || metadata.picture;
+
+  return typeof avatar === 'string' && avatar.trim() ? avatar : null;
 }
 
 function saveLocalCall(call: {
@@ -53,7 +71,7 @@ export function NewCallForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function createCall(event: React.FormEvent) {
+  async function createCall(event: React.FormEvent) {
     event.preventDefault();
 
     const cleanTitle = title.trim();
@@ -67,9 +85,13 @@ export function NewCallForm({
     setError('');
 
     const slug = makeSlug(cleanTitle);
+    const cleanDescription =
+      description.trim() ||
+      'Call aperta su NOVA. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.';
+
     const localCall = {
       title: cleanTitle,
-      description: description.trim() || 'Call aperta su NOVA. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+      description: cleanDescription,
       type: getCallTypeLabel(callType),
       accessType,
       slug,
@@ -80,26 +102,46 @@ export function NewCallForm({
 
     saveLocalCall(localCall);
 
-    /*
-      Non aspettiamo più /api/calls prima del redirect.
-      Prima il form restava bloccato su "Creo..." quando Supabase/API non rispondevano.
-      Ora la Call si apre subito e il salvataggio remoto viene tentato in background.
-    */
-    fetch('/api/calls', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      keepalive: true,
-      body: JSON.stringify({
-        title: cleanTitle,
-        description: localCall.description,
-        call_type: callType,
-        access_type: accessType,
-      }),
-    }).catch(() => {
-      // Fallback locale già salvato: nessun blocco per l'utente.
-    });
+    try {
+      const supabase = createBrowserSupabase();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    window.location.assign(`/c/${slug}`);
+      if (userError || !user) {
+        window.location.assign(`/login?next=${encodeURIComponent(`/calls/new?title=${encodeURIComponent(cleanTitle)}`)}`);
+        return;
+      }
+
+      const { error: insertError } = await supabase.from('calls').upsert(
+        {
+          slug,
+          title: cleanTitle,
+          description: cleanDescription,
+          call_type: callType,
+          access_type: accessType,
+          status: 'live',
+          pulse_score: 12,
+          participants: 1,
+          host_id: user.id,
+          host_name: getUserName(user),
+          host_avatar: getUserAvatar(user),
+        },
+        { onConflict: 'slug' }
+      );
+
+      if (insertError) {
+        setError(`La Call è stata salvata localmente, ma non su Supabase: ${insertError.message}`);
+        setLoading(false);
+        return;
+      }
+
+      window.location.assign(`/c/${slug}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore durante la creazione della Call.');
+      setLoading(false);
+    }
   }
 
   return (
@@ -188,7 +230,7 @@ export function NewCallForm({
         {error && <p className="text-sm font-black text-pink-300">{error}</p>}
 
         <Button type="submit" disabled={loading} variant="lime" className="w-full">
-          {loading ? 'Apro la Call...' : 'Apri la Call'}
+          {loading ? 'Creo la Live...' : 'Apri la Call'}
         </Button>
       </form>
     </Card>
