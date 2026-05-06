@@ -53,6 +53,14 @@ type HostMoment = {
   popularityScore: number;
 };
 
+type WorldNewsItem = {
+  title: string;
+  source: string;
+  url: string;
+  description?: string;
+  category?: string;
+};
+
 type AiAnswerKey = 'situation' | 'block' | 'desiredOutcome';
 
 const aiQuestions: Array<{
@@ -134,7 +142,6 @@ function extractKeywords(thoughts: LiveThought[]) {
     'del',
     'della',
     'delle',
-    'di',
     'dopo',
     'dove',
     'essere',
@@ -143,23 +150,11 @@ function extractKeywords(thoughts: LiveThought[]) {
     'gli',
     'hai',
     'ho',
-    'il',
-    'in',
-    'la',
-    'le',
-    'lo',
-    'ma',
-    'meno',
-    'mi',
     'per',
     'piu',
     'prima',
     'quando',
-    'se',
-    'si',
     'sono',
-    'su',
-    'ti',
     'tra',
     'una',
     'uno',
@@ -186,12 +181,12 @@ function extractKeywords(thoughts: LiveThought[]) {
 function buildTrendEchoes(thoughts: LiveThought[]): TrendEcho[] {
   const keywords = extractKeywords(thoughts);
   const byType = thoughts.reduce<Record<string, number>>((acc, thought) => {
-    const type = thought.call_type || 'capire';
+    const type = thought.call_type || 'Capire';
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
 
-  const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || 'capire';
+  const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Capire';
 
   return [
     {
@@ -266,6 +261,52 @@ function getThoughtTypeIcon(item: string) {
             : '▣';
 }
 
+function inferThoughtType(value: string) {
+  const normalized = normalizeText(value);
+
+  if (
+    normalized.includes('decid') ||
+    normalized.includes('scelta') ||
+    normalized.includes('scegliere') ||
+    normalized.includes('dubbio')
+  ) {
+    return 'Decidere';
+  }
+
+  if (normalized.includes('feedback') || normalized.includes('opinione') || normalized.includes('parere')) {
+    return 'Feedback';
+  }
+
+  if (
+    normalized.includes('persone') ||
+    normalized.includes('network') ||
+    normalized.includes('contatti') ||
+    normalized.includes('conoscere')
+  ) {
+    return 'Trovare persone';
+  }
+
+  if (
+    normalized.includes('subito') ||
+    normalized.includes('oggi') ||
+    normalized.includes('urgente') ||
+    normalized.includes('ora')
+  ) {
+    return 'Fare ora';
+  }
+
+  if (
+    normalized.includes('creare') ||
+    normalized.includes('costruire') ||
+    normalized.includes('progetto') ||
+    normalized.includes('idea')
+  ) {
+    return 'Creare insieme';
+  }
+
+  return 'Capire';
+}
+
 export function NovaHome() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
@@ -278,7 +319,10 @@ export function NovaHome() {
     block: '',
     desiredOutcome: '',
   });
+
   const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
+  const [worldNews, setWorldNews] = useState<WorldNewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [avgPulse, setAvgPulse] = useState(0);
   const [trendEchoes, setTrendEchoes] = useState<TrendEcho[]>([]);
@@ -288,6 +332,7 @@ export function NovaHome() {
 
   useEffect(() => {
     loadDashboardData();
+    loadWorldNews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -318,7 +363,7 @@ export function NovaHome() {
         const { count } = await supabase
           .from('user_links')
           .select('id', { count: 'exact', head: true })
-          .eq('target_user_id', user.id)
+          .eq('receiver_id', user.id)
           .eq('status', 'pending');
 
         pendingCount = count || 0;
@@ -337,6 +382,30 @@ export function NovaHome() {
       setTrendEchoes(buildTrendEchoes(localThoughts));
       setHostMoment(computeHostOfMoment(localThoughts));
       setNotificationCount(0);
+    }
+  }
+
+  async function loadWorldNews() {
+    try {
+      setNewsLoading(true);
+
+      const response = await fetch('/api/world-news', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !Array.isArray(data?.items)) {
+        setWorldNews([]);
+        return;
+      }
+
+      setWorldNews(data.items);
+    } catch {
+      setWorldNews([]);
+    } finally {
+      setNewsLoading(false);
     }
   }
 
@@ -375,52 +444,6 @@ export function NovaHome() {
     }
   }
 
-  function inferThoughtType(value: string) {
-    const normalized = normalizeText(value);
-
-    if (
-      normalized.includes('decid') ||
-      normalized.includes('scelta') ||
-      normalized.includes('scegliere') ||
-      normalized.includes('dubbio')
-    ) {
-      return 'Decidere';
-    }
-
-    if (normalized.includes('feedback') || normalized.includes('opinione') || normalized.includes('parere')) {
-      return 'Feedback';
-    }
-
-    if (
-      normalized.includes('persone') ||
-      normalized.includes('network') ||
-      normalized.includes('contatti') ||
-      normalized.includes('conoscere')
-    ) {
-      return 'Trovare persone';
-    }
-
-    if (
-      normalized.includes('subito') ||
-      normalized.includes('oggi') ||
-      normalized.includes('urgente') ||
-      normalized.includes('ora')
-    ) {
-      return 'Fare ora';
-    }
-
-    if (
-      normalized.includes('creare') ||
-      normalized.includes('costruire') ||
-      normalized.includes('progetto') ||
-      normalized.includes('idea')
-    ) {
-      return 'Creare insieme';
-    }
-
-    return 'Capire';
-  }
-
   function updateAiAnswer(key: AiAnswerKey, value: string) {
     setAiAnswers((current) => ({
       ...current,
@@ -454,11 +477,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
   }
 
   function openThought() {
-    const title = text.trim() || aiAnswers.situation.trim() || 'Nuovo Spunto Nova';
+    const title = text.trim().split('\n')[0] || 'Nuovo Spunto Nova';
 
     const call: NovaCall = {
       title,
-      description: text.trim() || 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+      description:
+        text.trim() || 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
       type,
       accessType: 'public',
       slug: makeSlug(title),
@@ -597,6 +621,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           )}
 
           <TrendEchoSection echoes={trendEchoes} />
+          <WorldNewsSection items={worldNews} loading={newsLoading} />
           <HostOfMomentSection host={hostMoment} />
           <LiveStrip thoughts={liveThoughts} />
         </section>
@@ -635,49 +660,20 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           width: 100%;
           color: var(--text);
           background:
-            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.24), transparent 22%),
-            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, 0.16), transparent 24%),
-            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, 0.1), transparent 28%),
+            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, .24), transparent 22%),
+            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, .16), transparent 24%),
+            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, .10), transparent 28%),
             linear-gradient(180deg, #e7f8ff 0%, #f3fbff 30%, #d9f2ff 62%, #c6eaff 84%, #b8e4ff 100%);
           overflow-x: hidden;
           isolation: isolate;
         }
 
-        .nova-preview::before {
-          content: '';
-          position: fixed;
-          inset: 0;
-          z-index: -2;
-          pointer-events: none;
-          background-image:
-            radial-gradient(circle, rgba(15, 23, 42, 0.16) 0 1px, transparent 1px),
-            radial-gradient(circle, rgba(255, 255, 255, 0.55) 0 1px, transparent 1px);
-          background-size: 96px 96px, 164px 164px;
-          background-position: 18px 26px, 54px 80px;
-          opacity: 0.14;
-          mask-image: radial-gradient(circle at center, black 0%, transparent 88%);
-        }
-
-        .nova-preview::after {
-          content: '';
-          position: fixed;
-          inset: auto -20% -16% -20%;
-          height: 44vh;
-          z-index: -1;
-          pointer-events: none;
-          background:
-            radial-gradient(ellipse at 50% 100%, rgba(6, 182, 212, 0.24), transparent 58%),
-            radial-gradient(ellipse at 72% 80%, rgba(37, 99, 235, 0.14), transparent 48%);
-          filter: blur(28px);
-          opacity: 0.86;
-        }
-
         .glass {
-          border: 1px solid rgba(255, 255, 255, 0.68);
+          border: 1px solid rgba(255,255,255,.68);
           background:
-            radial-gradient(circle at 82% 0%, rgba(6, 182, 212, 0.08), transparent 32%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(223, 246, 255, 0.68));
-          box-shadow: 0 22px 74px rgba(37, 99, 235, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+            radial-gradient(circle at 82% 0%, rgba(6,182,212,.08), transparent 32%),
+            linear-gradient(180deg, rgba(255,255,255,.82), rgba(223,246,255,.68));
+          box-shadow: 0 22px 74px rgba(37,99,235,.11), inset 0 1px 0 rgba(255,255,255,.96);
           backdrop-filter: blur(24px) saturate(1.22);
           color: #0f172a;
         }
@@ -713,9 +709,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           justify-content: center;
           overflow: hidden;
           border-radius: 18px;
-          border: 1px solid rgba(6, 182, 212, 0.22);
-          background: rgba(255, 255, 255, 0.72);
-          box-shadow: 0 0 24px rgba(6, 182, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(6,182,212,.22);
+          background: rgba(255,255,255,.72);
+          box-shadow: 0 0 24px rgba(6,182,212,.15), inset 0 1px 0 rgba(255,255,255,.9);
           flex-shrink: 0;
         }
 
@@ -729,7 +725,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .brand-word {
           font-size: 20px;
           font-weight: 900;
-          letter-spacing: 0.28em;
+          letter-spacing: .28em;
           color: #0f172a;
         }
 
@@ -748,13 +744,13 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           width: 49px;
           height: 49px;
           border-radius: 18px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: rgba(255, 255, 255, 0.68);
+          border: 1px solid rgba(15,23,42,.1);
+          background: rgba(255,255,255,.68);
           color: #0f172a;
           display: grid;
           place-items: center;
           font-size: 19px;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
           text-decoration: none;
         }
 
@@ -762,7 +758,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 999px;
           overflow: hidden;
           background: radial-gradient(circle at 30% 20%, #fbcfe8, #8f7cff 38%, #58c4ff 70%);
-          box-shadow: 0 0 28px rgba(124, 58, 237, 0.22);
+          box-shadow: 0 0 28px rgba(124,58,237,.22);
         }
 
         .sidebar {
@@ -779,10 +775,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .sidebar::before {
-          content: '';
+          content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(130deg, rgba(6, 182, 212, 0.1), transparent 36%, rgba(124, 58, 237, 0.08));
+          background: linear-gradient(130deg, rgba(6,182,212,.10), transparent 36%, rgba(124,58,237,.08));
           pointer-events: none;
         }
 
@@ -800,7 +796,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           height: 52px;
           padding: 0 14px;
           border-radius: 16px;
-          color: rgba(15, 23, 42, 0.72);
+          color: rgba(15,23,42,.72);
           font-size: 16px;
           font-weight: 800;
           text-decoration: none;
@@ -809,15 +805,15 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .nav-item:hover,
         .nav-item.active {
           color: #075985;
-          background: linear-gradient(90deg, rgba(6, 182, 212, 0.16), rgba(124, 58, 237, 0.08));
-          box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.16), 0 12px 28px rgba(37, 99, 235, 0.08);
+          background: linear-gradient(90deg, rgba(6,182,212,.16), rgba(124,58,237,.08));
+          box-shadow: inset 0 0 0 1px rgba(6,182,212,.16), 0 12px 28px rgba(37,99,235,.08);
         }
 
         .nav-icon {
           width: 23px;
           text-align: center;
           font-size: 18px;
-          filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.24));
+          filter: drop-shadow(0 0 8px rgba(6,182,212,.24));
         }
 
         .nav-badge {
@@ -842,7 +838,6 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           align-items: center;
           justify-content: space-between;
           padding: 0 17px;
-          border: 0;
           border-radius: 18px;
           color: #0f172a;
           font-size: 21px;
@@ -851,7 +846,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-align: left;
           text-decoration: none;
           background: linear-gradient(135deg, #a3e635, #7de3ff 72%);
-          box-shadow: 0 18px 34px rgba(6, 182, 212, 0.18);
+          box-shadow: 0 18px 34px rgba(6,182,212,.18);
         }
 
         .online {
@@ -861,12 +856,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 999px;
           padding: 10px 13px;
           color: #475569;
-          background: rgba(255, 255, 255, 0.52);
+          background: rgba(255,255,255,.52);
           display: flex;
           gap: 10px;
           align-items: center;
           font-size: 12px;
-          letter-spacing: 0.08em;
+          letter-spacing: .08em;
           font-weight: 800;
         }
 
@@ -875,7 +870,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           height: 8px;
           border-radius: 99px;
           background: var(--green);
-          box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+          box-shadow: 0 0 12px rgba(16,185,129,.45);
         }
 
         .nova-center {
@@ -886,8 +881,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .nova-center h1 {
           margin: 0;
           font-size: clamp(52px, 5.2vw, 83px);
-          line-height: 0.98;
-          letter-spacing: -0.065em;
+          line-height: .98;
+          letter-spacing: -.065em;
           font-weight: 900;
         }
 
@@ -907,26 +902,24 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .composer {
           position: relative;
-          height: 140px;
           border-radius: 30px;
           padding: 22px;
           overflow: hidden;
-          border: 1px solid rgba(6, 182, 212, 0.26);
+          border: 1px solid rgba(6,182,212,.26);
           background:
-            radial-gradient(ellipse at 38% 6%, rgba(6, 182, 212, 0.22), transparent 28%),
-            radial-gradient(ellipse at 74% 54%, rgba(219, 39, 119, 0.14), transparent 32%),
-            rgba(255, 255, 255, 0.84);
-          box-shadow: 0 0 28px rgba(6, 182, 212, 0.1), 0 18px 45px rgba(37, 99, 235, 0.08);
+            radial-gradient(ellipse at 38% 6%, rgba(6,182,212,.22), transparent 28%),
+            radial-gradient(ellipse at 74% 54%, rgba(219,39,119,.14), transparent 32%),
+            rgba(255,255,255,.84);
+          box-shadow: 0 0 28px rgba(6,182,212,.10), 0 18px 45px rgba(37,99,235,.08);
         }
 
         .ai-composer {
-          height: auto;
           min-height: 238px;
           padding: 24px;
           background:
-            radial-gradient(circle at 18% 8%, rgba(56, 214, 255, 0.26), transparent 28%),
-            radial-gradient(circle at 78% 38%, rgba(219, 39, 119, 0.12), transparent 32%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(237, 249, 255, 0.84));
+            radial-gradient(circle at 18% 8%, rgba(56,214,255,.26), transparent 28%),
+            radial-gradient(circle at 78% 38%, rgba(219,39,119,.12), transparent 32%),
+            linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,249,255,.84));
         }
 
         .composer-content {
@@ -950,7 +943,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           color: #0284c7;
           font-size: 11px;
           font-weight: 950;
-          letter-spacing: 0.18em;
+          letter-spacing: .18em;
           text-transform: uppercase;
         }
 
@@ -960,7 +953,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           color: #10213a;
           font-size: clamp(24px, 2.2vw, 38px);
           line-height: 1;
-          letter-spacing: -0.045em;
+          letter-spacing: -.045em;
           font-weight: 950;
         }
 
@@ -970,20 +963,20 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-width: 56px;
           height: 38px;
           border-radius: 999px;
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(124, 58, 237, 0.12));
+          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(124,58,237,.12));
           color: #075985;
           font-size: 13px;
           font-weight: 950;
-          border: 1px solid rgba(6, 182, 212, 0.22);
+          border: 1px solid rgba(6,182,212,.22);
         }
 
         .ai-question-box {
           margin-top: 22px;
           border-radius: 22px;
-          border: 1px solid rgba(90, 132, 185, 0.18);
-          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(90,132,185,.18);
+          background: rgba(255,255,255,.72);
           padding: 16px;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
         }
 
         .ai-question-label {
@@ -995,7 +988,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .composer-input {
-          width: calc(100% - 78px);
+          width: 100%;
           min-height: 68px;
           resize: none;
           border: 0;
@@ -1007,16 +1000,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           font-family: inherit;
         }
 
-        .composer-input::placeholder {
-          color: rgba(100, 116, 139, 0.82);
-        }
-
         .ai-input {
-          width: 100%;
           min-height: 82px;
           color: #10213a;
-          font-size: 16px;
           font-weight: 750;
+        }
+
+        .composer-input::placeholder {
+          color: rgba(100,116,139,.82);
         }
 
         .composer-actions {
@@ -1028,6 +1019,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .ai-actions {
           margin-top: 18px;
           flex-wrap: wrap;
+          padding-right: 86px;
         }
 
         .mini-pill {
@@ -1037,26 +1029,28 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 9px;
           height: 38px;
           border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(248, 250, 252, 0.82);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(248,250,252,.82);
           padding: 0 16px;
           color: #475569;
           font-size: 14px;
           font-weight: 850;
           cursor: pointer;
           font-family: inherit;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
         }
 
         .mini-pill:disabled {
-          opacity: 0.45;
           cursor: not-allowed;
+          opacity: .45;
         }
 
-        .ai-primary-pill {
+        .ai-primary-pill,
+        .ai-open-button,
+        .ai-open-cta {
           background: linear-gradient(135deg, #a3e635, #7de3ff) !important;
           color: #10213a !important;
-          border-color: rgba(6, 182, 212, 0.18) !important;
+          border-color: rgba(6,182,212,.18) !important;
         }
 
         .hidden-file {
@@ -1073,16 +1067,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: grid;
           place-items: center;
           font-size: 26px;
-          background: radial-gradient(circle, rgba(255, 255, 255, 0.96), rgba(226, 232, 240, 0.74));
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          box-shadow: 0 16px 36px rgba(124, 58, 237, 0.14);
+          border: 1px solid rgba(15,23,42,.08);
+          box-shadow: 0 16px 36px rgba(124,58,237,.14);
           cursor: pointer;
-        }
-
-        .ai-open-button {
-          background: linear-gradient(135deg, #a3e635, #7de3ff);
-          color: #10213a;
-          font-weight: 950;
         }
 
         .ai-preview {
@@ -1100,7 +1087,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           color: #10213a;
           font-size: 24px;
           font-weight: 950;
-          letter-spacing: -0.035em;
+          letter-spacing: -.035em;
         }
 
         .ai-preview p {
@@ -1118,11 +1105,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border: 0;
           border-radius: 999px;
           padding: 0 22px;
-          background: linear-gradient(135deg, #a3e635, #7de3ff);
-          color: #10213a;
           font-size: 14px;
           font-weight: 950;
-          box-shadow: 0 16px 34px rgba(6, 182, 212, 0.16);
+          box-shadow: 0 16px 34px rgba(6,182,212,.16);
           cursor: pointer;
         }
 
@@ -1139,22 +1124,22 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           align-items: center;
           gap: 10px;
           border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.64);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.64);
           color: #475569;
           padding: 0 19px;
           font-size: 14px;
           font-weight: 850;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
           cursor: pointer;
           font-family: inherit;
         }
 
         .chip.active {
-          border-color: rgba(6, 182, 212, 0.24);
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.18), rgba(124, 58, 237, 0.12));
+          border-color: rgba(6,182,212,.24);
+          background: linear-gradient(135deg, rgba(6,182,212,.18), rgba(124,58,237,.12));
           color: #075985;
-          box-shadow: 0 14px 28px rgba(37, 99, 235, 0.1);
+          box-shadow: 0 14px 28px rgba(37,99,235,.10);
         }
 
         .featured {
@@ -1162,23 +1147,23 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-height: 310px;
           border-radius: var(--radius-xl);
           overflow: hidden;
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          border: 1px solid rgba(255,255,255,.18);
           background:
-            radial-gradient(circle at 80% 0%, rgba(6, 182, 212, 0.2), transparent 30%),
-            linear-gradient(180deg, rgba(27, 68, 105, 0.9), rgba(21, 49, 79, 0.88));
-          box-shadow: 0 24px 90px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            radial-gradient(circle at 80% 0%, rgba(6,182,212,.20), transparent 30%),
+            linear-gradient(180deg, rgba(27,68,105,.90), rgba(21,49,79,.88));
+          box-shadow: 0 24px 90px rgba(37,99,235,.12), inset 0 1px 0 rgba(255,255,255,.12);
           color: #eff6ff;
         }
 
         .featured::before {
-          content: '';
+          content: "";
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse at 78% 36%, rgba(219, 39, 119, 0.34), transparent 14%),
-            radial-gradient(ellipse at 82% 26%, rgba(6, 182, 212, 0.34), transparent 26%),
-            linear-gradient(165deg, transparent 0 42%, rgba(125, 227, 255, 0.14), transparent 57%);
-          opacity: 0.88;
+            radial-gradient(ellipse at 78% 36%, rgba(219,39,119,.34), transparent 14%),
+            radial-gradient(ellipse at 82% 26%, rgba(6,182,212,.34), transparent 26%),
+            linear-gradient(165deg, transparent 0 42%, rgba(125,227,255,.14), transparent 57%);
+          opacity: .88;
         }
 
         .featured-content {
@@ -1197,10 +1182,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 8px;
           min-height: 34px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255,255,255,.10);
+          border: 1px solid rgba(255,255,255,.12);
           padding: 0 15px;
-          color: rgba(255, 255, 255, 0.92);
+          color: rgba(255,255,255,.92);
           font-size: 13px;
           font-weight: 900;
         }
@@ -1215,7 +1200,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin: 34px 0 9px;
           font-size: 40px;
           line-height: 1;
-          letter-spacing: -0.045em;
+          letter-spacing: -.045em;
           font-weight: 950;
         }
 
@@ -1233,24 +1218,19 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-top: 24px;
         }
 
-        .avatars {
-          display: flex;
-          align-items: center;
-        }
-
         .plus-count {
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.12);
+          background: rgba(255,255,255,.12);
           padding: 10px 14px;
           font-weight: 900;
           color: white;
         }
 
         .active-count {
-          border-left: 1px solid rgba(255, 255, 255, 0.14);
+          border-left: 1px solid rgba(255,255,255,.14);
           padding-left: 18px;
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.92);
+          color: rgba(255,255,255,.92);
           font-weight: 750;
         }
 
@@ -1276,9 +1256,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-width: 140px;
           height: 52px;
           border-radius: 999px;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          background: rgba(255, 255, 255, 0.08);
-          color: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          color: rgba(255,255,255,.92);
           font-weight: 900;
           display: inline-flex;
           align-items: center;
@@ -1286,6 +1266,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 10px;
           text-decoration: none;
           padding: 0 18px;
+          cursor: pointer;
         }
 
         .primary-cta {
@@ -1298,14 +1279,15 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           font-size: 21px;
           font-weight: 950;
           background: linear-gradient(100deg, #a3e635, #7de3ff);
-          box-shadow: 0 18px 34px rgba(6, 182, 212, 0.18);
+          box-shadow: 0 18px 34px rgba(6,182,212,.18);
           display: inline-flex;
           align-items: center;
           justify-content: center;
           text-decoration: none;
         }
 
-        .host-card {
+        .host-card,
+        .world-news-card {
           margin-top: 16px;
           border-radius: 24px;
           padding: 18px 22px;
@@ -1326,8 +1308,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .trend-item {
           border-radius: 18px;
           padding: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.58);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.58);
         }
 
         .trend-title {
@@ -1340,6 +1322,125 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           line-height: 1.5;
           font-weight: 700;
           font-size: 13px;
+        }
+
+        .world-news-card {
+          display: block;
+          border-radius: 26px;
+          padding: 22px;
+        }
+
+        .world-news-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 18px;
+        }
+
+        .world-news-head h2 {
+          margin: 0;
+          max-width: 720px;
+          color: #10213a;
+          font-size: clamp(25px, 2.3vw, 40px);
+          line-height: 1;
+          letter-spacing: -.045em;
+          font-weight: 950;
+        }
+
+        .world-news-main-cta {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 44px;
+          border-radius: 999px;
+          padding: 0 18px;
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          color: #10213a;
+          font-size: 13px;
+          font-weight: 950;
+          text-decoration: none;
+        }
+
+        .world-news-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .world-news-item {
+          min-height: 190px;
+          border-radius: 20px;
+          border: 1px solid rgba(15, 23, 42, .08);
+          background:
+            radial-gradient(circle at 20% 0%, rgba(6, 182, 212, .13), transparent 34%),
+            linear-gradient(180deg, rgba(255,255,255,.78), rgba(239,249,255,.62));
+          padding: 16px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.88);
+        }
+
+        .world-news-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+        }
+
+        .world-news-item h3 {
+          margin: 13px 0 8px;
+          color: #10213a;
+          font-size: 18px;
+          line-height: 1.15;
+          letter-spacing: -.025em;
+          font-weight: 950;
+        }
+
+        .world-news-item p {
+          margin: 0;
+          color: #475569;
+          font-size: 13px;
+          line-height: 1.5;
+          font-weight: 700;
+        }
+
+        .world-news-actions {
+          margin-top: 14px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .world-news-actions a {
+          display: inline-flex;
+          align-items: center;
+          min-height: 34px;
+          border-radius: 999px;
+          padding: 0 12px;
+          background: rgba(255,255,255,.72);
+          color: #075985;
+          font-size: 12px;
+          font-weight: 950;
+          text-decoration: none;
+          border: 1px solid rgba(6,182,212,.16);
+        }
+
+        .world-news-actions a:last-child {
+          background: linear-gradient(135deg, rgba(163,230,53,.88), rgba(125,227,255,.88));
+          color: #10213a;
+        }
+
+        .world-news-empty {
+          grid-column: 1 / -1;
+          border-radius: 20px;
+          padding: 18px;
+          background: rgba(255,255,255,.58);
+          color: #475569;
+          font-weight: 850;
         }
 
         .host-left {
@@ -1359,7 +1460,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           font-size: 26px;
           font-weight: 950;
           background: radial-gradient(circle at 34% 25%, #7de3ff, #8f7cff 32%, #e77bcf 54%, #15314f 78%);
-          box-shadow: 0 0 34px rgba(6, 182, 212, 0.18), inset 0 0 16px rgba(255, 255, 255, 0.16);
+          box-shadow: 0 0 34px rgba(6,182,212,.18), inset 0 0 16px rgba(255,255,255,.16);
         }
 
         .host-orb img {
@@ -1391,12 +1492,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0;
-          border-left: 1px solid rgba(15, 23, 42, 0.08);
+          border-left: 1px solid rgba(15,23,42,.08);
         }
 
         .metric {
           padding-left: 22px;
-          border-right: 1px solid rgba(15, 23, 42, 0.08);
+          border-right: 1px solid rgba(15,23,42,.08);
         }
 
         .metric:last-child {
@@ -1429,9 +1530,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-top: 16px;
           border-radius: 24px;
           padding: 14px 16px;
-          background: rgba(255, 255, 255, 0.58);
-          border: 1px solid rgba(255, 255, 255, 0.64);
-          box-shadow: 0 20px 50px rgba(37, 99, 235, 0.08);
+          background: rgba(255,255,255,.58);
+          border: 1px solid rgba(255,255,255,.64);
+          box-shadow: 0 20px 50px rgba(37,99,235,.08);
         }
 
         .strip-head {
@@ -1463,8 +1564,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-height: 84px;
           border-radius: 16px;
           padding: 10px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(255, 255, 255, 0.7));
+          border: 1px solid rgba(15,23,42,.08);
+          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(255,255,255,.70));
           overflow: hidden;
           position: relative;
           font-weight: 900;
@@ -1472,18 +1573,6 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           line-height: 1.15;
           color: #0f172a;
           text-decoration: none;
-        }
-
-        .mini-card::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 8px;
-          height: 18px;
-          background: repeating-linear-gradient(90deg, rgba(6, 182, 212, 0.65) 0 2px, transparent 2px 9px);
-          opacity: 0.28;
-          transform: skewX(-8deg);
         }
 
         .mini-status {
@@ -1524,7 +1613,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-bottom: 18px;
           font-size: 28px;
           font-weight: 950;
-          letter-spacing: -0.03em;
+          letter-spacing: -.03em;
         }
 
         .panel-title small {
@@ -1536,14 +1625,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .echo-body {
           display: grid;
-          grid-template-columns: 1.05fr 0.95fr;
+          grid-template-columns: 1.05fr .95fr;
           gap: 14px;
           height: auto;
         }
 
         .inner {
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.48);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.48);
           border-radius: 18px;
           padding: 16px;
         }
@@ -1552,7 +1641,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin: 0 0 15px;
           color: #64748b;
           font-size: 14px;
-          letter-spacing: 0.04em;
+          letter-spacing: .04em;
         }
 
         .insight {
@@ -1573,9 +1662,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: rgba(6, 182, 212, 0.12);
+          background: rgba(6,182,212,.12);
           color: var(--cyan);
-          border: 1px solid rgba(6, 182, 212, 0.18);
+          border: 1px solid rgba(6,182,212,.18);
         }
 
         .mood-wrap {
@@ -1592,10 +1681,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-align: center;
           color: white;
           background:
-            radial-gradient(circle at 28% 30%, rgba(6, 182, 212, 0.94), transparent 31%),
-            radial-gradient(circle at 75% 35%, rgba(219, 39, 119, 0.76), transparent 32%),
-            radial-gradient(circle at 60% 70%, rgba(124, 58, 237, 0.78), transparent 42%);
-          filter: drop-shadow(0 0 18px rgba(219, 39, 119, 0.24));
+            radial-gradient(circle at 28% 30%, rgba(6,182,212,.94), transparent 31%),
+            radial-gradient(circle at 75% 35%, rgba(219,39,119,.76), transparent 32%),
+            radial-gradient(circle at 60% 70%, rgba(124,58,237,.78), transparent 42%);
+          filter: drop-shadow(0 0 18px rgba(219,39,119,.24));
           border-radius: 45% 55% 52% 48% / 46% 38% 62% 54%;
           animation: morph 7s ease-in-out infinite;
         }
@@ -1608,7 +1697,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: block;
           margin-top: 9px;
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.82);
+          color: rgba(255,255,255,.82);
         }
 
         @keyframes morph {
@@ -1660,27 +1749,27 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           place-items: center;
           position: relative;
           background:
-            repeating-radial-gradient(circle, transparent 0 12px, rgba(6, 182, 212, 0.13) 13px 14px),
+            repeating-radial-gradient(circle, transparent 0 12px, rgba(6,182,212,.13) 13px 14px),
             conic-gradient(from -15deg, transparent 0 18deg, var(--cyan) 38deg, var(--lime) 120deg, var(--pink) 240deg, transparent 310deg),
-            radial-gradient(circle, rgba(6, 182, 212, 0.16), transparent 52%);
-          box-shadow: 0 0 36px rgba(6, 182, 212, 0.18);
+            radial-gradient(circle, rgba(6,182,212,.16), transparent 52%);
+          box-shadow: 0 0 36px rgba(6,182,212,.18);
         }
 
         .radial::before {
-          content: '';
+          content: "";
           position: absolute;
           inset: 42px;
           border-radius: inherit;
-          background: rgba(255, 255, 255, 0.88);
-          box-shadow: inset 0 0 20px rgba(15, 23, 42, 0.06);
+          background: rgba(255,255,255,.88);
+          box-shadow: inset 0 0 20px rgba(15,23,42,.06);
         }
 
         .radial::after {
-          content: '';
+          content: "";
           position: absolute;
           width: 8px;
           height: 126%;
-          background: linear-gradient(transparent, rgba(6, 182, 212, 0.65), rgba(124, 58, 237, 0.52), transparent);
+          background: linear-gradient(transparent, rgba(6,182,212,.65), rgba(124,58,237,.52), transparent);
           filter: blur(2px);
         }
 
@@ -1719,7 +1808,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 14px;
           position: relative;
           overflow: hidden;
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.24));
+          background: linear-gradient(180deg, rgba(255,255,255,.60), rgba(255,255,255,.24));
         }
 
         .chart svg {
@@ -1746,12 +1835,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             min-height: 280px;
           }
 
-          .echo-body {
-            display: flex;
-            flex-direction: column;
-            height: auto;
-          }
-
+          .echo-body,
           .pulse {
             display: flex;
             flex-direction: column;
@@ -1783,7 +1867,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           }
 
           .right,
-          .trend-grid {
+          .trend-grid,
+          .world-news-grid {
             grid-template-columns: 1fr;
           }
         }
@@ -1813,7 +1898,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
           .brand-word {
             font-size: 18px;
-            letter-spacing: 0.22em;
+            letter-spacing: .22em;
           }
 
           .top-actions {
@@ -1854,9 +1939,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             height: auto;
             border-radius: 24px;
             padding: 9px;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255,255,255,.80);
             backdrop-filter: blur(26px) saturate(1.4);
-            box-shadow: 0 18px 60px rgba(37, 99, 235, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            box-shadow: 0 18px 60px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.9);
           }
 
           .sidebar::before,
@@ -1878,7 +1963,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             gap: 0;
           }
 
-          .nav-item:nth-child(n + 6) {
+          .nav-item:nth-child(n+6) {
             display: none;
           }
 
@@ -1912,7 +1997,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           }
 
           .open-call::before {
-            content: '+';
+            content: "+";
             font-size: 36px;
             line-height: 1;
           }
@@ -1931,8 +2016,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             margin: 0 auto;
             text-align: center;
             font-size: clamp(42px, 13.6vw, 58px);
-            line-height: 0.92;
-            letter-spacing: -0.07em;
+            line-height: .92;
+            letter-spacing: -.07em;
           }
 
           .subtitle {
@@ -1948,7 +2033,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             padding: 18px;
           }
 
-          .ai-builder-head {
+          .ai-builder-head,
+          .world-news-head {
             flex-direction: column;
           }
 
@@ -1957,20 +2043,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             align-items: stretch;
           }
 
-          .ai-open-cta {
+          .ai-open-cta,
+          .world-news-main-cta {
             width: 100%;
           }
 
-          .composer-input {
-            font-size: 14px;
-          }
-
-          .ai-input {
-            width: 100%;
-          }
-
-          .composer-actions {
+          .ai-actions {
             gap: 8px;
+            padding-right: 58px;
           }
 
           .mini-pill {
@@ -2027,7 +2107,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             margin-top: 48px;
             max-width: 270px;
             font-size: 34px;
-            line-height: 0.98;
+            line-height: .98;
           }
 
           .featured p {
@@ -2102,7 +2182,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           .metrics {
             grid-template-columns: repeat(3, 1fr);
             border-left: 0;
-            border-top: 1px solid rgba(15, 23, 42, 0.08);
+            border-top: 1px solid rgba(15,23,42,.08);
             padding-top: 14px;
           }
 
@@ -2163,7 +2243,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             font-size: 12px;
           }
 
-          .echo-body {
+          .echo-body,
+          .pulse {
             display: flex;
             flex-direction: column;
             height: auto;
@@ -2177,12 +2258,6 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           .mood-blob {
             width: 142px;
             height: 122px;
-          }
-
-          .pulse {
-            display: flex;
-            flex-direction: column;
-            height: auto;
           }
 
           .radial {
@@ -2320,6 +2395,7 @@ function FeaturedThought({
           <Link href={`/c/${thought.slug}?mode=chat`} className="call-action">
             ▱ Chat
           </Link>
+
           <Link href={`/c/${thought.slug}`} className="primary-cta">
             Apri lo Spunto →
           </Link>
@@ -2345,6 +2421,78 @@ function TrendEchoSection({ echoes }: { echoes: TrendEcho[] }) {
             <div className="trend-text">{echo.text}</div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function WorldNewsSection({ items, loading }: { items: WorldNewsItem[]; loading: boolean }) {
+  const fallbackItems: WorldNewsItem[] = [
+    {
+      title: 'Tecnologia, lavoro e relazioni stanno cambiando più velocemente delle abitudini sociali.',
+      source: 'NOVA Echo',
+      url: '/calls/new',
+      description: 'Uno spunto utile per aprire conversazioni su futuro, scelte personali e nuove priorità.',
+      category: 'Società',
+    },
+    {
+      title: 'Sempre più persone cercano comunità piccole, fidate e orientate a decisioni concrete.',
+      source: 'NOVA Echo',
+      url: '/calls/new',
+      description: 'Può diventare uno Spunto su amicizie, lavoro, fiducia o appartenenza.',
+      category: 'Community',
+    },
+    {
+      title: 'Il tema del cambiamento personale resta centrale: città, lavoro, coppia, famiglia, denaro.',
+      source: 'NOVA Echo',
+      url: '/calls/new',
+      description: 'Perfetto per generare Spunti dove la rete può portare esperienze reali.',
+      category: 'Vita',
+    },
+  ];
+
+  const visibleItems = items.length ? items : fallbackItems;
+
+  return (
+    <section className="world-news-card glass">
+      <div className="world-news-head">
+        <div>
+          <p className="ai-eyebrow">News dal mondo</p>
+          <h2>Notizie dal mondo per dare spunto… a un nuovo Spunto</h2>
+        </div>
+
+        <Link href="/calls/new" className="world-news-main-cta">
+          Apri uno Spunto →
+        </Link>
+      </div>
+
+      <div className="world-news-grid">
+        {loading ? (
+          <div className="world-news-empty">Carico notizie e segnali dal mondo…</div>
+        ) : (
+          visibleItems.slice(0, 6).map((item) => (
+            <article className="world-news-item" key={`${item.title}-${item.source}`}>
+              <div className="world-news-meta">
+                <span>{item.category || 'Mondo'}</span>
+                <span>{item.source}</span>
+              </div>
+
+              <h3>{item.title}</h3>
+
+              {item.description && <p>{item.description}</p>}
+
+              <div className="world-news-actions">
+                <a href={item.url} target="_blank" rel="noreferrer">
+                  Leggi
+                </a>
+
+                <Link href={`/calls/new?title=${encodeURIComponent(item.title)}&type=${encodeURIComponent('Capire')}`}>
+                  Usa come Spunto
+                </Link>
+              </div>
+            </article>
+          ))
+        )}
       </div>
     </section>
   );
