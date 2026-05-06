@@ -470,8 +470,8 @@ function openThought() {
 
 const featured = liveThoughts[0] || null;
 
-  return (
-    <div className="nova-preview">
+return (
+  <div className="nova-preview">
       <TopChrome />
 
       <main className="nova-app">
