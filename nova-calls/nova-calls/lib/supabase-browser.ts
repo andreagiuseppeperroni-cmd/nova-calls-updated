@@ -1,4 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+let browserSupabase: SupabaseClient | null = null;
 
 export function createBrowserSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,5 +10,16 @@ export function createBrowserSupabase() {
     throw new Error('Missing Supabase browser environment variables.');
   }
 
-  return createClient(url, anonKey);
+  if (!browserSupabase) {
+    browserSupabase = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'nova-supabase-auth',
+      },
+    });
+  }
+
+  return browserSupabase;
 }
