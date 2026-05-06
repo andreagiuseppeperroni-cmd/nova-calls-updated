@@ -191,6 +191,7 @@ export function CallRoom({ slug }: { slug: string }) {
   const [linkRow, setLinkRow] = useState<UserLinkRow | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
+  const [selectedProfileLinksCount, setSelectedProfileLinksCount] = useState(0);
 
   useEffect(() => {
     setCall(readCall(slug) || demoCalls[0]);
@@ -333,6 +334,16 @@ export function CallRoom({ slug }: { slug: string }) {
     return true;
   }
 
+  async function loadSelectedProfileLinksCount(profileId: string) {
+    const { count, error } = await supabase
+      .from('user_links')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${profileId},receiver_id.eq.${profileId}`);
+
+    if (!error) setSelectedProfileLinksCount(count || 0);
+  }
+
   async function loadLinkWithProfile(profileId: string) {
     if (!user || user.id === profileId) {
       setLinkRow(null);
@@ -359,6 +370,7 @@ export function CallRoom({ slug }: { slug: string }) {
   async function openProfileFromMessage(message: Message) {
     setLinkRow(null);
     setLinkMessage(null);
+    setSelectedProfileLinksCount(0);
 
     if (!message.userId) {
       setSelectedProfile(null);
@@ -394,6 +406,7 @@ export function CallRoom({ slug }: { slug: string }) {
 
     setSelectedProfile(data as PublicProfile);
     setProfileLoading(false);
+    await loadSelectedProfileLinksCount(message.userId);
     await loadLinkWithProfile(message.userId);
   }
 
@@ -681,6 +694,7 @@ export function CallRoom({ slug }: { slug: string }) {
                   setProfileLoading(false);
                   setLinkRow(null);
                   setLinkMessage(null);
+                  setSelectedProfileLinksCount(0);
                 }}
                 className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/10 text-xl font-black hover:bg-white/15"
                 aria-label="Chiudi profilo"
@@ -709,7 +723,7 @@ export function CallRoom({ slug }: { slug: string }) {
                       <p className="text-xs font-black uppercase tracking-[.24em] text-cyan-200/75">Profilo pubblico</p>
                       <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-.04em]">{profileName}</h3>
                       <p className="mt-1 text-sm font-bold text-cyan-200">
-                        {selectedProfile?.city || 'NOVA'} · {selectedProfile?.nova_points || 0} punti Nova
+                        {selectedProfile?.city || 'NOVA'} · {selectedProfile?.nova_points || 0} punti Nova · {selectedProfileLinksCount} legami
                       </p>
                     </div>
                   </div>
@@ -734,7 +748,7 @@ export function CallRoom({ slug }: { slug: string }) {
                     </div>
                   )}
 
-                  <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+                  <div className="mt-6 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <b className="text-2xl text-cyan-300">{selectedProfile?.contributions || 0}</b>
                       <span className="mt-1 block text-[11px] font-bold text-slate-400">Messaggi utili</span>
@@ -746,6 +760,10 @@ export function CallRoom({ slug }: { slug: string }) {
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <b className="text-2xl text-pink-300">{selectedProfile?.outcomes_helped || 0}</b>
                       <span className="mt-1 block text-[11px] font-bold text-slate-400">Outcome</span>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <b className="text-2xl text-violet-300">{selectedProfileLinksCount}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Legami</span>
                     </div>
                   </div>
 
