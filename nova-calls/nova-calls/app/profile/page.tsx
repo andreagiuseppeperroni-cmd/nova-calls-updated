@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Navbar, Button, Card } from '@/components/ui';
 import { NovaScoreCard, ProfileOrb, useNovaProfile } from '@/components/profile-store';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 function splitTags(value: string) {
   return value
@@ -14,10 +15,56 @@ function splitTags(value: string) {
 
 export default function ProfilePage() {
   const { profile, save, uploadAvatar, loading, syncError } = useNovaProfile();
+  const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [linksCount, setLinksCount] = useState(0);
+  const [linksLoading, setLinksLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLinksCount() {
+      setLinksLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!active) return;
+
+      if (!user) {
+        setLinksCount(0);
+        setLinksLoading(false);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from('user_links')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (!active) return;
+
+      if (error) {
+        setLocalError(error.message);
+        setLinksCount(0);
+      } else {
+        setLinksCount(count || 0);
+      }
+
+      setLinksLoading(false);
+    }
+
+    loadLinksCount();
+
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
 
   function update(field: keyof typeof profile, value: string) {
     save({ [field]: value });
@@ -108,7 +155,7 @@ export default function ProfilePage() {
             <Card className="p-6">
               <h2 className="text-2xl font-black">Contributi</h2>
 
-              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+              <div className="mt-5 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
                 <div className="rounded-2xl bg-white/5 p-4">
                   <b className="text-3xl text-cyan-300">{profile.contributions}</b>
                   <span className="mt-1 block text-xs font-bold text-slate-400">Messaggi utili</span>
@@ -122,6 +169,11 @@ export default function ProfilePage() {
                 <div className="rounded-2xl bg-white/5 p-4">
                   <b className="text-3xl text-pink-300">{profile.outcomesHelped}</b>
                   <span className="mt-1 block text-xs font-bold text-slate-400">Outcome</span>
+                </div>
+
+                <div className="rounded-2xl bg-white/5 p-4">
+                  <b className="text-3xl text-violet-300">{linksLoading ? '…' : linksCount}</b>
+                  <span className="mt-1 block text-xs font-bold text-slate-400">Legami</span>
                 </div>
               </div>
             </Card>
@@ -210,7 +262,7 @@ export default function ProfilePage() {
                   <div>
                     <h4 className="text-2xl font-black">{profile.displayName}</h4>
                     <p className="text-sm font-bold text-cyan-200">
-                      {profile.city} · {profile.score} punti Nova
+                      {profile.city} · {profile.score} punti Nova · {linksLoading ? '…' : linksCount} legami
                     </p>
                     <p className="mt-2 font-semibold leading-7 text-slate-300">{profile.bio}</p>
 
