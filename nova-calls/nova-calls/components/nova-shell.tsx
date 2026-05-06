@@ -449,25 +449,26 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
   setText(generatedText);
   setType(inferredType);
 }
-  function openThought() {
-    const title = text.trim() || 'Nuovo Spunto Nova';
 
-    const call: NovaCall = {
-      title,
-      description: 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
-      type,
-      accessType: 'public',
-      slug: makeSlug(title),
-      pulse: 12,
-      participants: 1,
-      createdAt: new Date().toISOString(),
-    };
+function openThought() {
+  const title = text.trim() || 'Nuovo Spunto Nova';
 
-    saveLocalThought(call);
-    window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
-  }
+  const call: NovaCall = {
+    title,
+    description: 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+    type,
+    accessType: 'public',
+    slug: makeSlug(title),
+    pulse: 12,
+    participants: 1,
+    createdAt: new Date().toISOString(),
+  };
 
-  const featured = liveThoughts[0] || null;
+  saveLocalThought(call);
+  window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
+}
+
+const featured = liveThoughts[0] || null;
 
   return (
     <div className="nova-preview">
