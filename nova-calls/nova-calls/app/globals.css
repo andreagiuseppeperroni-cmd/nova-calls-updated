@@ -1,19 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  --color-nova-bg: #030712;
-  --color-nova-panel: #07101f;
-  --color-nova-cyan: #22d3ee;
-  --color-nova-blue: #3b82f6;
-  --color-nova-violet: #8b5cf6;
-  --color-nova-pink: #ec4899;
-  --color-nova-coral: #fb7185;
-  --color-nova-lime: #bef264;
+  --color-nova-bg: #e7f8ff;
+  --color-nova-bg-soft: #f3fbff;
+  --color-nova-bg-end: #b8e4ff;
 
-  --shadow-nova: 0 24px 90px rgba(34, 211, 238, 0.16);
+  --color-nova-panel: #ffffff;
+  --color-nova-panel-blue: #d9f2ff;
+  --color-nova-deep: #15314f;
+  --color-nova-azure: #24557f;
+
+  --color-nova-cyan: #06b6d4;
+  --color-nova-blue: #2563eb;
+  --color-nova-violet: #7c3aed;
+  --color-nova-pink: #db2777;
+  --color-nova-coral: #fb7185;
+  --color-nova-lime: #a3e635;
+
+  --shadow-nova: 0 24px 90px rgba(37, 99, 235, 0.13);
 }
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: light;
+  --nova-text: #0f172a;
+  --nova-text-soft: #475569;
+  --nova-text-muted: #64748b;
+  --nova-border: rgba(148, 163, 184, 0.18);
+  --nova-glass: rgba(255, 255, 255, 0.74);
+  --nova-glass-strong: rgba(255, 255, 255, 0.86);
+  --nova-azure-glass: rgba(217, 242, 255, 0.72);
+}
 
 * { box-sizing: border-box; }
 
@@ -22,12 +38,19 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100vh;
-  color: white;
+  color: var(--nova-text);
   background:
-    radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.18), transparent 26%),
-    radial-gradient(circle at 85% 14%, rgba(236, 72, 153, 0.14), transparent 24%),
-    radial-gradient(circle at 10% 40%, rgba(139, 92, 246, 0.16), transparent 26%),
-    linear-gradient(180deg, #020617 0%, #050816 52%, #020617 100%);
+    radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.24), transparent 22%),
+    radial-gradient(circle at 84% 10%, rgba(124, 58, 237, 0.16), transparent 24%),
+    radial-gradient(circle at 72% 76%, rgba(219, 39, 119, 0.10), transparent 28%),
+    linear-gradient(
+      180deg,
+      #e7f8ff 0%,
+      #f3fbff 30%,
+      #d9f2ff 62%,
+      #c6eaff 84%,
+      #b8e4ff 100%
+    );
   font-family:
     Inter,
     ui-sans-serif,
@@ -44,12 +67,25 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(circle, rgba(255,255,255,.46) 0 1px, transparent 1px),
-    radial-gradient(circle, rgba(34,211,238,.42) 0 1px, transparent 1px);
-  background-size: 96px 96px, 153px 153px;
-  background-position: 12px 24px, 44px 74px;
-  opacity: .11;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 82%);
+    radial-gradient(circle, rgba(15, 23, 42, 0.16) 0 1px, transparent 1px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.55) 0 1px, transparent 1px);
+  background-size: 96px 96px, 164px 164px;
+  background-position: 18px 26px, 54px 80px;
+  opacity: 0.14;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 88%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto -20% -18% -20%;
+  height: 46vh;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(6, 182, 212, 0.28), transparent 58%),
+    radial-gradient(ellipse at 72% 80%, rgba(37, 99, 235, 0.16), transparent 48%);
+  filter: blur(28px);
+  opacity: 0.85;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -58,25 +94,98 @@ button, input, textarea, select { font: inherit; }
 
 button { cursor: pointer; }
 
+input,
+textarea,
+select {
+  color: #0f172a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(100, 116, 139, 0.78);
+}
+
 .nova-glass {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(11, 18, 41, 0.78), rgba(5, 10, 27, 0.7));
-  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  background:
+    radial-gradient(circle at 80% 0%, rgba(6, 182, 212, 0.10), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(223, 246, 255, 0.66));
+  box-shadow: 0 24px 90px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(24px) saturate(1.22);
+  color: #0f172a;
+}
+
+.nova-glass-dark {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background:
+    radial-gradient(circle at 15% 0%, rgba(6, 182, 212, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 10%, rgba(124, 58, 237, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(43, 93, 134, 0.90), rgba(57, 116, 163, 0.88));
+  box-shadow: 0 24px 80px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(24px) saturate(1.2);
+  color: #eff6ff;
 }
 
 .nova-text {
-  background: linear-gradient(90deg, #22d3ee, #60a5fa, #a78bfa, #ec4899);
+  background: linear-gradient(90deg, #06b6d4, #2563eb, #7c3aed, #db2777);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .nova-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  background:
+    radial-gradient(circle at 82% 0%, rgba(6, 182, 212, 0.08), transparent 30%),
+    rgba(255, 255, 255, 0.76);
+  box-shadow: 0 22px 74px rgba(37, 99, 235, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(24px) saturate(1.18);
+  color: #0f172a;
+}
+
+.shadow-nova {
+  box-shadow: 0 24px 90px rgba(37, 99, 235, 0.13);
+}
+
+.text-slate-300 {
+  color: #475569 !important;
+}
+
+.text-slate-400 {
+  color: #64748b !important;
+}
+
+.text-slate-500 {
+  color: #718096 !important;
+}
+
+.text-white {
+  color: #0f172a !important;
+}
+
+.bg-white\/5 {
+  background-color: rgba(255, 255, 255, 0.48) !important;
+}
+
+.bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.bg-slate-950\/55,
+.bg-slate-950\/60,
+.bg-slate-950\/70,
+.bg-slate-950\/80,
+.bg-slate-950\/85 {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.border-white\/10,
+.border-white\/15 {
+  border-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+.placeholder\:text-white\/35::placeholder {
+  color: rgba(100, 116, 139, 0.74) !important;
 }
 
 .line-clamp-2 {
