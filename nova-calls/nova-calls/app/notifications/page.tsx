@@ -6,33 +6,22 @@ import { useRouter } from 'next/navigation';
 import { Navbar, Button, Card } from '@/components/ui';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
-type LinkRequest = {
+type UserLink = {
   id: string;
   requester_id: string;
   receiver_id: string;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
-  requester?: {
-    full_name: string | null;
-    avatar_url: string | null;
-    city: string | null;
-    bio: string | null;
-    nova_points: number | null;
-  } | null;
+  updated_at?: string | null;
 };
 
-type SentLink = {
+type Profile = {
   id: string;
-  requester_id: string;
-  receiver_id: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  receiver?: {
-    full_name: string | null;
-    avatar_url: string | null;
-    city: string | null;
-    nova_points: number | null;
-  } | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  bio: string | null;
+  nova_points: number | null;
 };
 
 function initials(name: string) {
@@ -65,11 +54,39 @@ export default function Page() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [received, setReceived] = useState<LinkRequest[]>([]);
-  const [sent, setSent] = useState<SentLink[]>([]);
+  const [received, setReceived] = useState<UserLink[]>([]);
+  const [sent, setSent] = useState<UserLink[]>([]);
+  const [profilesById, setProfilesById] = useState<Record<string, Profile>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadProfiles(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
+
+    if (uniqueIds.length === 0) {
+      setProfilesById({});
+      return;
+    }
+
+    const { data, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, city, bio, nova_points')
+      .in('id', uniqueIds);
+
+    if (profilesError) {
+      setError(`Legami caricati, ma non riesco a leggere alcuni profili: ${profilesError.message}`);
+      setProfilesById({});
+      return;
+    }
+
+    const nextMap: Record<string, Profile> = {};
+    ((data || []) as Profile[]).forEach((profile) => {
+      nextMap[profile.id] = profile;
+    });
+
+    setProfilesById(nextMap);
+  }
 
   async function loadNotifications(currentUserId?: string) {
     const uid = currentUserId || userId;
@@ -80,43 +97,14 @@ export default function Page() {
 
     const { data: receivedData, error: receivedError } = await supabase
       .from('user_links')
-      .select(
-        `
-        id,
-        requester_id,
-        receiver_id,
-        status,
-        created_at,
-        requester:profiles!user_links_requester_id_fkey (
-          full_name,
-          avatar_url,
-          city,
-          bio,
-          nova_points
-        )
-      `
-      )
+      .select('id, requester_id, receiver_id, status, created_at, updated_at')
       .eq('receiver_id', uid)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     const { data: sentData, error: sentError } = await supabase
       .from('user_links')
-      .select(
-        `
-        id,
-        requester_id,
-        receiver_id,
-        status,
-        created_at,
-        receiver:profiles!user_links_receiver_id_fkey (
-          full_name,
-          avatar_url,
-          city,
-          nova_points
-        )
-      `
-      )
+      .select('id, requester_id, receiver_id, status, created_at, updated_at')
       .eq('requester_id', uid)
       .in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: false })
@@ -126,10 +114,21 @@ export default function Page() {
       setError(receivedError?.message || sentError?.message || 'Impossibile caricare le notifiche.');
       setReceived([]);
       setSent([]);
-    } else {
-      setReceived((receivedData || []) as LinkRequest[]);
-      setSent((sentData || []) as SentLink[]);
+      setProfilesById({});
+      setLoading(false);
+      return;
     }
+
+    const nextReceived = (receivedData || []) as UserLink[];
+    const nextSent = (sentData || []) as UserLink[];
+
+    setReceived(nextReceived);
+    setSent(nextSent);
+
+    await loadProfiles([
+      ...nextReceived.map((link) => link.requester_id),
+      ...nextSent.map((link) => link.receiver_id),
+    ]);
 
     setLoading(false);
   }
@@ -274,7 +273,7 @@ export default function Page() {
             {!loading && received.length > 0 && (
               <div className="mt-6 grid gap-4">
                 {received.map((request) => {
-                  const profile = request.requester;
+                  const profile = profilesById[request.requester_id];
                   const name = profile?.full_name || 'Utente Nova';
                   const avatar = profile?.avatar_url || '';
 
@@ -346,7 +345,7 @@ export default function Page() {
               )}
 
               {sent.map((link) => {
-                const profile = link.receiver;
+                const profile = profilesById[link.receiver_id];
                 const name = profile?.full_name || 'Utente Nova';
 
                 return (
