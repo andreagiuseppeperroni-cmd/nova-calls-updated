@@ -55,9 +55,6 @@ type UserLinkRow = {
   status: 'pending' | 'accepted' | 'rejected';
 };
 
-const starterMessages: Message[] = [];
-
-
 function readCall(slug: string) {
   if (typeof window === 'undefined') return undefined;
 
@@ -280,9 +277,7 @@ export function CallRoom({ slug }: { slug: string }) {
   const echo = useMemo(() => {
     const userMessages = messages.filter((message) => message.kind !== 'ai' && message.kind !== 'system');
 
-    if (userMessages.length < 2) {
-      return null;
-    }
+    if (userMessages.length < 2) return null;
 
     const allText = userMessages.map((message) => message.text).join(' ').toLowerCase();
 
@@ -472,7 +467,7 @@ export function CallRoom({ slug }: { slug: string }) {
   async function joinCall() {
     if (joined) return;
 
-    const ok = await insertSharedMessage(`${getUserName(user)} è entrato/a nella Call.`);
+    const ok = await insertSharedMessage(`${getUserName(user)} è entrato/a nello Spunto.`);
     if (!ok) return;
 
     addNovaContribution(5, 'callsJoined');
@@ -503,7 +498,7 @@ export function CallRoom({ slug }: { slug: string }) {
       `Decisione proposta: ${
         call?.type === 'Decidere'
           ? 'scegli una prova reversibile entro 14 giorni'
-          : 'trasforma la Call in tre prossime azioni'
+          : 'trasforma lo Spunto in tre prossime azioni'
       }. Step: 1) definisci il vincolo più forte, 2) chiedi feedback a due persone esperte, 3) fissa una scadenza chiara.`
     );
   }
@@ -516,26 +511,26 @@ export function CallRoom({ slug }: { slug: string }) {
 
   if (!call || !authReady) {
     return (
-      <main className="grid min-h-screen place-items-center px-4 text-white">
-        <div className="nova-glass rounded-[2rem] p-7 text-center">
-          <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-200/70">NOVA</p>
-          <h1 className="mt-3 text-3xl font-black">Accesso alla Call…</h1>
-          <p className="mt-3 font-semibold text-slate-300">Se non sei loggato, ti porto alla pagina di login.</p>
+      <main className="grid min-h-screen place-items-center px-4 text-slate-950">
+        <div className="rounded-[2rem] border border-white/70 bg-white/80 p-7 text-center shadow-[0_24px_70px_rgba(37,99,235,.14)] backdrop-blur-2xl">
+          <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-700">NOVA</p>
+          <h1 className="mt-3 text-3xl font-black">Accesso allo Spunto…</h1>
+          <p className="mt-3 font-semibold text-slate-600">Se non sei loggato, ti porto alla pagina di login.</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white md:px-7">
+    <main className="min-h-screen px-4 py-6 text-slate-950 md:px-7">
       <div className="mx-auto flex w-[min(1180px,100%)] items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 text-xl font-black tracking-[.18em]">
+        <Link href="/" className="flex items-center gap-3 text-xl font-black tracking-[.18em] text-slate-950">
           NOVA
         </Link>
 
         <div className="flex items-center gap-3">
-          <Link href="/calls/new" className="rounded-full bg-lime-300 px-5 py-3 text-sm font-black text-slate-950">
-            ＋ Apri Call
+          <Link href="/calls/new" className="rounded-full bg-lime-300 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_14px_30px_rgba(132,204,22,.22)]">
+            ＋ Apri Spunto
           </Link>
           <ProfileOrb className="h-11 w-11" />
         </div>
@@ -543,107 +538,119 @@ export function CallRoom({ slug }: { slug: string }) {
 
       <section className="mx-auto mt-8 grid w-[min(1180px,100%)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
-          <header className="nova-glass overflow-hidden rounded-[2rem] p-6">
+          <header className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/78 p-6 text-slate-950 shadow-[0_24px_70px_rgba(37,99,235,.12)] backdrop-blur-2xl">
             <div className="mb-5 inline-flex rounded-full bg-lime-300 px-4 py-2 text-sm font-black text-slate-950">
-              ● Call live
+              ● Spunto live
             </div>
 
-            <h1 className="max-w-4xl text-5xl font-black leading-[.95] tracking-[-.06em] md:text-7xl">
+            <h1 className="max-w-4xl text-5xl font-black leading-[.95] tracking-[-.06em] text-slate-950 md:text-7xl">
               {call.title}
             </h1>
 
-            <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-300">{call.description}</p>
+            <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-700">{call.description}</p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 onClick={joinCall}
                 className={`rounded-full px-5 py-3 text-sm font-black ${
-                  joined ? 'bg-emerald-300 text-slate-950' : 'border border-white/15 bg-white/10'
+                  joined
+                    ? 'bg-emerald-300 text-slate-950'
+                    : 'border border-slate-950/10 bg-white/70 text-slate-800 hover:bg-white'
                 }`}
               >
-                {joined ? 'Dentro la Call' : 'Entra nella Call'}
+                {joined ? 'Dentro lo Spunto' : 'Entra nello Spunto'}
               </button>
 
-              <button onClick={reactToCall} className="rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black">
+              <button
+                onClick={reactToCall}
+                className="rounded-full border border-slate-950/10 bg-white/70 px-5 py-3 text-sm font-black text-slate-800 hover:bg-white"
+              >
                 ☆ Reagisci
               </button>
 
-              <button onClick={generateOutcome} className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-300 px-5 py-3 text-sm font-black">
+              <button
+                onClick={generateOutcome}
+                className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-300 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(6,182,212,.22)]"
+              >
                 Genera Outcome
               </button>
             </div>
           </header>
 
-          <section className="nova-glass rounded-[2rem] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-black">▱ Chat della Call</h2>
-              <span className="text-sm font-bold text-slate-300">
+          <section className="rounded-[2rem] border border-white/70 bg-white/86 p-5 text-slate-950 shadow-[0_24px_70px_rgba(37,99,235,.12)] backdrop-blur-2xl">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-black text-slate-950">▱ Chat dello Spunto</h2>
+              <span className="rounded-full bg-slate-950/5 px-3 py-1 text-sm font-black text-slate-700">
                 {loadingMessages ? 'Sincronizzo…' : `${messages.length} messaggi`}
               </span>
             </div>
 
             {roomError && (
-              <div className="mb-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-100">
+              <div className="mb-4 rounded-2xl border border-rose-300/40 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">
                 {roomError}
               </div>
             )}
 
             <div className="space-y-3">
               {!loadingMessages && messages.length === 0 && (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <div className="rounded-2xl border border-slate-950/10 bg-white/78 p-6 text-center text-slate-950 shadow-[0_12px_30px_rgba(15,23,42,.06)]">
                   <h3 className="text-xl font-black">La chat è vuota</h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                     Inizia tu la conversazione. Echo interverrà solo se rileva qualcosa di importante.
                   </p>
                 </div>
               )}
 
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`rounded-2xl border p-4 ${
-                    message.kind === 'ai'
-                      ? 'border-cyan-300/25 bg-cyan-300/10'
-                      : message.kind === 'host'
-                        ? 'border-violet-300/20 bg-violet-300/10'
-                        : message.text.includes('è entrato/a nella Call.')
-                          ? 'border-lime-300/20 bg-lime-300/10'
-                          : 'border-white/10 bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openProfileFromMessage(message)}
-                      className="group relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-white/10 text-xs font-black outline-none ring-0 transition hover:scale-105 hover:ring-4 hover:ring-cyan-300/20"
-                      title={`Vedi profilo di ${message.author}`}
-                    >
-                      {message.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={message.avatar} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{initials(message.author)}</span>
-                      )}
-                    </button>
+              {messages.map((message) => {
+                const isSystemJoin = message.text.includes('è entrato/a nello Spunto.') || message.text.includes('è entrato/a nella Call.');
 
-                    <button type="button" onClick={() => openProfileFromMessage(message)} className="text-left">
-                      <div className="text-xs font-black uppercase tracking-wide text-white/45 hover:text-cyan-200">
-                        {message.author}
-                      </div>
-                      {message.createdAt && (
-                        <div className="text-[11px] font-bold text-white/30">
-                          {new Date(message.createdAt).toLocaleTimeString('it-IT', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                return (
+                  <div
+                    key={message.id}
+                    className={`rounded-2xl border p-4 text-slate-950 shadow-[0_12px_30px_rgba(15,23,42,.06)] ${
+                      message.kind === 'ai'
+                        ? 'border-cyan-300/45 bg-cyan-50'
+                        : message.kind === 'host'
+                          ? 'border-violet-300/45 bg-violet-50'
+                          : isSystemJoin
+                            ? 'border-lime-300/50 bg-lime-50'
+                            : 'border-slate-950/10 bg-white/82'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openProfileFromMessage(message)}
+                        className="group relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-950/10 bg-white text-xs font-black text-slate-950 outline-none ring-0 transition hover:scale-105 hover:ring-4 hover:ring-cyan-300/25"
+                        title={`Vedi profilo di ${message.author}`}
+                      >
+                        {message.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={message.avatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span>{initials(message.author)}</span>
+                        )}
+                      </button>
+
+                      <button type="button" onClick={() => openProfileFromMessage(message)} className="text-left">
+                        <div className="text-xs font-black uppercase tracking-wide text-slate-700 hover:text-cyan-700">
+                          {message.author}
                         </div>
-                      )}
-                    </button>
-                  </div>
+                        {message.createdAt && (
+                          <div className="text-[11px] font-bold text-slate-500">
+                            {new Date(message.createdAt).toLocaleTimeString('it-IT', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        )}
+                      </button>
+                    </div>
 
-                  <p className="mt-3 font-semibold leading-7 text-slate-100">{message.text}</p>
-                </div>
-              ))}
+                    <p className="mt-3 font-semibold leading-7 text-slate-800">{message.text}</p>
+                  </div>
+                );
+              })}
             </div>
 
             <form onSubmit={sendMessage} className="mt-4 flex gap-3">
@@ -651,19 +658,21 @@ export function CallRoom({ slug }: { slug: string }) {
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder="Aggiungi un contributo..."
-                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 font-bold outline-none placeholder:text-white/35"
+                className="min-w-0 flex-1 rounded-2xl border border-slate-950/12 bg-white/95 px-5 py-4 font-bold text-slate-950 outline-none placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-300/20"
               />
-              <button className="rounded-2xl bg-lime-300 px-5 py-4 font-black text-slate-950">Invia</button>
+              <button className="rounded-2xl bg-lime-300 px-5 py-4 font-black text-slate-950 shadow-[0_14px_30px_rgba(132,204,22,.22)]">
+                Invia
+              </button>
             </form>
           </section>
         </div>
 
         <aside className="space-y-5">
-          <div className="nova-glass rounded-[2rem] p-5">
-            <h3 className="text-xl font-black">〽 Pulse</h3>
+          <div className="rounded-[2rem] border border-white/70 bg-white/82 p-5 text-slate-950 shadow-[0_24px_70px_rgba(37,99,235,.12)] backdrop-blur-2xl">
+            <h3 className="text-xl font-black text-slate-950">〽 Pulse</h3>
             <div className="mt-5 grid place-items-center">
               <div className="grid h-40 w-40 place-items-center rounded-full bg-[conic-gradient(from_-20deg,#22d3ee,#bef264,#ec4899,#22d3ee)] p-3">
-                <div className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-center text-4xl font-black">
+                <div className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-center text-4xl font-black text-white">
                   {pulse}
                   <span className="block text-xs text-slate-300">
                     {pulse >= 85 ? 'Altissima' : pulse >= 65 ? 'Alta' : pulse >= 35 ? 'Media' : 'In partenza'}
@@ -671,25 +680,25 @@ export function CallRoom({ slug }: { slug: string }) {
                 </div>
               </div>
             </div>
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-300">
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">
               Calcolato da messaggi, partecipazione e reazioni nella stanza.
             </p>
           </div>
 
-          <div className="nova-glass rounded-[2rem] p-5">
-            <h3 className="text-xl font-black">⌁ Echo</h3>
+          <div className="rounded-[2rem] border border-white/70 bg-white/82 p-5 text-slate-950 shadow-[0_24px_70px_rgba(37,99,235,.12)] backdrop-blur-2xl">
+            <h3 className="text-xl font-black text-slate-950">⌁ Echo</h3>
             {echo ? (
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{echo}</p>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">{echo}</p>
             ) : (
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-400">
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
                 Echo resta in ascolto e interviene solo quando rileva un segnale importante nella chat.
               </p>
             )}
           </div>
 
-          <div className="nova-glass rounded-[2rem] p-5">
-            <h3 className="text-xl font-black">◇ Outcome</h3>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">
+          <div className="rounded-[2rem] border border-white/70 bg-white/82 p-5 text-slate-950 shadow-[0_24px_70px_rgba(37,99,235,.12)] backdrop-blur-2xl">
+            <h3 className="text-xl font-black text-slate-950">◇ Outcome</h3>
+            <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
               {outcome || 'Quando la stanza è pronta, genera una sintesi con decisione, motivazione e prossime azioni.'}
             </p>
           </div>
@@ -697,9 +706,9 @@ export function CallRoom({ slug }: { slug: string }) {
       </section>
 
       {(profileFallback || profileLoading) && (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/75 px-4 backdrop-blur-xl">
-          <div className="relative w-[min(580px,100%)] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 p-6 shadow-[0_0_60px_rgba(34,211,238,.22)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(34,211,238,.2),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(236,72,153,.16),transparent_30%)]" />
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/55 px-4 backdrop-blur-xl">
+          <div className="relative w-[min(580px,100%)] overflow-hidden rounded-[2rem] border border-white/70 bg-white p-6 text-slate-950 shadow-[0_0_60px_rgba(37,99,235,.22)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(34,211,238,.16),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(236,72,153,.10),transparent_30%)]" />
 
             <div className="relative z-10">
               <button
@@ -713,7 +722,7 @@ export function CallRoom({ slug }: { slug: string }) {
                   setLinkMessage(null);
                   setSelectedProfileLinksCount(0);
                 }}
-                className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/10 text-xl font-black hover:bg-white/15"
+                className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full border border-slate-950/10 bg-slate-950/5 text-xl font-black text-slate-950 hover:bg-slate-950/10"
                 aria-label="Chiudi profilo"
               >
                 ×
@@ -721,13 +730,13 @@ export function CallRoom({ slug }: { slug: string }) {
 
               {profileLoading ? (
                 <div className="py-16 text-center">
-                  <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-200/75">Profilo Nova</p>
-                  <h3 className="mt-3 text-3xl font-black">Carico profilo…</h3>
+                  <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-700">Profilo Nova</p>
+                  <h3 className="mt-3 text-3xl font-black text-slate-950">Carico profilo…</h3>
                 </div>
               ) : (
                 <>
                   <div className="flex items-start gap-5 pr-12">
-                    <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[radial-gradient(circle_at_30%_20%,#f8b4ff,#7c3aed_38%,#0f172a_70%)] text-xl font-black">
+                    <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-950/10 bg-[radial-gradient(circle_at_30%_20%,#f8b4ff,#7c3aed_38%,#bae6fd_70%)] text-xl font-black text-white">
                       {profileAvatar ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={profileAvatar} alt="" className="h-full w-full object-cover" />
@@ -737,28 +746,28 @@ export function CallRoom({ slug }: { slug: string }) {
                     </div>
 
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[.24em] text-cyan-200/75">Profilo pubblico</p>
-                      <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-.04em]">{profileName}</h3>
-                      <p className="mt-1 text-sm font-bold text-cyan-200">
+                      <p className="text-xs font-black uppercase tracking-[.24em] text-cyan-700">Profilo pubblico</p>
+                      <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-.04em] text-slate-950">{profileName}</h3>
+                      <p className="mt-1 text-sm font-bold text-cyan-700">
                         {selectedProfile?.city || 'NOVA'} · {selectedProfile?.nova_points || 0} punti Nova · {selectedProfileLinksCount} legami
                       </p>
                     </div>
                   </div>
 
                   {profileError && (
-                    <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100">
+                    <div className="mt-5 rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
                       {profileError}
                     </div>
                   )}
 
-                  <p className="mt-5 font-semibold leading-7 text-slate-300">
+                  <p className="mt-5 font-semibold leading-7 text-slate-700">
                     {selectedProfile?.bio || 'Questo utente non ha ancora completato la biografia del profilo.'}
                   </p>
 
                   {profileTags.length > 0 && (
                     <div className="mt-5 flex flex-wrap gap-2">
                       {profileTags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-200">
+                        <span key={tag} className="rounded-full bg-slate-950/6 px-3 py-1 text-xs font-black text-slate-700">
                           {tag}
                         </span>
                       ))}
@@ -766,26 +775,26 @@ export function CallRoom({ slug }: { slug: string }) {
                   )}
 
                   <div className="mt-6 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <b className="text-2xl text-cyan-300">{selectedProfile?.contributions || 0}</b>
-                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Messaggi utili</span>
+                    <div className="rounded-2xl border border-slate-950/10 bg-white/70 p-4">
+                      <b className="text-2xl text-cyan-700">{selectedProfile?.contributions || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-600">Messaggi utili</span>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <b className="text-2xl text-lime-300">{selectedProfile?.calls_joined || 0}</b>
-                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Call entrate</span>
+                    <div className="rounded-2xl border border-slate-950/10 bg-white/70 p-4">
+                      <b className="text-2xl text-lime-700">{selectedProfile?.calls_joined || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-600">Spunti entrati</span>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <b className="text-2xl text-pink-300">{selectedProfile?.outcomes_helped || 0}</b>
-                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Outcome</span>
+                    <div className="rounded-2xl border border-slate-950/10 bg-white/70 p-4">
+                      <b className="text-2xl text-pink-600">{selectedProfile?.outcomes_helped || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-600">Outcome</span>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <b className="text-2xl text-violet-300">{selectedProfileLinksCount}</b>
-                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Legami</span>
+                    <div className="rounded-2xl border border-slate-950/10 bg-white/70 p-4">
+                      <b className="text-2xl text-violet-600">{selectedProfileLinksCount}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-600">Legami</span>
                     </div>
                   </div>
 
                   {selectedProfile && user?.id !== selectedProfile.id && (
-                    <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                    <div className="mt-6 rounded-[1.5rem] border border-slate-950/10 bg-slate-950/5 p-4">
                       <p className="text-xs font-black uppercase tracking-[.2em] text-slate-500">Legame personale</p>
 
                       {canRequestLink && (
@@ -800,13 +809,13 @@ export function CallRoom({ slug }: { slug: string }) {
                       )}
 
                       {linkStatus === 'pending_sent' && (
-                        <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100">
+                        <div className="mt-3 rounded-2xl border border-cyan-300/40 bg-cyan-50 px-4 py-3 text-sm font-bold text-cyan-900">
                           Richiesta inviata. Quando l&apos;altra persona accetta, si sbloccherà la chat privata.
                         </div>
                       )}
 
                       {linkStatus === 'pending_received' && (
-                        <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100">
+                        <div className="mt-3 rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
                           Questa persona ti ha già inviato una richiesta. Vai in Notifiche per accettarla o rifiutarla.
                         </div>
                       )}
@@ -821,14 +830,12 @@ export function CallRoom({ slug }: { slug: string }) {
                       )}
 
                       {linkStatus === 'rejected' && (
-                        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-300">
+                        <div className="mt-3 rounded-2xl border border-slate-950/10 bg-white/70 px-4 py-3 text-sm font-bold text-slate-700">
                           Questo legame non è attivo.
                         </div>
                       )}
 
-                      {linkMessage && (
-                        <p className="mt-3 text-sm font-bold text-slate-300">{linkMessage}</p>
-                      )}
+                      {linkMessage && <p className="mt-3 text-sm font-bold text-slate-700">{linkMessage}</p>}
                     </div>
                   )}
 
