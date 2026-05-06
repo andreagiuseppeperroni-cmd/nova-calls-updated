@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Button, Card } from '@/components/ui';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 type Mode = 'login' | 'signup';
 
@@ -12,10 +12,25 @@ function getSiteUrl() {
   return process.env.NEXT_PUBLIC_SITE_URL || '';
 }
 
+function getSafeNext(value: string | null) {
+  if (!value) return '/';
+
+  try {
+    const decoded = decodeURIComponent(value);
+
+    if (!decoded.startsWith('/')) return '/';
+    if (decoded.startsWith('//')) return '/';
+
+    return decoded;
+  } catch {
+    return '/';
+  }
+}
+
 export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -25,7 +40,25 @@ export function AuthForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const next = searchParams.get('next') || '/dashboard';
+  const next = getSafeNext(searchParams.get('next'));
+
+  async function goToNext() {
+    /*
+      Lasciamo a Supabase un istante per salvare la sessione nel browser.
+      Senza questo piccolo passaggio, la Call può leggere "nessun utente"
+      e rimandare subito a /login anche dopo un login corretto.
+    */
+    await supabase.auth.getSession();
+
+    router.replace(next);
+    router.refresh();
+
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.location.href = next;
+      }
+    }, 150);
+  }
 
   async function handleEmailAuth(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +68,7 @@ export function AuthForm() {
 
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -46,14 +79,23 @@ export function AuthForm() {
 
         if (error) throw error;
 
+        /*
+          Se Supabase non richiede conferma email, signUp restituisce già una sessione.
+          In quel caso mandiamo subito l'utente alla pagina richiesta.
+        */
+        if (data.session) {
+          await goToNext();
+          return;
+        }
+
         setMessage(
-          'Registrazione avviata. Se Supabase richiede conferma email, controlla la posta; altrimenti puoi entrare subito.'
+          'Registrazione avviata. Se Supabase richiede conferma email, controlla la posta e poi rientra da questo link.'
         );
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.replace(next);
-        router.refresh();
+
+        await goToNext();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore durante l’autenticazione.');
@@ -106,9 +148,15 @@ export function AuthForm() {
           {mode === 'login' ? 'Accedi a Nova' : 'Crea il tuo profilo'}
         </h1>
         <p className="mt-3 font-semibold leading-7 text-slate-300">
-          Entra per salvare le Call, ritrovare gli Outcome e collegare il tuo network.
+          Entra per partecipare alle Call, salvare gli Outcome e contribuire alla stanza.
         </p>
       </div>
+
+      {next !== '/' && (
+        <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-50">
+          Dopo il login tornerai automaticamente alla Call.
+        </div>
+      )}
 
       <div className="mt-7 grid grid-cols-2 rounded-full border border-white/10 bg-white/5 p-1">
         <button
@@ -139,6 +187,7 @@ export function AuthForm() {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               placeholder="Giulia Rossi"
+              autoComplete="name"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4 font-semibold text-white outline-none ring-cyan-300/0 transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
             />
           </label>
@@ -152,6 +201,7 @@ export function AuthForm() {
             type="email"
             required
             placeholder="tu@email.com"
+            autoComplete="email"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4 font-semibold text-white outline-none ring-cyan-300/0 transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
           />
         </label>
@@ -165,6 +215,7 @@ export function AuthForm() {
             required
             minLength={6}
             placeholder="Minimo 6 caratteri"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4 font-semibold text-white outline-none ring-cyan-300/0 transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
           />
         </label>
@@ -202,7 +253,7 @@ export function AuthForm() {
       </div>
 
       <p className="mt-5 text-center text-xs font-semibold leading-6 text-slate-400">
-        Per Google e magic link devi configurare i Redirect URL in Supabase. Login email/password funziona appena abiliti Auth e variabili ambiente.
+        Per Google e magic link devi configurare i Redirect URL in Supabase. Email e password usano la sessione del browser.
       </p>
     </Card>
   );
