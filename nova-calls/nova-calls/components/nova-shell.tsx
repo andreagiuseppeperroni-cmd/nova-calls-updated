@@ -243,11 +243,16 @@ function getThoughtTypeIcon(item: string) {
 }
 
 export function NovaHome() {
-  const supabase = useMemo(() => createBrowserSupabase(), []);
   const [text, setText] = useState('');
-  const [type, setType] = useState('Decidere');
-  const [attachmentName, setAttachmentName] = useState('');
-  const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
+const [type, setType] = useState('Decidere');
+const [attachmentName, setAttachmentName] = useState('');
+const [aiStep, setAiStep] = useState(0);
+const [aiAnswers, setAiAnswers] = useState({
+  situation: '',
+  block: '',
+  desiredOutcome: '',
+});
+const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [avgPulse, setAvgPulse] = useState(0);
   const [trendEchoes, setTrendEchoes] = useState<TrendEcho[]>([]);
@@ -343,7 +348,107 @@ async function closeThoughtEarly(slug: string) {
     setClosingSlug(null);
   }
 }
+const aiQuestions = [
+  {
+    key: 'situation',
+    label: 'Che cosa sta succedendo?',
+    placeholder: 'Esempio: sto valutando se cambiare lavoro, città o progetto...',
+  },
+  {
+    key: 'block',
+    label: 'Qual è il nodo che ti blocca di più?',
+    placeholder: 'Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...',
+  },
+  {
+    key: 'desiredOutcome',
+    label: 'Che tipo di aiuto vorresti ricevere dalla rete?',
+    placeholder: 'Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...',
+  },
+] as const;
 
+function inferThoughtType(value: string) {
+  const normalized = normalizeText(value);
+
+  if (
+    normalized.includes('decid') ||
+    normalized.includes('scelta') ||
+    normalized.includes('scegliere') ||
+    normalized.includes('dubbio')
+  ) {
+    return 'Decidere';
+  }
+
+  if (
+    normalized.includes('feedback') ||
+    normalized.includes('opinione') ||
+    normalized.includes('parere')
+  ) {
+    return 'Feedback';
+  }
+
+  if (
+    normalized.includes('persone') ||
+    normalized.includes('network') ||
+    normalized.includes('contatti') ||
+    normalized.includes('conoscere')
+  ) {
+    return 'Trovare persone';
+  }
+
+  if (
+    normalized.includes('subito') ||
+    normalized.includes('oggi') ||
+    normalized.includes('urgente') ||
+    normalized.includes('ora')
+  ) {
+    return 'Fare ora';
+  }
+
+  if (
+    normalized.includes('creare') ||
+    normalized.includes('costruire') ||
+    normalized.includes('progetto') ||
+    normalized.includes('idea')
+  ) {
+    return 'Creare insieme';
+  }
+
+  return 'Capire';
+}
+
+function updateAiAnswer(key: keyof typeof aiAnswers, value: string) {
+  setAiAnswers((current) => ({
+    ...current,
+    [key]: value,
+  }));
+}
+
+function buildAiThought() {
+  const situation = aiAnswers.situation.trim();
+  const block = aiAnswers.block.trim();
+  const desiredOutcome = aiAnswers.desiredOutcome.trim();
+
+  const fullText = `${situation} ${block} ${desiredOutcome}`.trim();
+
+  if (!situation || !block || !desiredOutcome) {
+    alert('Rispondi alle tre domande per generare uno Spunto.');
+    return;
+  }
+
+  const inferredType = inferThoughtType(fullText);
+
+  const generatedTitle =
+    situation.length > 82 ? `${situation.slice(0, 79).trim()}...` : situation;
+
+  const generatedText = `${generatedTitle}
+
+Nodo principale: ${block}
+
+Aiuto che cerco dalla rete: ${desiredOutcome}`;
+
+  setText(generatedText);
+  setType(inferredType);
+}
   function openThought() {
     const title = text.trim() || 'Nuovo Spunto Nova';
 
@@ -377,15 +482,92 @@ async function closeThoughtEarly(slug: string) {
           </h1>
           <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
 
-          <div className="composer">
-            <div className="composer-content">
-              <textarea
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                placeholder="Racconta il tuo Spunto..."
-                rows={3}
-                className="composer-input"
-              />
+          <div className="composer ai-composer">
+  <div className="composer-content">
+    <div className="ai-builder-head">
+      <div>
+        <p className="ai-eyebrow">AI Spunto Builder</p>
+        <h2>Ti aiuto a trasformare un pensiero in uno Spunto</h2>
+      </div>
+
+      <span className="ai-step-pill">
+        {aiStep + 1}/{aiQuestions.length}
+      </span>
+    </div>
+
+    <div className="ai-question-box">
+      <label className="ai-question-label">{aiQuestions[aiStep].label}</label>
+
+      <textarea
+        value={aiAnswers[aiQuestions[aiStep].key]}
+        onChange={(event) => updateAiAnswer(aiQuestions[aiStep].key, event.target.value)}
+        placeholder={aiQuestions[aiStep].placeholder}
+        rows={3}
+        className="composer-input ai-input"
+      />
+    </div>
+
+    <div className="composer-actions ai-actions">
+      <button
+        type="button"
+        onClick={() => setAiStep((value) => Math.max(0, value - 1))}
+        className="mini-pill"
+        disabled={aiStep === 0}
+      >
+        ← Indietro
+      </button>
+
+      {aiStep < aiQuestions.length - 1 ? (
+        <button
+          type="button"
+          onClick={() => setAiStep((value) => Math.min(aiQuestions.length - 1, value + 1))}
+          className="mini-pill ai-primary-pill"
+        >
+          Continua →
+        </button>
+      ) : (
+        <button type="button" onClick={buildAiThought} className="mini-pill ai-primary-pill">
+          Genera Spunto
+        </button>
+      )}
+
+      <label className="mini-pill attachment-pill">
+        ⌘ {attachmentName || 'Allega'}
+        <input
+          type="file"
+          className="hidden-file"
+          onChange={(event) => setAttachmentName(event.target.files?.[0]?.name || '')}
+        />
+      </label>
+
+      <button
+        type="button"
+        onClick={() => setType(type === 'Anonima' ? 'Decidere' : 'Anonima')}
+        className="mini-pill anon-pill"
+      >
+        ◒ Anonima
+      </button>
+    </div>
+  </div>
+
+  <button type="button" onClick={openThought} className="mic ai-open-button">
+    ✦
+  </button>
+</div>
+
+{text && (
+  <div className="ai-preview glass">
+    <div>
+      <p className="ai-eyebrow">Spunto generato</p>
+      <h3>{text.split('\n')[0]}</h3>
+      <p>{text}</p>
+    </div>
+
+    <button type="button" onClick={openThought} className="ai-open-cta">
+      Apri lo Spunto →
+    </button>
+  </div>
+)}
 
               <div className="composer-actions">
                 <button type="button" onClick={openThought} className="circle-plus">
@@ -760,7 +942,136 @@ async function closeThoughtEarly(slug: string) {
             rgba(255,255,255,.84);
           box-shadow: 0 0 28px rgba(6,182,212,.10), 0 18px 45px rgba(37,99,235,.08);
         }
+.ai-composer {
+  height: auto;
+  min-height: 238px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(56,214,255,.26), transparent 28%),
+    radial-gradient(circle at 78% 38%, rgba(219,39,119,.12), transparent 32%),
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,249,255,.84));
+}
 
+.ai-builder-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.ai-eyebrow {
+  margin: 0 0 6px;
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.ai-builder-head h2 {
+  margin: 0;
+  max-width: 680px;
+  color: #10213a;
+  font-size: clamp(24px, 2.2vw, 38px);
+  line-height: 1;
+  letter-spacing: -.045em;
+  font-weight: 950;
+}
+
+.ai-step-pill {
+  display: grid;
+  place-items: center;
+  min-width: 56px;
+  height: 38px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(124,58,237,.12));
+  color: #075985;
+  font-size: 13px;
+  font-weight: 950;
+  border: 1px solid rgba(6,182,212,.22);
+}
+
+.ai-question-box {
+  margin-top: 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(90,132,185,.18);
+  background: rgba(255,255,255,.72);
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.ai-question-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #10213a;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.ai-input {
+  width: 100%;
+  min-height: 82px;
+  color: #10213a;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.ai-actions {
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.ai-primary-pill {
+  background: linear-gradient(135deg, #a3e635, #7de3ff) !important;
+  color: #10213a !important;
+  border-color: rgba(6,182,212,.18) !important;
+}
+
+.ai-open-button {
+  background: linear-gradient(135deg, #a3e635, #7de3ff);
+  color: #10213a;
+  font-weight: 950;
+}
+
+.ai-preview {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-radius: 24px;
+  padding: 18px 20px;
+}
+
+.ai-preview h3 {
+  margin: 0;
+  color: #10213a;
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: -.035em;
+}
+
+.ai-preview p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 700;
+  white-space: pre-line;
+}
+
+.ai-open-cta {
+  flex: 0 0 auto;
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 22px;
+  background: linear-gradient(135deg, #a3e635, #7de3ff);
+  color: #10213a;
+  font-size: 14px;
+  font-weight: 950;
+  box-shadow: 0 16px 34px rgba(6,182,212,.16);
+}
         .composer-content {
           position: relative;
           z-index: 1;
@@ -1516,6 +1827,22 @@ async function closeThoughtEarly(slug: string) {
             justify-content: center;
             gap: 12px;
             transform: none;
+            .ai-composer {
+  min-height: 260px;
+  padding: 18px;
+}
+
+.ai-builder-head {
+  flex-direction: column;
+}
+
+.ai-preview {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ai-open-cta {
+  width: 100%;
           }
 
           .brand-logo-box {
