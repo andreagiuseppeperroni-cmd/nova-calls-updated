@@ -1,17 +1,62 @@
 import { NextResponse } from 'next/server';
-import { createRouteSupabase } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(_request: Request, { params }: { params: { slug: string } }) {
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    throw new Error('Missing Supabase admin environment variables.');
+  }
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function getSupabasePublic() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error('Missing Supabase public environment variables.');
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: { slug: string } }
+) {
   try {
-    const supabase = createRouteSupabase();
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '').trim();
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.user) {
+    if (!token) {
       return NextResponse.json({ error: 'Non autorizzato.' }, { status: 401 });
     }
+
+    const supabasePublic = getSupabasePublic();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabasePublic.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Sessione non valida.' }, { status: 401 });
+    }
+
+    const supabase = getSupabaseAdmin();
 
     const { data: call, error: findError } = await supabase
       .from('calls')
@@ -23,13 +68,18 @@ export async function POST(_request: Request, { params }: { params: { slug: stri
       return NextResponse.json({ error: 'Spunto non trovato.' }, { status: 404 });
     }
 
-    if (call.host_id !== session.user.id) {
-      return NextResponse.json({ error: 'Solo l’host può chiudere lo Spunto.' }, { status: 403 });
+    if (call.host_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Solo l’host può chiudere lo Spunto.' },
+        { status: 403 }
+      );
     }
 
     const { error: updateError } = await supabase
       .from('calls')
-      .update({ status: 'closed' })
+      .update({
+        status: 'closed',
+      })
       .eq('id', call.id);
 
     if (updateError) {
@@ -53,7 +103,15 @@ export async function POST(_request: Request, { params }: { params: { slug: stri
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: 'Errore durante la chiusura.' }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Errore durante la chiusura.',
+      },
+      { status: 500 }
+    );
   }
 }
