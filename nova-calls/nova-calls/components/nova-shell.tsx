@@ -53,6 +53,30 @@ type HostMoment = {
   popularityScore: number;
 };
 
+type AiAnswerKey = 'situation' | 'block' | 'desiredOutcome';
+
+const aiQuestions: Array<{
+  key: AiAnswerKey;
+  label: string;
+  placeholder: string;
+}> = [
+  {
+    key: 'situation',
+    label: 'Che cosa sta succedendo?',
+    placeholder: 'Esempio: sto valutando se cambiare lavoro, città o progetto...',
+  },
+  {
+    key: 'block',
+    label: 'Qual è il nodo che ti blocca di più?',
+    placeholder: 'Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...',
+  },
+  {
+    key: 'desiredOutcome',
+    label: 'Che tipo di aiuto vorresti ricevere dalla rete?',
+    placeholder: 'Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...',
+  },
+];
+
 function readStoredCalls() {
   if (typeof window === 'undefined') return [] as NovaCall[];
 
@@ -243,16 +267,18 @@ function getThoughtTypeIcon(item: string) {
 }
 
 export function NovaHome() {
+  const supabase = useMemo(() => createBrowserSupabase(), []);
+
   const [text, setText] = useState('');
-const [type, setType] = useState('Decidere');
-const [attachmentName, setAttachmentName] = useState('');
-const [aiStep, setAiStep] = useState(0);
-const [aiAnswers, setAiAnswers] = useState({
-  situation: '',
-  block: '',
-  desiredOutcome: '',
-});
-const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
+  const [type, setType] = useState('Decidere');
+  const [attachmentName, setAttachmentName] = useState('');
+  const [aiStep, setAiStep] = useState(0);
+  const [aiAnswers, setAiAnswers] = useState<Record<AiAnswerKey, string>>({
+    situation: '',
+    block: '',
+    desiredOutcome: '',
+  });
+  const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [avgPulse, setAvgPulse] = useState(0);
   const [trendEchoes, setTrendEchoes] = useState<TrendEcho[]>([]);
@@ -314,164 +340,142 @@ const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
     }
   }
 
-async function closeThoughtEarly(slug: string) {
-  try {
-    setClosingSlug(slug);
+  async function closeThoughtEarly(slug: string) {
+    try {
+      setClosingSlug(slug);
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
-      alert('Devi essere loggato per chiudere lo Spunto.');
+      if (!session?.access_token) {
+        alert('Devi essere loggato per chiudere lo Spunto.');
+        return;
+      }
+
+      const response = await fetch(`/api/calls/${slug}/close`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
+        return;
+      }
+
+      window.location.href = `/outcome?slug=${slug}`;
+    } catch {
+      alert('Errore durante la chiusura dello Spunto.');
+    } finally {
+      setClosingSlug(null);
+    }
+  }
+
+  function inferThoughtType(value: string) {
+    const normalized = normalizeText(value);
+
+    if (
+      normalized.includes('decid') ||
+      normalized.includes('scelta') ||
+      normalized.includes('scegliere') ||
+      normalized.includes('dubbio')
+    ) {
+      return 'Decidere';
+    }
+
+    if (normalized.includes('feedback') || normalized.includes('opinione') || normalized.includes('parere')) {
+      return 'Feedback';
+    }
+
+    if (
+      normalized.includes('persone') ||
+      normalized.includes('network') ||
+      normalized.includes('contatti') ||
+      normalized.includes('conoscere')
+    ) {
+      return 'Trovare persone';
+    }
+
+    if (
+      normalized.includes('subito') ||
+      normalized.includes('oggi') ||
+      normalized.includes('urgente') ||
+      normalized.includes('ora')
+    ) {
+      return 'Fare ora';
+    }
+
+    if (
+      normalized.includes('creare') ||
+      normalized.includes('costruire') ||
+      normalized.includes('progetto') ||
+      normalized.includes('idea')
+    ) {
+      return 'Creare insieme';
+    }
+
+    return 'Capire';
+  }
+
+  function updateAiAnswer(key: AiAnswerKey, value: string) {
+    setAiAnswers((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function buildAiThought() {
+    const situation = aiAnswers.situation.trim();
+    const block = aiAnswers.block.trim();
+    const desiredOutcome = aiAnswers.desiredOutcome.trim();
+
+    const fullText = `${situation} ${block} ${desiredOutcome}`.trim();
+
+    if (!situation || !block || !desiredOutcome) {
+      alert('Rispondi alle tre domande per generare uno Spunto.');
       return;
     }
 
-    const response = await fetch(`/api/calls/${slug}/close`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
+    const inferredType = inferThoughtType(fullText);
+    const generatedTitle = situation.length > 82 ? `${situation.slice(0, 79).trim()}...` : situation;
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
-      return;
-    }
-
-    window.location.href = `/outcome?slug=${slug}`;
-  } catch {
-    alert('Errore durante la chiusura dello Spunto.');
-  } finally {
-    setClosingSlug(null);
-  }
-}
-const aiQuestions = [
-  {
-    key: 'situation',
-    label: 'Che cosa sta succedendo?',
-    placeholder: 'Esempio: sto valutando se cambiare lavoro, città o progetto...',
-  },
-  {
-    key: 'block',
-    label: 'Qual è il nodo che ti blocca di più?',
-    placeholder: 'Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...',
-  },
-  {
-    key: 'desiredOutcome',
-    label: 'Che tipo di aiuto vorresti ricevere dalla rete?',
-    placeholder: 'Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...',
-  },
-] as const;
-
-function inferThoughtType(value: string) {
-  const normalized = normalizeText(value);
-
-  if (
-    normalized.includes('decid') ||
-    normalized.includes('scelta') ||
-    normalized.includes('scegliere') ||
-    normalized.includes('dubbio')
-  ) {
-    return 'Decidere';
-  }
-
-  if (
-    normalized.includes('feedback') ||
-    normalized.includes('opinione') ||
-    normalized.includes('parere')
-  ) {
-    return 'Feedback';
-  }
-
-  if (
-    normalized.includes('persone') ||
-    normalized.includes('network') ||
-    normalized.includes('contatti') ||
-    normalized.includes('conoscere')
-  ) {
-    return 'Trovare persone';
-  }
-
-  if (
-    normalized.includes('subito') ||
-    normalized.includes('oggi') ||
-    normalized.includes('urgente') ||
-    normalized.includes('ora')
-  ) {
-    return 'Fare ora';
-  }
-
-  if (
-    normalized.includes('creare') ||
-    normalized.includes('costruire') ||
-    normalized.includes('progetto') ||
-    normalized.includes('idea')
-  ) {
-    return 'Creare insieme';
-  }
-
-  return 'Capire';
-}
-
-function updateAiAnswer(key: keyof typeof aiAnswers, value: string) {
-  setAiAnswers((current) => ({
-    ...current,
-    [key]: value,
-  }));
-}
-
-function buildAiThought() {
-  const situation = aiAnswers.situation.trim();
-  const block = aiAnswers.block.trim();
-  const desiredOutcome = aiAnswers.desiredOutcome.trim();
-
-  const fullText = `${situation} ${block} ${desiredOutcome}`.trim();
-
-  if (!situation || !block || !desiredOutcome) {
-    alert('Rispondi alle tre domande per generare uno Spunto.');
-    return;
-  }
-
-  const inferredType = inferThoughtType(fullText);
-
-  const generatedTitle =
-    situation.length > 82 ? `${situation.slice(0, 79).trim()}...` : situation;
-
-  const generatedText = `${generatedTitle}
+    const generatedText = `${generatedTitle}
 
 Nodo principale: ${block}
 
 Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
-  setText(generatedText);
-  setType(inferredType);
-}
+    setText(generatedText);
+    setType(inferredType);
+  }
 
-function openThought() {
-  const title = text.trim() || 'Nuovo Spunto Nova';
+  function openThought() {
+    const title = text.trim() || aiAnswers.situation.trim() || 'Nuovo Spunto Nova';
 
-  const call: NovaCall = {
-    title,
-    description: 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
-    type,
-    accessType: 'public',
-    slug: makeSlug(title),
-    pulse: 12,
-    participants: 1,
-    createdAt: new Date().toISOString(),
-  };
+    const call: NovaCall = {
+      title,
+      description: text.trim() || 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+      type,
+      accessType: 'public',
+      slug: makeSlug(title),
+      pulse: 12,
+      participants: 1,
+      createdAt: new Date().toISOString(),
+    };
 
-  saveLocalThought(call);
-  window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
-}
+    saveLocalThought(call);
+    window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
+  }
 
-const featured = liveThoughts[0] || null;
+  const featured = liveThoughts[0] || null;
+  const currentQuestion = aiQuestions[aiStep];
 
-return (
-  <div className="nova-preview">
+  return (
+    <div className="nova-preview">
       <TopChrome />
 
       <main className="nova-app">
@@ -484,96 +488,53 @@ return (
           <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
 
           <div className="composer ai-composer">
-  <div className="composer-content">
-    <div className="ai-builder-head">
-      <div>
-        <p className="ai-eyebrow">AI Spunto Builder</p>
-        <h2>Ti aiuto a trasformare un pensiero in uno Spunto</h2>
-      </div>
+            <div className="composer-content">
+              <div className="ai-builder-head">
+                <div>
+                  <p className="ai-eyebrow">AI Spunto Builder</p>
+                  <h2>Ti aiuto a trasformare un pensiero in uno Spunto</h2>
+                </div>
 
-      <span className="ai-step-pill">
-        {aiStep + 1}/{aiQuestions.length}
-      </span>
-    </div>
+                <span className="ai-step-pill">
+                  {aiStep + 1}/{aiQuestions.length}
+                </span>
+              </div>
 
-    <div className="ai-question-box">
-      <label className="ai-question-label">{aiQuestions[aiStep].label}</label>
+              <div className="ai-question-box">
+                <label className="ai-question-label">{currentQuestion.label}</label>
 
-      <textarea
-        value={aiAnswers[aiQuestions[aiStep].key]}
-        onChange={(event) => updateAiAnswer(aiQuestions[aiStep].key, event.target.value)}
-        placeholder={aiQuestions[aiStep].placeholder}
-        rows={3}
-        className="composer-input ai-input"
-      />
-    </div>
+                <textarea
+                  value={aiAnswers[currentQuestion.key]}
+                  onChange={(event) => updateAiAnswer(currentQuestion.key, event.target.value)}
+                  placeholder={currentQuestion.placeholder}
+                  rows={3}
+                  className="composer-input ai-input"
+                />
+              </div>
 
-    <div className="composer-actions ai-actions">
-      <button
-        type="button"
-        onClick={() => setAiStep((value) => Math.max(0, value - 1))}
-        className="mini-pill"
-        disabled={aiStep === 0}
-      >
-        ← Indietro
-      </button>
-
-      {aiStep < aiQuestions.length - 1 ? (
-        <button
-          type="button"
-          onClick={() => setAiStep((value) => Math.min(aiQuestions.length - 1, value + 1))}
-          className="mini-pill ai-primary-pill"
-        >
-          Continua →
-        </button>
-      ) : (
-        <button type="button" onClick={buildAiThought} className="mini-pill ai-primary-pill">
-          Genera Spunto
-        </button>
-      )}
-
-      <label className="mini-pill attachment-pill">
-        ⌘ {attachmentName || 'Allega'}
-        <input
-          type="file"
-          className="hidden-file"
-          onChange={(event) => setAttachmentName(event.target.files?.[0]?.name || '')}
-        />
-      </label>
-
-      <button
-        type="button"
-        onClick={() => setType(type === 'Anonima' ? 'Decidere' : 'Anonima')}
-        className="mini-pill anon-pill"
-      >
-        ◒ Anonima
-      </button>
-    </div>
-  </div>
-
-  <button type="button" onClick={openThought} className="mic ai-open-button">
-    ✦
-  </button>
-</div>
-
-{text && (
-  <div className="ai-preview glass">
-    <div>
-      <p className="ai-eyebrow">Spunto generato</p>
-      <h3>{text.split('\n')[0]}</h3>
-      <p>{text}</p>
-    </div>
-
-    <button type="button" onClick={openThought} className="ai-open-cta">
-      Apri lo Spunto →
-    </button>
-  </div>
-)}
-
-              <div className="composer-actions">
-                <button type="button" onClick={openThought} className="circle-plus">
-                  +
+              <div className="composer-actions ai-actions">
+                <button
+                  type="button"
+                  onClick={() => setAiStep((value) => Math.max(0, value - 1))}
+                  className="mini-pill"
+                  disabled={aiStep === 0}
+                >
+                  ← Indietro
                 </button>
+
+                {aiStep < aiQuestions.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAiStep((value) => Math.min(aiQuestions.length - 1, value + 1))}
+                    className="mini-pill ai-primary-pill"
+                  >
+                    Continua →
+                  </button>
+                ) : (
+                  <button type="button" onClick={buildAiThought} className="mini-pill ai-primary-pill">
+                    Genera Spunto
+                  </button>
+                )}
 
                 <label className="mini-pill attachment-pill">
                   ⌘ {attachmentName || 'Allega'}
@@ -594,10 +555,24 @@ return (
               </div>
             </div>
 
-            <button type="button" onClick={openThought} className="mic">
-              🎙
+            <button type="button" onClick={openThought} className="mic ai-open-button">
+              ✦
             </button>
           </div>
+
+          {text && (
+            <div className="ai-preview glass">
+              <div>
+                <p className="ai-eyebrow">Spunto generato</p>
+                <h3>{text.split('\n')[0]}</h3>
+                <p>{text}</p>
+              </div>
+
+              <button type="button" onClick={openThought} className="ai-open-cta">
+                Apri lo Spunto →
+              </button>
+            </div>
+          )}
 
           <div className="chips">
             {thoughtTypes.map((item) => (
@@ -660,49 +635,49 @@ return (
           width: 100%;
           color: var(--text);
           background:
-            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, .24), transparent 22%),
-            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, .16), transparent 24%),
-            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, .10), transparent 28%),
+            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.24), transparent 22%),
+            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, 0.16), transparent 24%),
+            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, 0.1), transparent 28%),
             linear-gradient(180deg, #e7f8ff 0%, #f3fbff 30%, #d9f2ff 62%, #c6eaff 84%, #b8e4ff 100%);
           overflow-x: hidden;
           isolation: isolate;
         }
 
         .nova-preview::before {
-          content: "";
+          content: '';
           position: fixed;
           inset: 0;
           z-index: -2;
           pointer-events: none;
           background-image:
-            radial-gradient(circle, rgba(15,23,42,.16) 0 1px, transparent 1px),
-            radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1px);
+            radial-gradient(circle, rgba(15, 23, 42, 0.16) 0 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.55) 0 1px, transparent 1px);
           background-size: 96px 96px, 164px 164px;
           background-position: 18px 26px, 54px 80px;
-          opacity: .14;
+          opacity: 0.14;
           mask-image: radial-gradient(circle at center, black 0%, transparent 88%);
         }
 
         .nova-preview::after {
-          content: "";
+          content: '';
           position: fixed;
           inset: auto -20% -16% -20%;
           height: 44vh;
           z-index: -1;
           pointer-events: none;
           background:
-            radial-gradient(ellipse at 50% 100%, rgba(6, 182, 212, .24), transparent 58%),
-            radial-gradient(ellipse at 72% 80%, rgba(37, 99, 235, .14), transparent 48%);
+            radial-gradient(ellipse at 50% 100%, rgba(6, 182, 212, 0.24), transparent 58%),
+            radial-gradient(ellipse at 72% 80%, rgba(37, 99, 235, 0.14), transparent 48%);
           filter: blur(28px);
-          opacity: .86;
+          opacity: 0.86;
         }
 
         .glass {
-          border: 1px solid rgba(255,255,255,.68);
+          border: 1px solid rgba(255, 255, 255, 0.68);
           background:
-            radial-gradient(circle at 82% 0%, rgba(6,182,212,.08), transparent 32%),
-            linear-gradient(180deg, rgba(255,255,255,.82), rgba(223,246,255,.68));
-          box-shadow: 0 22px 74px rgba(37,99,235,.11), inset 0 1px 0 rgba(255,255,255,.96);
+            radial-gradient(circle at 82% 0%, rgba(6, 182, 212, 0.08), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(223, 246, 255, 0.68));
+          box-shadow: 0 22px 74px rgba(37, 99, 235, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.96);
           backdrop-filter: blur(24px) saturate(1.22);
           color: #0f172a;
         }
@@ -738,9 +713,9 @@ return (
           justify-content: center;
           overflow: hidden;
           border-radius: 18px;
-          border: 1px solid rgba(6,182,212,.22);
-          background: rgba(255,255,255,.72);
-          box-shadow: 0 0 24px rgba(6,182,212,.15), inset 0 1px 0 rgba(255,255,255,.9);
+          border: 1px solid rgba(6, 182, 212, 0.22);
+          background: rgba(255, 255, 255, 0.72);
+          box-shadow: 0 0 24px rgba(6, 182, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
           flex-shrink: 0;
         }
 
@@ -754,7 +729,7 @@ return (
         .brand-word {
           font-size: 20px;
           font-weight: 900;
-          letter-spacing: .28em;
+          letter-spacing: 0.28em;
           color: #0f172a;
         }
 
@@ -773,13 +748,13 @@ return (
           width: 49px;
           height: 49px;
           border-radius: 18px;
-          border: 1px solid rgba(15,23,42,.1);
-          background: rgba(255,255,255,.68);
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: rgba(255, 255, 255, 0.68);
           color: #0f172a;
           display: grid;
           place-items: center;
           font-size: 19px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
           text-decoration: none;
         }
 
@@ -787,7 +762,7 @@ return (
           border-radius: 999px;
           overflow: hidden;
           background: radial-gradient(circle at 30% 20%, #fbcfe8, #8f7cff 38%, #58c4ff 70%);
-          box-shadow: 0 0 28px rgba(124,58,237,.22);
+          box-shadow: 0 0 28px rgba(124, 58, 237, 0.22);
         }
 
         .sidebar {
@@ -804,10 +779,10 @@ return (
         }
 
         .sidebar::before {
-          content: "";
+          content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(130deg, rgba(6,182,212,.10), transparent 36%, rgba(124,58,237,.08));
+          background: linear-gradient(130deg, rgba(6, 182, 212, 0.1), transparent 36%, rgba(124, 58, 237, 0.08));
           pointer-events: none;
         }
 
@@ -825,7 +800,7 @@ return (
           height: 52px;
           padding: 0 14px;
           border-radius: 16px;
-          color: rgba(15,23,42,.72);
+          color: rgba(15, 23, 42, 0.72);
           font-size: 16px;
           font-weight: 800;
           text-decoration: none;
@@ -834,15 +809,15 @@ return (
         .nav-item:hover,
         .nav-item.active {
           color: #075985;
-          background: linear-gradient(90deg, rgba(6,182,212,.16), rgba(124,58,237,.08));
-          box-shadow: inset 0 0 0 1px rgba(6,182,212,.16), 0 12px 28px rgba(37,99,235,.08);
+          background: linear-gradient(90deg, rgba(6, 182, 212, 0.16), rgba(124, 58, 237, 0.08));
+          box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.16), 0 12px 28px rgba(37, 99, 235, 0.08);
         }
 
         .nav-icon {
           width: 23px;
           text-align: center;
           font-size: 18px;
-          filter: drop-shadow(0 0 8px rgba(6,182,212,.24));
+          filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.24));
         }
 
         .nav-badge {
@@ -876,7 +851,7 @@ return (
           text-align: left;
           text-decoration: none;
           background: linear-gradient(135deg, #a3e635, #7de3ff 72%);
-          box-shadow: 0 18px 34px rgba(6,182,212,.18);
+          box-shadow: 0 18px 34px rgba(6, 182, 212, 0.18);
         }
 
         .online {
@@ -886,12 +861,12 @@ return (
           border-radius: 999px;
           padding: 10px 13px;
           color: #475569;
-          background: rgba(255,255,255,.52);
+          background: rgba(255, 255, 255, 0.52);
           display: flex;
           gap: 10px;
           align-items: center;
           font-size: 12px;
-          letter-spacing: .08em;
+          letter-spacing: 0.08em;
           font-weight: 800;
         }
 
@@ -900,7 +875,7 @@ return (
           height: 8px;
           border-radius: 99px;
           background: var(--green);
-          box-shadow: 0 0 12px rgba(16,185,129,.45);
+          box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
         }
 
         .nova-center {
@@ -911,8 +886,8 @@ return (
         .nova-center h1 {
           margin: 0;
           font-size: clamp(52px, 5.2vw, 83px);
-          line-height: .98;
-          letter-spacing: -.065em;
+          line-height: 0.98;
+          letter-spacing: -0.065em;
           font-weight: 900;
         }
 
@@ -936,143 +911,24 @@ return (
           border-radius: 30px;
           padding: 22px;
           overflow: hidden;
-          border: 1px solid rgba(6,182,212,.26);
+          border: 1px solid rgba(6, 182, 212, 0.26);
           background:
-            radial-gradient(ellipse at 38% 6%, rgba(6,182,212,.22), transparent 28%),
-            radial-gradient(ellipse at 74% 54%, rgba(219,39,119,.14), transparent 32%),
-            rgba(255,255,255,.84);
-          box-shadow: 0 0 28px rgba(6,182,212,.10), 0 18px 45px rgba(37,99,235,.08);
+            radial-gradient(ellipse at 38% 6%, rgba(6, 182, 212, 0.22), transparent 28%),
+            radial-gradient(ellipse at 74% 54%, rgba(219, 39, 119, 0.14), transparent 32%),
+            rgba(255, 255, 255, 0.84);
+          box-shadow: 0 0 28px rgba(6, 182, 212, 0.1), 0 18px 45px rgba(37, 99, 235, 0.08);
         }
-.ai-composer {
-  height: auto;
-  min-height: 238px;
-  padding: 24px;
-  background:
-    radial-gradient(circle at 18% 8%, rgba(56,214,255,.26), transparent 28%),
-    radial-gradient(circle at 78% 38%, rgba(219,39,119,.12), transparent 32%),
-    linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,249,255,.84));
-}
 
-.ai-builder-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
+        .ai-composer {
+          height: auto;
+          min-height: 238px;
+          padding: 24px;
+          background:
+            radial-gradient(circle at 18% 8%, rgba(56, 214, 255, 0.26), transparent 28%),
+            radial-gradient(circle at 78% 38%, rgba(219, 39, 119, 0.12), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(237, 249, 255, 0.84));
+        }
 
-.ai-eyebrow {
-  margin: 0 0 6px;
-  color: #0284c7;
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-}
-
-.ai-builder-head h2 {
-  margin: 0;
-  max-width: 680px;
-  color: #10213a;
-  font-size: clamp(24px, 2.2vw, 38px);
-  line-height: 1;
-  letter-spacing: -.045em;
-  font-weight: 950;
-}
-
-.ai-step-pill {
-  display: grid;
-  place-items: center;
-  min-width: 56px;
-  height: 38px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(124,58,237,.12));
-  color: #075985;
-  font-size: 13px;
-  font-weight: 950;
-  border: 1px solid rgba(6,182,212,.22);
-}
-
-.ai-question-box {
-  margin-top: 22px;
-  border-radius: 22px;
-  border: 1px solid rgba(90,132,185,.18);
-  background: rgba(255,255,255,.72);
-  padding: 16px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
-}
-
-.ai-question-label {
-  display: block;
-  margin-bottom: 10px;
-  color: #10213a;
-  font-size: 15px;
-  font-weight: 950;
-}
-
-.ai-input {
-  width: 100%;
-  min-height: 82px;
-  color: #10213a;
-  font-size: 16px;
-  font-weight: 750;
-}
-
-.ai-actions {
-  margin-top: 18px;
-  flex-wrap: wrap;
-}
-
-.ai-primary-pill {
-  background: linear-gradient(135deg, #a3e635, #7de3ff) !important;
-  color: #10213a !important;
-  border-color: rgba(6,182,212,.18) !important;
-}
-
-.ai-open-button {
-  background: linear-gradient(135deg, #a3e635, #7de3ff);
-  color: #10213a;
-  font-weight: 950;
-}
-
-.ai-preview {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  border-radius: 24px;
-  padding: 18px 20px;
-}
-
-.ai-preview h3 {
-  margin: 0;
-  color: #10213a;
-  font-size: 24px;
-  font-weight: 950;
-  letter-spacing: -.035em;
-}
-
-.ai-preview p {
-  margin: 8px 0 0;
-  color: #475569;
-  font-size: 14px;
-  line-height: 1.55;
-  font-weight: 700;
-  white-space: pre-line;
-}
-
-.ai-open-cta {
-  flex: 0 0 auto;
-  min-height: 48px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0 22px;
-  background: linear-gradient(135deg, #a3e635, #7de3ff);
-  color: #10213a;
-  font-size: 14px;
-  font-weight: 950;
-  box-shadow: 0 16px 34px rgba(6,182,212,.16);
-}
         .composer-content {
           position: relative;
           z-index: 1;
@@ -1080,6 +936,62 @@ return (
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+        }
+
+        .ai-builder-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+        }
+
+        .ai-eyebrow {
+          margin: 0 0 6px;
+          color: #0284c7;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+
+        .ai-builder-head h2 {
+          margin: 0;
+          max-width: 680px;
+          color: #10213a;
+          font-size: clamp(24px, 2.2vw, 38px);
+          line-height: 1;
+          letter-spacing: -0.045em;
+          font-weight: 950;
+        }
+
+        .ai-step-pill {
+          display: grid;
+          place-items: center;
+          min-width: 56px;
+          height: 38px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(124, 58, 237, 0.12));
+          color: #075985;
+          font-size: 13px;
+          font-weight: 950;
+          border: 1px solid rgba(6, 182, 212, 0.22);
+        }
+
+        .ai-question-box {
+          margin-top: 22px;
+          border-radius: 22px;
+          border: 1px solid rgba(90, 132, 185, 0.18);
+          background: rgba(255, 255, 255, 0.72);
+          padding: 16px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .ai-question-label {
+          display: block;
+          margin-bottom: 10px;
+          color: #10213a;
+          font-size: 15px;
+          font-weight: 950;
         }
 
         .composer-input {
@@ -1096,13 +1008,26 @@ return (
         }
 
         .composer-input::placeholder {
-          color: rgba(100,116,139,.82);
+          color: rgba(100, 116, 139, 0.82);
+        }
+
+        .ai-input {
+          width: 100%;
+          min-height: 82px;
+          color: #10213a;
+          font-size: 16px;
+          font-weight: 750;
         }
 
         .composer-actions {
           display: flex;
           gap: 14px;
           align-items: center;
+        }
+
+        .ai-actions {
+          margin-top: 18px;
+          flex-wrap: wrap;
         }
 
         .mini-pill {
@@ -1112,32 +1037,30 @@ return (
           gap: 9px;
           height: 38px;
           border-radius: 999px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(248,250,252,.82);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(248, 250, 252, 0.82);
           padding: 0 16px;
           color: #475569;
           font-size: 14px;
           font-weight: 850;
           cursor: pointer;
           font-family: inherit;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        }
+
+        .mini-pill:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .ai-primary-pill {
+          background: linear-gradient(135deg, #a3e635, #7de3ff) !important;
+          color: #10213a !important;
+          border-color: rgba(6, 182, 212, 0.18) !important;
         }
 
         .hidden-file {
           display: none;
-        }
-
-        .circle-plus {
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(255,255,255,.72);
-          color: #0f172a;
-          font-size: 26px;
-          display: grid;
-          place-items: center;
-          cursor: pointer;
         }
 
         .mic {
@@ -1150,9 +1073,56 @@ return (
           display: grid;
           place-items: center;
           font-size: 26px;
-          background: radial-gradient(circle, rgba(255,255,255,.96), rgba(226,232,240,.74));
-          border: 1px solid rgba(15,23,42,.08);
-          box-shadow: 0 16px 36px rgba(124,58,237,.14);
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.96), rgba(226, 232, 240, 0.74));
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 16px 36px rgba(124, 58, 237, 0.14);
+          cursor: pointer;
+        }
+
+        .ai-open-button {
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          color: #10213a;
+          font-weight: 950;
+        }
+
+        .ai-preview {
+          margin-top: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          border-radius: 24px;
+          padding: 18px 20px;
+        }
+
+        .ai-preview h3 {
+          margin: 0;
+          color: #10213a;
+          font-size: 24px;
+          font-weight: 950;
+          letter-spacing: -0.035em;
+        }
+
+        .ai-preview p {
+          margin: 8px 0 0;
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.55;
+          font-weight: 700;
+          white-space: pre-line;
+        }
+
+        .ai-open-cta {
+          flex: 0 0 auto;
+          min-height: 48px;
+          border: 0;
+          border-radius: 999px;
+          padding: 0 22px;
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          color: #10213a;
+          font-size: 14px;
+          font-weight: 950;
+          box-shadow: 0 16px 34px rgba(6, 182, 212, 0.16);
           cursor: pointer;
         }
 
@@ -1169,22 +1139,22 @@ return (
           align-items: center;
           gap: 10px;
           border-radius: 999px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(255,255,255,.64);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(255, 255, 255, 0.64);
           color: #475569;
           padding: 0 19px;
           font-size: 14px;
           font-weight: 850;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
           cursor: pointer;
           font-family: inherit;
         }
 
         .chip.active {
-          border-color: rgba(6,182,212,.24);
-          background: linear-gradient(135deg, rgba(6,182,212,.18), rgba(124,58,237,.12));
+          border-color: rgba(6, 182, 212, 0.24);
+          background: linear-gradient(135deg, rgba(6, 182, 212, 0.18), rgba(124, 58, 237, 0.12));
           color: #075985;
-          box-shadow: 0 14px 28px rgba(37,99,235,.10);
+          box-shadow: 0 14px 28px rgba(37, 99, 235, 0.1);
         }
 
         .featured {
@@ -1192,23 +1162,23 @@ return (
           min-height: 310px;
           border-radius: var(--radius-xl);
           overflow: hidden;
-          border: 1px solid rgba(255,255,255,.18);
+          border: 1px solid rgba(255, 255, 255, 0.18);
           background:
-            radial-gradient(circle at 80% 0%, rgba(6,182,212,.20), transparent 30%),
-            linear-gradient(180deg, rgba(27,68,105,.90), rgba(21,49,79,.88));
-          box-shadow: 0 24px 90px rgba(37,99,235,.12), inset 0 1px 0 rgba(255,255,255,.12);
+            radial-gradient(circle at 80% 0%, rgba(6, 182, 212, 0.2), transparent 30%),
+            linear-gradient(180deg, rgba(27, 68, 105, 0.9), rgba(21, 49, 79, 0.88));
+          box-shadow: 0 24px 90px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
           color: #eff6ff;
         }
 
         .featured::before {
-          content: "";
+          content: '';
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse at 78% 36%, rgba(219,39,119,.34), transparent 14%),
-            radial-gradient(ellipse at 82% 26%, rgba(6,182,212,.34), transparent 26%),
-            linear-gradient(165deg, transparent 0 42%, rgba(125,227,255,.14), transparent 57%);
-          opacity: .88;
+            radial-gradient(ellipse at 78% 36%, rgba(219, 39, 119, 0.34), transparent 14%),
+            radial-gradient(ellipse at 82% 26%, rgba(6, 182, 212, 0.34), transparent 26%),
+            linear-gradient(165deg, transparent 0 42%, rgba(125, 227, 255, 0.14), transparent 57%);
+          opacity: 0.88;
         }
 
         .featured-content {
@@ -1227,10 +1197,10 @@ return (
           gap: 8px;
           min-height: 34px;
           border-radius: 999px;
-          background: rgba(255,255,255,.10);
-          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           padding: 0 15px;
-          color: rgba(255,255,255,.92);
+          color: rgba(255, 255, 255, 0.92);
           font-size: 13px;
           font-weight: 900;
         }
@@ -1245,7 +1215,7 @@ return (
           margin: 34px 0 9px;
           font-size: 40px;
           line-height: 1;
-          letter-spacing: -.045em;
+          letter-spacing: -0.045em;
           font-weight: 950;
         }
 
@@ -1270,17 +1240,17 @@ return (
 
         .plus-count {
           border-radius: 999px;
-          background: rgba(255,255,255,.12);
+          background: rgba(255, 255, 255, 0.12);
           padding: 10px 14px;
           font-weight: 900;
           color: white;
         }
 
         .active-count {
-          border-left: 1px solid rgba(255,255,255,.14);
+          border-left: 1px solid rgba(255, 255, 255, 0.14);
           padding-left: 18px;
           font-size: 14px;
-          color: rgba(255,255,255,.92);
+          color: rgba(255, 255, 255, 0.92);
           font-weight: 750;
         }
 
@@ -1306,9 +1276,9 @@ return (
           min-width: 140px;
           height: 52px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.14);
-          background: rgba(255,255,255,.08);
-          color: rgba(255,255,255,.92);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.92);
           font-weight: 900;
           display: inline-flex;
           align-items: center;
@@ -1328,7 +1298,7 @@ return (
           font-size: 21px;
           font-weight: 950;
           background: linear-gradient(100deg, #a3e635, #7de3ff);
-          box-shadow: 0 18px 34px rgba(6,182,212,.18);
+          box-shadow: 0 18px 34px rgba(6, 182, 212, 0.18);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -1356,8 +1326,8 @@ return (
         .trend-item {
           border-radius: 18px;
           padding: 16px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(255,255,255,.58);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(255, 255, 255, 0.58);
         }
 
         .trend-title {
@@ -1389,7 +1359,7 @@ return (
           font-size: 26px;
           font-weight: 950;
           background: radial-gradient(circle at 34% 25%, #7de3ff, #8f7cff 32%, #e77bcf 54%, #15314f 78%);
-          box-shadow: 0 0 34px rgba(6,182,212,.18), inset 0 0 16px rgba(255,255,255,.16);
+          box-shadow: 0 0 34px rgba(6, 182, 212, 0.18), inset 0 0 16px rgba(255, 255, 255, 0.16);
         }
 
         .host-orb img {
@@ -1421,12 +1391,12 @@ return (
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0;
-          border-left: 1px solid rgba(15,23,42,.08);
+          border-left: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .metric {
           padding-left: 22px;
-          border-right: 1px solid rgba(15,23,42,.08);
+          border-right: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .metric:last-child {
@@ -1459,9 +1429,9 @@ return (
           margin-top: 16px;
           border-radius: 24px;
           padding: 14px 16px;
-          background: rgba(255,255,255,.58);
-          border: 1px solid rgba(255,255,255,.64);
-          box-shadow: 0 20px 50px rgba(37,99,235,.08);
+          background: rgba(255, 255, 255, 0.58);
+          border: 1px solid rgba(255, 255, 255, 0.64);
+          box-shadow: 0 20px 50px rgba(37, 99, 235, 0.08);
         }
 
         .strip-head {
@@ -1493,8 +1463,8 @@ return (
           min-height: 84px;
           border-radius: 16px;
           padding: 10px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(255,255,255,.70));
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(255, 255, 255, 0.7));
           overflow: hidden;
           position: relative;
           font-weight: 900;
@@ -1505,14 +1475,14 @@ return (
         }
 
         .mini-card::after {
-          content: "";
+          content: '';
           position: absolute;
           left: 0;
           right: 0;
           bottom: 8px;
           height: 18px;
-          background: repeating-linear-gradient(90deg, rgba(6,182,212,.65) 0 2px, transparent 2px 9px);
-          opacity: .28;
+          background: repeating-linear-gradient(90deg, rgba(6, 182, 212, 0.65) 0 2px, transparent 2px 9px);
+          opacity: 0.28;
           transform: skewX(-8deg);
         }
 
@@ -1554,7 +1524,7 @@ return (
           margin-bottom: 18px;
           font-size: 28px;
           font-weight: 950;
-          letter-spacing: -.03em;
+          letter-spacing: -0.03em;
         }
 
         .panel-title small {
@@ -1566,14 +1536,14 @@ return (
 
         .echo-body {
           display: grid;
-          grid-template-columns: 1.05fr .95fr;
+          grid-template-columns: 1.05fr 0.95fr;
           gap: 14px;
           height: auto;
         }
 
         .inner {
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(255,255,255,.48);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(255, 255, 255, 0.48);
           border-radius: 18px;
           padding: 16px;
         }
@@ -1582,7 +1552,7 @@ return (
           margin: 0 0 15px;
           color: #64748b;
           font-size: 14px;
-          letter-spacing: .04em;
+          letter-spacing: 0.04em;
         }
 
         .insight {
@@ -1603,9 +1573,9 @@ return (
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: rgba(6,182,212,.12);
+          background: rgba(6, 182, 212, 0.12);
           color: var(--cyan);
-          border: 1px solid rgba(6,182,212,.18);
+          border: 1px solid rgba(6, 182, 212, 0.18);
         }
 
         .mood-wrap {
@@ -1622,10 +1592,10 @@ return (
           text-align: center;
           color: white;
           background:
-            radial-gradient(circle at 28% 30%, rgba(6,182,212,.94), transparent 31%),
-            radial-gradient(circle at 75% 35%, rgba(219,39,119,.76), transparent 32%),
-            radial-gradient(circle at 60% 70%, rgba(124,58,237,.78), transparent 42%);
-          filter: drop-shadow(0 0 18px rgba(219,39,119,.24));
+            radial-gradient(circle at 28% 30%, rgba(6, 182, 212, 0.94), transparent 31%),
+            radial-gradient(circle at 75% 35%, rgba(219, 39, 119, 0.76), transparent 32%),
+            radial-gradient(circle at 60% 70%, rgba(124, 58, 237, 0.78), transparent 42%);
+          filter: drop-shadow(0 0 18px rgba(219, 39, 119, 0.24));
           border-radius: 45% 55% 52% 48% / 46% 38% 62% 54%;
           animation: morph 7s ease-in-out infinite;
         }
@@ -1638,7 +1608,7 @@ return (
           display: block;
           margin-top: 9px;
           font-size: 13px;
-          color: rgba(255,255,255,.82);
+          color: rgba(255, 255, 255, 0.82);
         }
 
         @keyframes morph {
@@ -1690,27 +1660,27 @@ return (
           place-items: center;
           position: relative;
           background:
-            repeating-radial-gradient(circle, transparent 0 12px, rgba(6,182,212,.13) 13px 14px),
+            repeating-radial-gradient(circle, transparent 0 12px, rgba(6, 182, 212, 0.13) 13px 14px),
             conic-gradient(from -15deg, transparent 0 18deg, var(--cyan) 38deg, var(--lime) 120deg, var(--pink) 240deg, transparent 310deg),
-            radial-gradient(circle, rgba(6,182,212,.16), transparent 52%);
-          box-shadow: 0 0 36px rgba(6,182,212,.18);
+            radial-gradient(circle, rgba(6, 182, 212, 0.16), transparent 52%);
+          box-shadow: 0 0 36px rgba(6, 182, 212, 0.18);
         }
 
         .radial::before {
-          content: "";
+          content: '';
           position: absolute;
           inset: 42px;
           border-radius: inherit;
-          background: rgba(255,255,255,.88);
-          box-shadow: inset 0 0 20px rgba(15,23,42,.06);
+          background: rgba(255, 255, 255, 0.88);
+          box-shadow: inset 0 0 20px rgba(15, 23, 42, 0.06);
         }
 
         .radial::after {
-          content: "";
+          content: '';
           position: absolute;
           width: 8px;
           height: 126%;
-          background: linear-gradient(transparent, rgba(6,182,212,.65), rgba(124,58,237,.52), transparent);
+          background: linear-gradient(transparent, rgba(6, 182, 212, 0.65), rgba(124, 58, 237, 0.52), transparent);
           filter: blur(2px);
         }
 
@@ -1749,7 +1719,7 @@ return (
           border-radius: 14px;
           position: relative;
           overflow: hidden;
-          background: linear-gradient(180deg, rgba(255,255,255,.60), rgba(255,255,255,.24));
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.24));
         }
 
         .chart svg {
@@ -1828,22 +1798,6 @@ return (
             justify-content: center;
             gap: 12px;
             transform: none;
-            .ai-composer {
-  min-height: 260px;
-  padding: 18px;
-}
-
-.ai-builder-head {
-  flex-direction: column;
-}
-
-.ai-preview {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.ai-open-cta {
-  width: 100%;
           }
 
           .brand-logo-box {
@@ -1859,7 +1813,7 @@ return (
 
           .brand-word {
             font-size: 18px;
-            letter-spacing: .22em;
+            letter-spacing: 0.22em;
           }
 
           .top-actions {
@@ -1900,9 +1854,9 @@ return (
             height: auto;
             border-radius: 24px;
             padding: 9px;
-            background: rgba(255,255,255,.80);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(26px) saturate(1.4);
-            box-shadow: 0 18px 60px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.9);
+            box-shadow: 0 18px 60px rgba(37, 99, 235, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
           }
 
           .sidebar::before,
@@ -1924,7 +1878,7 @@ return (
             gap: 0;
           }
 
-          .nav-item:nth-child(n+6) {
+          .nav-item:nth-child(n + 6) {
             display: none;
           }
 
@@ -1958,7 +1912,7 @@ return (
           }
 
           .open-call::before {
-            content: "+";
+            content: '+';
             font-size: 36px;
             line-height: 1;
           }
@@ -1977,8 +1931,8 @@ return (
             margin: 0 auto;
             text-align: center;
             font-size: clamp(42px, 13.6vw, 58px);
-            line-height: .92;
-            letter-spacing: -.07em;
+            line-height: 0.92;
+            letter-spacing: -0.07em;
           }
 
           .subtitle {
@@ -1989,26 +1943,34 @@ return (
             line-height: 1.45;
           }
 
-          .composer {
-            height: 132px;
-            border-radius: 27px;
+          .ai-composer {
+            min-height: 260px;
             padding: 18px;
+          }
+
+          .ai-builder-head {
+            flex-direction: column;
+          }
+
+          .ai-preview {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .ai-open-cta {
+            width: 100%;
           }
 
           .composer-input {
             font-size: 14px;
-            width: calc(100% - 58px);
+          }
+
+          .ai-input {
+            width: 100%;
           }
 
           .composer-actions {
             gap: 8px;
-            padding-right: 58px;
-          }
-
-          .circle-plus {
-            width: 37px;
-            height: 37px;
-            font-size: 23px;
           }
 
           .mini-pill {
@@ -2065,7 +2027,7 @@ return (
             margin-top: 48px;
             max-width: 270px;
             font-size: 34px;
-            line-height: .98;
+            line-height: 0.98;
           }
 
           .featured p {
@@ -2140,7 +2102,7 @@ return (
           .metrics {
             grid-template-columns: repeat(3, 1fr);
             border-left: 0;
-            border-top: 1px solid rgba(15,23,42,.08);
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
             padding-top: 14px;
           }
 
@@ -2428,9 +2390,7 @@ function HostOfMomentSection({ host }: { host: HostMoment | null }) {
 
           <div className="host-name">{host.hostName}</div>
           <div className="host-title">Riconosciuto automaticamente dai dati della community</div>
-          <div className="host-bio">
-            Selezionato in base a partecipazione, Pulse medio e numero di Spunti aperti.
-          </div>
+          <div className="host-bio">Selezionato in base a partecipazione, Pulse medio e numero di Spunti aperti.</div>
         </div>
       </div>
 
