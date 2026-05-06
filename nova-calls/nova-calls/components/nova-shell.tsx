@@ -11,15 +11,15 @@ const STORAGE_KEY = 'nova:calls';
 const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
 
 const navItems = [
-  ['⌂', 'Home', '/'],
-  ['◷', 'Spunti', '/calls/new'],
-  ['⌁', 'Echo', '/echo'],
-  ['◇', 'Outcome', '/outcome'],
-  ['♙', 'Persone', '/people'],
-  ['⬡', 'Spazi', '/spaces'],
-  ['♧', 'Notifiche', '/notifications'],
-  ['▱', 'Messaggi', '/messages'],
-  ['◎', 'Profilo', '/profile'],
+  ['🏠', 'Home', '/'],
+  ['💡', 'Spunti', '/calls/new'],
+  ['🧠', 'Echo', '/echo'],
+  ['🏁', 'Outcome', '/outcome'],
+  ['👥', 'Persone', '/people'],
+  ['🌐', 'Spazi', '/spaces'],
+  ['🔔', 'Notifiche', '/notifications'],
+  ['💬', 'Messaggi', '/messages'],
+  ['👤', 'Profilo', '/profile'],
 ];
 
 type LiveThought = {
@@ -500,7 +500,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
   return (
     <div className="nova-preview">
-      <TopChrome />
+      <TopChrome isLoggedIn={Boolean(currentUserId)} />
 
       <main className="nova-app">
         <Sidebar notificationCount={notificationCount} />
@@ -761,6 +761,37 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           box-shadow: 0 0 28px rgba(124,58,237,.22);
         }
 
+        .auth-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .auth-btn {
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          padding: 0 18px;
+          font-size: 14px;
+          font-weight: 950;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .auth-login {
+          border: 1px solid rgba(15, 23, 42, .1);
+          background: rgba(255, 255, 255, .72);
+          color: #0f172a;
+        }
+
+        .auth-register {
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          color: #0f172a;
+          box-shadow: 0 16px 32px rgba(6, 182, 212, .16);
+        }
+
         .sidebar {
           display: flex;
           flex-direction: column;
@@ -814,6 +845,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-align: center;
           font-size: 18px;
           filter: drop-shadow(0 0 8px rgba(6,182,212,.24));
+        }
+
+        .nav-label {
+          display: inline;
         }
 
         .nav-badge {
@@ -1917,6 +1952,20 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             height: 38px;
           }
 
+          .auth-actions {
+            gap: 6px;
+          }
+
+          .auth-btn {
+            min-height: 38px;
+            padding: 0 12px;
+            font-size: 12px;
+          }
+
+          .auth-register {
+            display: none;
+          }
+
           .nova-app {
             display: flex;
             flex-direction: column;
@@ -1955,12 +2004,16 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           }
 
           .nav-item {
-            height: 50px;
+            position: relative;
+            height: 58px;
             justify-content: center;
-            padding: 0;
+            flex-direction: column;
+            padding: 6px 4px;
             border-radius: 18px;
-            font-size: 0;
-            gap: 0;
+            font-size: 10px;
+            line-height: 1;
+            gap: 5px;
+            text-align: center;
           }
 
           .nav-item:nth-child(n+6) {
@@ -1969,7 +2022,25 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
           .nav-icon {
             width: auto;
-            font-size: 20px;
+            font-size: 21px;
+            line-height: 1;
+            filter: none;
+          }
+
+          .nav-label {
+            display: block;
+            max-width: 64px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: rgba(15, 23, 42, .72);
+            font-size: 10px;
+            font-weight: 900;
+          }
+
+          .nav-item.active .nav-label,
+          .nav-item:hover .nav-label {
+            color: #075985;
           }
 
           .nav-badge {
@@ -2296,7 +2367,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
   );
 }
 
-function TopChrome() {
+function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <>
       <Link href="/" className="brand" aria-label="NOVA home">
@@ -2308,18 +2379,32 @@ function TopChrome() {
       </Link>
 
       <div className="top-actions">
-        <Link href="/search" className="icon-btn">
-          ⌕
+        <Link href="/search" className="icon-btn" aria-label="Cerca">
+          🔎
         </Link>
-        <Link href="/saved" className="icon-btn">
-          ☆
+
+        <Link href="/saved" className="icon-btn" aria-label="Salvati">
+          ⭐
         </Link>
-        <Link href="/people" className="icon-btn">
-          ♙
+
+        <Link href="/people" className="icon-btn" aria-label="Persone">
+          👥
         </Link>
-        <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
-          <ProfileOrb className="h-full w-full" />
-        </Link>
+
+        {isLoggedIn ? (
+          <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
+            <ProfileOrb className="h-full w-full" />
+          </Link>
+        ) : (
+          <div className="auth-actions">
+            <Link href="/login" className="auth-btn auth-login">
+              Login
+            </Link>
+            <Link href="/login?mode=register" className="auth-btn auth-register">
+              Registrati
+            </Link>
+          </div>
+        )}
       </div>
     </>
   );
@@ -2332,7 +2417,7 @@ function Sidebar({ notificationCount }: { notificationCount: number }) {
         {navItems.map(([icon, label, href], index) => (
           <Link key={label} href={href} className={`nav-item ${index === 0 ? 'active' : ''}`}>
             <span className="nav-icon">{icon}</span>
-            {label}
+            <span className="nav-label">{label}</span>
             {label === 'Notifiche' && notificationCount > 0 && <span className="nav-badge">{notificationCount}</span>}
           </Link>
         ))}
