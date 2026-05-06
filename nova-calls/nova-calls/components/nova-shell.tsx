@@ -238,18 +238,26 @@ export function NovaHome() {
 
         .brand {
           position: fixed;
-          left: 38px;
-          top: 33px;
+          left: 30px;
+          top: 24px;
           z-index: 10;
           display: flex;
           align-items: center;
-          gap: 21px;
-          letter-spacing: 24px;
-          font-size: 31px;
-          font-weight: 400;
-          color: #eaf5ff;
           text-decoration: none;
-          text-shadow: 0 0 20px rgba(34,211,238,.48);
+        }
+
+        .brand-logo {
+          display: block;
+          width: 168px;
+          height: auto;
+          object-fit: contain;
+          filter: drop-shadow(0 0 18px rgba(34,211,238,.32));
+          transition: filter .2s ease, transform .2s ease;
+        }
+
+        .brand:hover .brand-logo {
+          filter: drop-shadow(0 0 26px rgba(34,211,238,.46));
+          transform: translateY(-1px);
         }
 
         .brand-orb {
@@ -1268,10 +1276,10 @@ export function NovaHome() {
             width: calc(100% - 28px);
             margin: 18px auto 12px;
             justify-content: center;
-            gap: 16px;
-            letter-spacing: 17px;
-            font-size: 27px;
-            transform: translateX(8px);
+          }
+
+          .brand-logo {
+            width: 150px;
           }
 
           .brand-orb {
@@ -1709,8 +1717,12 @@ export function NovaHome() {
 function TopChrome() {
   return (
     <>
-      <Link href="/" className="brand">
-        N<span className="brand-orb" />VA
+      <Link href="/" className="brand" aria-label="NOVA home">
+        <img
+          src="/nova-logo.png"
+          alt="NOVA"
+          className="brand-logo"
+        />
       </Link>
 
       <div className="top-actions">
