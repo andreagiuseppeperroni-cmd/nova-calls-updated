@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Navbar, Button, Card } from '@/components/ui';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
@@ -64,11 +64,13 @@ function formatTime(value: string) {
 
 export default function Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedLinkId = searchParams.get('link');
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+  const [activeLinkId, setActiveLinkId] = useState<string | null>(requestedLinkId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(true);
@@ -133,11 +135,11 @@ export default function Page() {
 
     setConversations(nextConversations);
 
-    if (!activeLinkId && nextConversations.length > 0) {
+    if (requestedLinkId && nextConversations.some((item) => item.link.id === requestedLinkId)) {
+      setActiveLinkId(requestedLinkId);
+    } else if (!activeLinkId && nextConversations.length > 0) {
       setActiveLinkId(nextConversations[0].link.id);
-    }
-
-    if (activeLinkId && !nextConversations.some((item) => item.link.id === activeLinkId)) {
+    } else if (activeLinkId && !nextConversations.some((item) => item.link.id === activeLinkId)) {
       setActiveLinkId(nextConversations[0]?.link.id || null);
     }
 
@@ -190,6 +192,12 @@ export default function Page() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, supabase]);
+
+  useEffect(() => {
+    if (requestedLinkId) {
+      setActiveLinkId(requestedLinkId);
+    }
+  }, [requestedLinkId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -301,8 +309,8 @@ export default function Page() {
             </p>
           </div>
 
-          <Button href="/calls/new" variant="lime">
-            Apri una Call
+          <Button href="/profile" variant="lime">
+            Vai ai Legami
           </Button>
         </div>
 
@@ -348,8 +356,8 @@ export default function Page() {
 
                 {!loadingConversations &&
                   conversations.map((conversation) => {
-                    const profile = conversation.profile;
-                    const name = profile?.full_name || 'Utente Nova';
+                    const publicProfile = conversation.profile;
+                    const name = publicProfile?.full_name || 'Utente Nova';
                     const active = conversation.link.id === activeLinkId;
 
                     return (
@@ -365,9 +373,9 @@ export default function Page() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black">
-                            {profile?.avatar_url ? (
+                            {publicProfile?.avatar_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                              <img src={publicProfile.avatar_url} alt="" className="h-full w-full object-cover" />
                             ) : (
                               initials(name)
                             )}
@@ -376,7 +384,7 @@ export default function Page() {
                           <div className="min-w-0">
                             <div className="truncate text-sm font-black text-white">{name}</div>
                             <div className="text-xs font-bold text-slate-400">
-                              {profile?.city || 'NOVA'} · {profile?.nova_points || 0} punti
+                              {publicProfile?.city || 'NOVA'} · {publicProfile?.nova_points || 0} punti
                             </div>
                             <div className="mt-1 text-[11px] font-black uppercase tracking-[.16em] text-lime-300">
                               Legame attivo
