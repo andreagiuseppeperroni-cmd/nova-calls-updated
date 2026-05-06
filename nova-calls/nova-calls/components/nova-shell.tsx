@@ -243,21 +243,43 @@ export function NovaHome() {
           z-index: 10;
           display: flex;
           align-items: center;
+          gap: 12px;
+          color: #eaf5ff;
           text-decoration: none;
         }
 
-        .brand-logo {
-          display: block;
-          width: 168px;
-          height: auto;
-          object-fit: contain;
-          filter: drop-shadow(0 0 18px rgba(34,211,238,.32));
-          transition: filter .2s ease, transform .2s ease;
+        .brand-logo-box {
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(9, 15, 35, .72);
+          box-shadow: 0 0 24px rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.08);
+          flex-shrink: 0;
         }
 
-        .brand:hover .brand-logo {
-          filter: drop-shadow(0 0 26px rgba(34,211,238,.46));
-          transform: translateY(-1px);
+        .brand-logo-image {
+          width: 18px;
+          height: 18px;
+          object-fit: contain;
+          display: block;
+        }
+
+        .brand-word {
+          font-size: 20px;
+          font-weight: 900;
+          letter-spacing: .28em;
+          color: #ffffff;
+          text-shadow: 0 0 18px rgba(34,211,238,.18);
+        }
+
+        .brand:hover .brand-logo-box {
+          border-color: rgba(34,211,238,.32);
+          box-shadow: 0 0 32px rgba(34,211,238,.28), inset 0 1px 0 rgba(255,255,255,.08);
         }
 
         .brand-orb {
@@ -1276,10 +1298,24 @@ export function NovaHome() {
             width: calc(100% - 28px);
             margin: 18px auto 12px;
             justify-content: center;
+            gap: 12px;
+            transform: none;
           }
 
-          .brand-logo {
-            width: 150px;
+          .brand-logo-box {
+            width: 18px;
+            height: 18px;
+            border-radius: 16px;
+          }
+
+          .brand-logo-image {
+            width: 18px;
+            height: 18px;
+          }
+
+          .brand-word {
+            font-size: 18px;
+            letter-spacing: .22em;
           }
 
           .brand-orb {
@@ -1718,11 +1754,11 @@ function TopChrome() {
   return (
     <>
       <Link href="/" className="brand" aria-label="NOVA home">
-        <img
-          src="/nova-logo.png"
-          alt="NOVA"
-          className="brand-logo"
-        />
+        <span className="brand-logo-box">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/nova-logo.png" alt="" className="brand-logo-image" />
+        </span>
+        <span className="brand-word">NOVA</span>
       </Link>
 
       <div className="top-actions">
