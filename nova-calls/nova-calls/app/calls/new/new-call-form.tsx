@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { makeSlug } from '@/lib/local-call';
 
+const STORAGE_KEY = 'nova:calls';
+
 const callTypes = [
   { value: 'decidere', label: '🧭 Decidere' },
   { value: 'capire', label: '🔍 Capire' },
@@ -12,6 +14,30 @@ const callTypes = [
   { value: 'fare-ora', label: '📍 Fare ora' },
   { value: 'creare-insieme', label: '✨ Creare insieme' },
 ];
+
+function getCallTypeLabel(value: string) {
+  return callTypes.find((item) => item.value === value)?.label.replace(/^[^ ]+ /, '') || value;
+}
+
+function saveLocalCall(call: {
+  title: string;
+  description: string;
+  type: string;
+  accessType: string;
+  slug: string;
+  pulse: number;
+  participants: number;
+  createdAt: string;
+}) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const current = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([call, ...current].slice(0, 12)));
+  } catch {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([call]));
+  }
+}
 
 export function NewCallForm({
   initialTitle,
@@ -22,15 +48,17 @@ export function NewCallForm({
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState('');
-  const [callType, setCallType] = useState(initialType);
+  const [callType, setCallType] = useState(initialType || 'decidere');
   const [accessType, setAccessType] = useState('public');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function createCall(event: React.FormEvent) {
+  function createCall(event: React.FormEvent) {
     event.preventDefault();
 
-    if (!title.trim()) {
+    const cleanTitle = title.trim();
+
+    if (!cleanTitle) {
       setError('Scrivi la domanda della Call.');
       return;
     }
@@ -38,70 +66,72 @@ export function NewCallForm({
     setLoading(true);
     setError('');
 
-    const response = await fetch('/api/calls', {
+    const slug = makeSlug(cleanTitle);
+    const localCall = {
+      title: cleanTitle,
+      description: description.trim() || 'Call aperta su NOVA. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+      type: getCallTypeLabel(callType),
+      accessType,
+      slug,
+      pulse: 12,
+      participants: 1,
+      createdAt: new Date().toISOString(),
+    };
+
+    saveLocalCall(localCall);
+
+    /*
+      Non aspettiamo più /api/calls prima del redirect.
+      Prima il form restava bloccato su "Creo..." quando Supabase/API non rispondevano.
+      Ora la Call si apre subito e il salvataggio remoto viene tentato in background.
+    */
+    fetch('/api/calls', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, call_type: callType, access_type: accessType }),
+      keepalive: true,
+      body: JSON.stringify({
+        title: cleanTitle,
+        description: localCall.description,
+        call_type: callType,
+        access_type: accessType,
+      }),
+    }).catch(() => {
+      // Fallback locale già salvato: nessun blocco per l'utente.
     });
 
-    const data = await response.json().catch(() => null);
-    setLoading(false);
-
-    if (!response.ok) {
-      const slug = makeSlug(title);
-      const localCall = {
-        title,
-        description,
-        type: callTypes.find((item) => item.value === callType)?.label.replace(/^[^ ]+ /, '') || callType,
-        accessType,
-        slug,
-        pulse: 12,
-        participants: 1,
-        createdAt: new Date().toISOString(),
-      };
-      const current = JSON.parse(window.localStorage.getItem('nova:calls') || '[]');
-      window.localStorage.setItem('nova:calls', JSON.stringify([localCall, ...current]));
-      window.location.href = `/c/${slug}`;
-      return;
-    }
-
-    const call = data.call;
-    const localCall = {
-      title: call.title || title,
-      description: call.description || description,
-      type: callTypes.find((item) => item.value === callType)?.label.replace(/^[^ ]+ /, '') || callType,
-      accessType,
-      slug: call.slug,
-      pulse: call.pulse_score || 12,
-      participants: 1,
-      createdAt: call.created_at || new Date().toISOString(),
-    };
-    const current = JSON.parse(window.localStorage.getItem('nova:calls') || '[]');
-    window.localStorage.setItem('nova:calls', JSON.stringify([localCall, ...current]));
-
-    window.location.href = `/c/${call.slug}`;
+    window.location.assign(`/c/${slug}`);
   }
 
   return (
     <Card className="p-5 md:p-6">
       <form onSubmit={createCall} className="space-y-5">
         <div>
-          <label className="text-sm font-black text-cyan-100">Domanda / titolo</label>
+          <label htmlFor="call-title" className="text-sm font-black text-cyan-100">
+            Domanda / titolo
+          </label>
           <input
+            id="call-title"
+            name="call-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Es. Mi trasferisco a Milano?"
+            autoComplete="off"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 font-bold text-white outline-none placeholder:text-white/35 focus:ring-4 focus:ring-cyan-300/10"
           />
         </div>
 
         <div>
-          <label className="text-sm font-black text-cyan-100">Contesto</label>
+          <label htmlFor="call-description" className="text-sm font-black text-cyan-100">
+            Contesto
+          </label>
           <textarea
+            id="call-description"
+            name="call-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Racconta cosa sta succedendo e che tipo di aiuto ti serve..."
             rows={5}
+            autoComplete="off"
             className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-white/10 px-5 py-4 font-bold leading-7 text-white outline-none placeholder:text-white/35 focus:ring-4 focus:ring-cyan-300/10"
           />
         </div>
@@ -158,7 +188,7 @@ export function NewCallForm({
         {error && <p className="text-sm font-black text-pink-300">{error}</p>}
 
         <Button type="submit" disabled={loading} variant="lime" className="w-full">
-          {loading ? 'Creo...' : 'Apri la Call'}
+          {loading ? 'Apro la Call...' : 'Apri la Call'}
         </Button>
       </form>
     </Card>
