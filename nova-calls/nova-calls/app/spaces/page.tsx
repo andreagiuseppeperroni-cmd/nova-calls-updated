@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Navbar, Button, Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 type LiveCall = {
@@ -47,6 +47,49 @@ function formatTime(value: string) {
   } catch {
     return 'Ora';
   }
+}
+
+function SpacesTopBar() {
+  return (
+    <header className="spaces-topbar">
+      <Link href="/" className="spaces-brand" aria-label="NOVA home">
+        <span className="spaces-logo-box">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/nova-logo.png" alt="" className="spaces-logo-image" />
+        </span>
+        <span className="spaces-brand-word">NOVA</span>
+      </Link>
+
+      <nav className="spaces-nav" aria-label="Navigazione principale">
+        <Link href="/" className="spaces-nav-link">
+          <span>🏠</span>
+          Home
+        </Link>
+        <Link href="/profile" className="spaces-nav-link">
+          <span>👤</span>
+          Profilo
+        </Link>
+        <Link href="/messages" className="spaces-nav-link">
+          <span>💬</span>
+          Messaggi
+        </Link>
+      </nav>
+
+      <div className="spaces-actions">
+        <Link href="/login" className="spaces-login">
+          Login / Registrati
+        </Link>
+
+        <Link href="/calls/new" className="spaces-open-call">
+          + Apri una Call
+        </Link>
+
+        <Link href="/profile" className="spaces-profile-orb" aria-label="Profilo">
+          👤
+        </Link>
+      </div>
+    </header>
+  );
 }
 
 export default function Page() {
@@ -155,17 +198,18 @@ export default function Page() {
 
   return (
     <div>
-      <Navbar />
+      <SpacesTopBar />
 
-      <main className="mx-auto w-[min(1180px,calc(100%-28px))] py-10">
+      <main className="mx-auto w-[min(1180px,calc(100%-28px))] py-10 pt-28 md:pt-32">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-200/75">
+            <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-700 md:text-cyan-200/90">
               Live attive sui tuoi interessi
             </p>
-            <h1 className="mt-3 text-5xl font-black tracking-[-.05em]">Spazi</h1>
-            <p className="mt-3 max-w-2xl font-semibold leading-7 text-slate-300">
-              Qui trovi le Call pubbliche attive create dalla community. Entra in una stanza, ascolta, contribuisci e aiuta a generare Echo e Outcome.
+            <h1 className="mt-3 text-5xl font-black tracking-[-.05em] text-slate-950 md:text-white">Spazi</h1>
+            <p className="mt-3 max-w-2xl font-semibold leading-7 text-slate-700 md:text-slate-200">
+              Qui trovi le Call pubbliche attive create dalla community. Entra in una stanza, ascolta, contribuisci e
+              aiuta a generare Echo e Outcome.
             </p>
           </div>
 
@@ -298,6 +342,242 @@ export default function Page() {
           )}
         </Card>
       </main>
+
+      <style jsx global>{`
+        .spaces-topbar {
+          position: fixed;
+          inset: 0 0 auto 0;
+          z-index: 100;
+          min-height: 78px;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 22px;
+          padding: 12px clamp(18px, 4vw, 42px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+          background:
+            radial-gradient(circle at 18% 0%, rgba(6, 182, 212, 0.2), transparent 30%),
+            linear-gradient(90deg, rgba(11, 25, 45, 0.96), rgba(32, 44, 75, 0.96));
+          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.24);
+          backdrop-filter: blur(22px) saturate(1.3);
+        }
+
+        .spaces-brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          color: #ffffff;
+          text-decoration: none;
+        }
+
+        .spaces-logo-box {
+          width: 48px;
+          height: 48px;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-radius: 16px;
+          border: 1px solid rgba(125, 227, 255, 0.32);
+          background: rgba(255, 255, 255, 0.9);
+          box-shadow: 0 0 28px rgba(6, 182, 212, 0.22);
+          flex: 0 0 auto;
+        }
+
+        .spaces-logo-image {
+          width: 38px;
+          height: 38px;
+          object-fit: contain;
+          display: block;
+        }
+
+        .spaces-brand-word {
+          color: #ffffff;
+          font-size: 19px;
+          font-weight: 950;
+          letter-spacing: 0.34em;
+          text-shadow: 0 2px 12px rgba(0, 0, 0, 0.32);
+        }
+
+        .spaces-nav {
+          justify-self: center;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+        }
+
+        .spaces-nav-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 0 14px;
+          border-radius: 999px;
+          color: #f8fafc;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 950;
+          text-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
+          transition:
+            transform 0.2s ease,
+            background 0.2s ease,
+            color 0.2s ease;
+        }
+
+        .spaces-nav-link:hover {
+          transform: translateY(-1px);
+          color: #10213a;
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          text-shadow: none;
+        }
+
+        .spaces-actions {
+          display: inline-flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+
+        .spaces-login {
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          padding: 0 16px;
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 950;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        }
+
+        .spaces-login:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .spaces-open-call {
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          padding: 0 22px;
+          color: #10220a;
+          background: linear-gradient(135deg, #a3e635, #7de3ff);
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 950;
+          box-shadow: 0 14px 30px rgba(6, 182, 212, 0.22);
+          white-space: nowrap;
+        }
+
+        .spaces-profile-orb {
+          width: 48px;
+          height: 48px;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          color: #ffffff;
+          background:
+            radial-gradient(circle at 30% 20%, #fbcfe8, #8f7cff 38%, #58c4ff 70%),
+            #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.24);
+          text-decoration: none;
+          box-shadow: 0 0 26px rgba(124, 58, 237, 0.26);
+          flex: 0 0 auto;
+        }
+
+        @media (max-width: 920px) {
+          .spaces-topbar {
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            padding: 10px 14px;
+          }
+
+          .spaces-nav {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            justify-self: stretch;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border-radius: 22px;
+          }
+
+          .spaces-nav-link {
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 10px;
+            font-size: 12px;
+          }
+
+          .spaces-actions {
+            gap: 8px;
+          }
+
+          .spaces-login {
+            display: none;
+          }
+
+          .spaces-open-call {
+            min-height: 42px;
+            padding: 0 15px;
+            font-size: 12px;
+          }
+
+          .spaces-profile-orb {
+            width: 42px;
+            height: 42px;
+          }
+
+          .spaces-brand-word {
+            font-size: 16px;
+            letter-spacing: 0.24em;
+          }
+
+          .spaces-logo-box {
+            width: 42px;
+            height: 42px;
+          }
+
+          .spaces-logo-image {
+            width: 34px;
+            height: 34px;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .spaces-brand-word {
+            display: none;
+          }
+
+          .spaces-open-call {
+            font-size: 0;
+            width: 44px;
+            padding: 0;
+          }
+
+          .spaces-open-call::before {
+            content: '+';
+            font-size: 26px;
+            line-height: 1;
+          }
+
+          .spaces-nav-link {
+            gap: 5px;
+            font-size: 11px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
