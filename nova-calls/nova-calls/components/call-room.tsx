@@ -55,29 +55,8 @@ type UserLinkRow = {
   status: 'pending' | 'accepted' | 'rejected';
 };
 
-const starterMessages: Message[] = [
-  {
-    id: 'starter-host',
-    userId: null,
-    author: 'Giulia · Host',
-    text: 'Partiamo dal punto: che cosa renderebbe questa decisione davvero sicura?',
-    kind: 'host',
-  },
-  {
-    id: 'starter-marco',
-    userId: null,
-    author: 'Marco',
-    text: 'Io separerei desiderio, vincoli economici e rete locale. Sono tre decisioni diverse.',
-    kind: 'guest',
-  },
-  {
-    id: 'starter-ai',
-    userId: null,
-    author: 'Nova Echo',
-    text: 'Sto rilevando un tema dominante: stabilità prima, esplorazione subito dopo.',
-    kind: 'ai',
-  },
-];
+const starterMessages: Message[] = [];
+
 
 function readCall(slug: string) {
   if (typeof window === 'undefined') return undefined;
@@ -175,7 +154,7 @@ export function CallRoom({ slug }: { slug: string }) {
   const [call, setCall] = useState<NovaCall | undefined>();
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(starterMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [reactions, setReactions] = useState(12);
   const [joined, setJoined] = useState(false);
@@ -255,9 +234,9 @@ export function CallRoom({ slug }: { slug: string }) {
         setRoomError(
           `Non riesco a leggere i messaggi condivisi. Controlla che la tabella call_messages esista e che Realtime/RLS siano configurati. Dettaglio: ${error.message}`
         );
-        setMessages(starterMessages);
+        setMessages([]);
       } else {
-        setMessages(uniqueMessages([...starterMessages, ...(data || []).map(mapDbMessage)]));
+        setMessages(uniqueMessages((data || []).map(mapDbMessage)));
       }
 
       setLoadingMessages(false);
@@ -299,17 +278,40 @@ export function CallRoom({ slug }: { slug: string }) {
   }, [call?.pulse, joined, messages.length, reactions]);
 
   const echo = useMemo(() => {
-    const allText = messages.map((message) => message.text).join(' ').toLowerCase();
+    const userMessages = messages.filter((message) => message.kind !== 'ai' && message.kind !== 'system');
 
-    if (allText.includes('sold') || allText.includes('econom') || allText.includes('costo')) {
-      return 'Echo: il nodo principale sembra economico. Prima azione consigliata: scenario a 90 giorni con budget minimo, medio e ideale.';
+    if (userMessages.length < 2) {
+      return null;
     }
 
-    if (allText.includes('paura') || allText.includes('sicura')) {
-      return 'Echo: la stanza distingue paura e segnale reale. Serve una prova piccola prima della decisione grande.';
+    const allText = userMessages.map((message) => message.text).join(' ').toLowerCase();
+
+    const economicSignals = ['sold', 'econom', 'budget', 'costo', 'costi', 'spesa', 'stipendio', 'affitto', 'investimento'];
+    const fearSignals = ['paura', 'ansia', 'insicur', 'sicura', 'sicuro', 'rischio', 'rischioso', 'blocc'];
+    const decisionSignals = ['decidere', 'scelta', 'scegliere', 'dubbio', 'indeciso', 'indecisa', 'priorità', 'opzioni'];
+    const relationshipSignals = ['relazione', 'amicizia', 'famiglia', 'partner', 'collega', 'team', 'conflitto'];
+
+    if (economicSignals.some((signal) => allText.includes(signal))) {
+      return 'Echo: sta emergendo un nodo economico. Prima azione consigliata: chiarire budget, rischio massimo e scenario a 90 giorni.';
     }
 
-    return 'Echo: stanno emergendo chiarezza, bisogno di rete e una prossima azione concreta da testare subito.';
+    if (fearSignals.some((signal) => allText.includes(signal))) {
+      return 'Echo: la stanza sta distinguendo paura e segnale reale. Potrebbe servire una prova piccola prima della decisione grande.';
+    }
+
+    if (decisionSignals.some((signal) => allText.includes(signal))) {
+      return 'Echo: il tema centrale sembra una scelta da rendere più concreta. Prova a separare opzioni, vincoli e prossimo passo reversibile.';
+    }
+
+    if (relationshipSignals.some((signal) => allText.includes(signal))) {
+      return 'Echo: sta emergendo un tema relazionale. Può essere utile chiarire aspettative, confini e richiesta specifica all’altra persona.';
+    }
+
+    if (userMessages.length >= 5) {
+      return 'Echo: la conversazione ha abbastanza segnali per una prima sintesi. Prova a trasformare i punti emersi in 3 prossime azioni.';
+    }
+
+    return null;
   }, [messages]);
 
   async function insertSharedMessage(body: string) {
@@ -587,6 +589,15 @@ export function CallRoom({ slug }: { slug: string }) {
             )}
 
             <div className="space-y-3">
+              {!loadingMessages && messages.length === 0 && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                  <h3 className="text-xl font-black">La chat è vuota</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                    Inizia tu la conversazione. Echo interverrà solo se rileva qualcosa di importante.
+                  </p>
+                </div>
+              )}
+
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -667,7 +678,13 @@ export function CallRoom({ slug }: { slug: string }) {
 
           <div className="nova-glass rounded-[2rem] p-5">
             <h3 className="text-xl font-black">⌁ Echo</h3>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{echo}</p>
+            {echo ? (
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{echo}</p>
+            ) : (
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-400">
+                Echo resta in ascolto e interviene solo quando rileva un segnale importante nella chat.
+              </p>
+            )}
           </div>
 
           <div className="nova-glass rounded-[2rem] p-5">
