@@ -1,17 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { demoCalls, makeSlug, type NovaCall } from '@/lib/local-call';
 import { ProfileOrb } from '@/components/profile-store';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 const STORAGE_KEY = 'nova:calls';
 
-const callTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
+const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
 
 const navItems = [
   ['⌂', 'Home', '/'],
-  ['◷', 'Call', '/calls/new'],
+  ['◷', 'Spunti', '/calls/new'],
   ['⌁', 'Echo', '/echo'],
   ['◇', 'Outcome', '/outcome'],
   ['♙', 'Persone', '/people'],
@@ -20,6 +21,37 @@ const navItems = [
   ['▱', 'Messaggi', '/messages'],
   ['◎', 'Profilo', '/profile'],
 ];
+
+type LiveThought = {
+  id?: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  call_type: string | null;
+  access_type: string;
+  status: string;
+  pulse_score: number;
+  participants: number;
+  host_id: string | null;
+  host_name: string | null;
+  host_avatar: string | null;
+  created_at: string;
+};
+
+type TrendEcho = {
+  title: string;
+  text: string;
+};
+
+type HostMoment = {
+  hostId: string;
+  hostName: string;
+  hostAvatar: string | null;
+  hostedCount: number;
+  totalParticipants: number;
+  avgPulse: number;
+  popularityScore: number;
+};
 
 function readStoredCalls() {
   if (typeof window === 'undefined') return [] as NovaCall[];
@@ -31,29 +63,281 @@ function readStoredCalls() {
   }
 }
 
-function saveCall(call: NovaCall) {
+function saveLocalThought(call: NovaCall) {
   const calls = readStoredCalls();
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify([call, ...calls].slice(0, 12)));
 }
 
+function localCallToThought(call: NovaCall): LiveThought {
+  return {
+    slug: call.slug,
+    title: call.title,
+    description: call.description,
+    call_type: call.type,
+    access_type: call.accessType || 'public',
+    status: 'live',
+    pulse_score: call.pulse || 12,
+    participants: call.participants || 1,
+    host_id: null,
+    host_name: 'NOVA',
+    host_avatar: null,
+    created_at: call.createdAt || new Date().toISOString(),
+  };
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
+}
+
+function extractKeywords(thoughts: LiveThought[]) {
+  const stopwords = new Set([
+    'adesso',
+    'alla',
+    'allo',
+    'anche',
+    'avere',
+    'capire',
+    'cosa',
+    'come',
+    'con',
+    'da',
+    'dei',
+    'del',
+    'della',
+    'delle',
+    'di',
+    'dopo',
+    'dove',
+    'essere',
+    'fare',
+    'fra',
+    'gli',
+    'hai',
+    'ho',
+    'il',
+    'in',
+    'la',
+    'le',
+    'lo',
+    'ma',
+    'meno',
+    'mi',
+    'per',
+    'piu',
+    'prima',
+    'quando',
+    'se',
+    'si',
+    'sono',
+    'su',
+    'ti',
+    'tra',
+    'una',
+    'uno',
+  ]);
+
+  const map = new Map<string, number>();
+
+  for (const thought of thoughts) {
+    const raw = `${thought.title} ${thought.description || ''}`;
+    const words = normalizeText(raw).split(/\s+/);
+
+    for (const word of words) {
+      if (!word || word.length < 4 || stopwords.has(word)) continue;
+      map.set(word, (map.get(word) || 0) + 1);
+    }
+  }
+
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([word]) => word);
+}
+
+function buildTrendEchoes(thoughts: LiveThought[]): TrendEcho[] {
+  const keywords = extractKeywords(thoughts);
+  const byType = thoughts.reduce<Record<string, number>>((acc, thought) => {
+    const type = thought.call_type || 'capire';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || 'capire';
+
+  return [
+    {
+      title: 'Tema dominante',
+      text: keywords.length
+        ? `Negli Spunti recenti emergono soprattutto: ${keywords.slice(0, 3).join(', ')}.`
+        : 'Stanno emergendo nuovi temi, ma servono più Spunti reali per leggere la tendenza.',
+    },
+    {
+      title: 'Energia della rete',
+      text: `La categoria più attiva ora è “${topType}”: la community sta cercando confronto immediato.`,
+    },
+    {
+      title: 'Nuovo Spunto suggerito',
+      text: keywords[0]
+        ? `Apri uno Spunto su “${keywords[0]}” per intercettare un bisogno già presente nella rete.`
+        : 'Apri uno Spunto su una decisione concreta: è il formato che genera più partecipazione.',
+    },
+  ];
+}
+
+function computeHostOfMoment(thoughts: LiveThought[]): HostMoment | null {
+  const grouped = new Map<string, HostMoment>();
+
+  for (const thought of thoughts) {
+    if (!thought.host_id || !thought.host_name) continue;
+
+    const current = grouped.get(thought.host_id) || {
+      hostId: thought.host_id,
+      hostName: thought.host_name,
+      hostAvatar: thought.host_avatar || null,
+      hostedCount: 0,
+      totalParticipants: 0,
+      avgPulse: 0,
+      popularityScore: 0,
+    };
+
+    current.hostedCount += 1;
+    current.totalParticipants += thought.participants || 0;
+    current.avgPulse += thought.pulse_score || 0;
+
+    grouped.set(thought.host_id, current);
+  }
+
+  const hosts = [...grouped.values()].map((host) => {
+    const avgPulse = host.hostedCount ? Math.round(host.avgPulse / host.hostedCount) : 0;
+    const popularityScore = host.hostedCount * 12 + host.totalParticipants * 2 + avgPulse * 3;
+
+    return { ...host, avgPulse, popularityScore };
+  });
+
+  return hosts.sort((a, b) => b.popularityScore - a.popularityScore)[0] || null;
+}
+
+function avgPulseValue(thoughts: LiveThought[]) {
+  if (!thoughts.length) return 0;
+  const total = thoughts.reduce((sum, item) => sum + (item.pulse_score || 0), 0);
+  return Math.round(total / thoughts.length);
+}
+
+function getThoughtTypeIcon(item: string) {
+  return item === 'Decidere'
+    ? '◈'
+    : item === 'Capire'
+      ? '⚭'
+      : item === 'Feedback'
+        ? '▱'
+        : item === 'Trovare persone'
+          ? '♙'
+          : item === 'Fare ora'
+            ? '☆'
+            : '▣';
+}
+
 export function NovaHome() {
+  const supabase = useMemo(() => createBrowserSupabase(), []);
   const [text, setText] = useState('');
   const [type, setType] = useState('Decidere');
   const [attachmentName, setAttachmentName] = useState('');
-  const [calls, setCalls] = useState<NovaCall[]>(demoCalls);
+  const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [avgPulse, setAvgPulse] = useState(0);
+  const [trendEchoes, setTrendEchoes] = useState<TrendEcho[]>([]);
+  const [hostMoment, setHostMoment] = useState<HostMoment | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [closingSlug, setClosingSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    setCalls([...readStoredCalls(), ...demoCalls]);
+    loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const featured = calls[0] || demoCalls[0];
+  async function loadDashboardData() {
+    const localThoughts = [...readStoredCalls(), ...demoCalls].map(localCallToThought);
 
-  function openCall() {
-    const title = text.trim() || 'Nuova Call Nova';
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      setCurrentUserId(user?.id || null);
+
+      const { data: thoughts, error } = await supabase
+        .from('calls')
+        .select(
+          'id, slug, title, description, call_type, access_type, status, pulse_score, participants, host_id, host_name, host_avatar, created_at'
+        )
+        .eq('access_type', 'public')
+        .in('status', ['live', 'open'])
+        .order('participants', { ascending: false })
+        .order('pulse_score', { ascending: false })
+        .limit(24);
+
+      let pendingCount = 0;
+
+      if (user) {
+        const { count } = await supabase
+          .from('user_links')
+          .select('id', { count: 'exact', head: true })
+          .eq('target_user_id', user.id)
+          .eq('status', 'pending');
+
+        pendingCount = count || 0;
+      }
+
+      const safeThoughts = error || !thoughts?.length ? localThoughts : (thoughts as LiveThought[]);
+
+      setLiveThoughts(safeThoughts);
+      setAvgPulse(avgPulseValue(safeThoughts));
+      setTrendEchoes(buildTrendEchoes(safeThoughts));
+      setHostMoment(computeHostOfMoment(safeThoughts));
+      setNotificationCount(pendingCount);
+    } catch {
+      setLiveThoughts(localThoughts);
+      setAvgPulse(avgPulseValue(localThoughts));
+      setTrendEchoes(buildTrendEchoes(localThoughts));
+      setHostMoment(computeHostOfMoment(localThoughts));
+      setNotificationCount(0);
+    }
+  }
+
+  async function closeThoughtEarly(slug: string) {
+    try {
+      setClosingSlug(slug);
+
+      const response = await fetch(`/api/calls/${slug}/close`, {
+        method: 'POST',
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
+        return;
+      }
+
+      window.location.href = `/outcome?slug=${slug}`;
+    } catch {
+      alert('Errore durante la chiusura dello Spunto.');
+    } finally {
+      setClosingSlug(null);
+    }
+  }
+
+  function openThought() {
+    const title = text.trim() || 'Nuovo Spunto Nova';
 
     const call: NovaCall = {
       title,
-      description: 'Call aperta dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+      description: 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
       type,
       accessType: 'public',
       slug: makeSlug(title),
@@ -62,35 +346,37 @@ export function NovaHome() {
       createdAt: new Date().toISOString(),
     };
 
-    saveCall(call);
-    window.location.href = `/c/${call.slug}`;
+    saveLocalThought(call);
+    window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
   }
+
+  const featured = liveThoughts[0] || null;
 
   return (
     <div className="nova-preview">
       <TopChrome />
 
       <main className="nova-app">
-        <Sidebar />
+        <Sidebar notificationCount={notificationCount} />
 
         <section className="nova-center">
           <h1>
             Di cosa hai bisogno <span className="gradient-text">adesso?</span>
           </h1>
-          <p className="subtitle">Apri una Call. La risposta è già nella tua rete.</p>
+          <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
 
           <div className="composer">
             <div className="composer-content">
               <textarea
                 value={text}
                 onChange={(event) => setText(event.target.value)}
-                placeholder="Racconta la tua Call..."
+                placeholder="Racconta il tuo Spunto..."
                 rows={3}
                 className="composer-input"
               />
 
               <div className="composer-actions">
-                <button type="button" onClick={openCall} className="circle-plus">
+                <button type="button" onClick={openThought} className="circle-plus">
                   +
                 </button>
 
@@ -113,59 +399,58 @@ export function NovaHome() {
               </div>
             </div>
 
-            <button type="button" onClick={openCall} className="mic">
+            <button type="button" onClick={openThought} className="mic">
               🎙
             </button>
           </div>
 
           <div className="chips">
-            {callTypes.map((item) => (
+            {thoughtTypes.map((item) => (
               <button
                 type="button"
                 key={item}
                 onClick={() => setType(item)}
                 className={`chip ${type === item ? 'active' : ''}`}
               >
-                {item === 'Decidere'
-                  ? '◈'
-                  : item === 'Capire'
-                    ? '⚭'
-                    : item === 'Feedback'
-                      ? '▱'
-                      : item === 'Trovare persone'
-                        ? '♙'
-                        : item === 'Fare ora'
-                          ? '☆'
-                          : '▣'}{' '}
-                {item}
+                {getThoughtTypeIcon(item)} {item}
               </button>
             ))}
           </div>
 
-          <FeaturedCall call={featured} />
-          <HostCard />
-          <LiveStrip calls={calls} />
+          {featured && (
+            <FeaturedThought
+              thought={featured}
+              currentUserId={currentUserId}
+              onCloseEarly={closeThoughtEarly}
+              closingSlug={closingSlug}
+            />
+          )}
+
+          <TrendEchoSection echoes={trendEchoes} />
+          <HostOfMomentSection host={hostMoment} />
+          <LiveStrip thoughts={liveThoughts} />
         </section>
 
-        <RightPanels />
+        <RightPanels avgPulse={avgPulse} trendEchoes={trendEchoes} />
       </main>
 
       <style jsx global>{`
         :root {
-          --bg: #030712;
-          --panel: rgba(8, 14, 35, 0.72);
-          --panel-2: rgba(13, 20, 48, 0.72);
-          --line: rgba(142, 202, 255, 0.18);
-          --text: #f8fbff;
-          --muted: rgba(226, 232, 240, 0.66);
-          --soft: rgba(226, 232, 240, 0.42);
-          --cyan: #22d3ee;
-          --blue: #3b82f6;
-          --violet: #8b5cf6;
-          --pink: #ec4899;
+          --bg: #e7f8ff;
+          --panel: rgba(255, 255, 255, 0.74);
+          --panel-2: rgba(217, 242, 255, 0.72);
+          --deep-panel: rgba(27, 68, 105, 0.9);
+          --line: rgba(148, 163, 184, 0.2);
+          --text: #0f172a;
+          --muted: #475569;
+          --soft: #64748b;
+          --cyan: #06b6d4;
+          --blue: #2563eb;
+          --violet: #7c3aed;
+          --pink: #db2777;
           --coral: #fb7185;
-          --lime: #bef264;
-          --green: #34d399;
+          --lime: #a3e635;
+          --green: #10b981;
           --radius-xl: 30px;
         }
 
@@ -180,11 +465,10 @@ export function NovaHome() {
           width: 100%;
           color: var(--text);
           background:
-            radial-gradient(circle at 51% 18%, rgba(34, 211, 238, .18), transparent 16%),
-            radial-gradient(circle at 73% 9%, rgba(139, 92, 246, .14), transparent 20%),
-            radial-gradient(circle at 43% 77%, rgba(236, 72, 153, .13), transparent 20%),
-            radial-gradient(circle at 12% 22%, rgba(14, 165, 233, .11), transparent 18%),
-            linear-gradient(180deg, #020617 0%, #020817 42%, #030712 100%);
+            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, .24), transparent 22%),
+            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, .16), transparent 24%),
+            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, .10), transparent 28%),
+            linear-gradient(180deg, #e7f8ff 0%, #f3fbff 30%, #d9f2ff 62%, #c6eaff 84%, #b8e4ff 100%);
           overflow-x: hidden;
           isolation: isolate;
         }
@@ -196,33 +480,36 @@ export function NovaHome() {
           z-index: -2;
           pointer-events: none;
           background-image:
-            radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1px),
-            radial-gradient(circle, rgba(34,211,238,.45) 0 1px, transparent 1px);
-          background-size: 94px 94px, 157px 157px;
-          background-position: 13px 21px, 48px 77px;
-          opacity: .11;
-          mask-image: radial-gradient(circle at center, black 0%, transparent 83%);
+            radial-gradient(circle, rgba(15,23,42,.16) 0 1px, transparent 1px),
+            radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1px);
+          background-size: 96px 96px, 164px 164px;
+          background-position: 18px 26px, 54px 80px;
+          opacity: .14;
+          mask-image: radial-gradient(circle at center, black 0%, transparent 88%);
         }
 
         .nova-preview::after {
           content: "";
           position: fixed;
-          inset: -20%;
+          inset: auto -20% -16% -20%;
+          height: 44vh;
           z-index: -1;
           pointer-events: none;
           background:
-            conic-gradient(from 110deg at 50% 42%, transparent 0deg, rgba(34, 211, 238, .15) 40deg, transparent 78deg, rgba(236, 72, 153, .11) 126deg, transparent 190deg, rgba(190, 242, 100, .07) 250deg, transparent 330deg),
-            radial-gradient(ellipse at 50% 0%, rgba(34, 211, 238, .14), transparent 42%);
+            radial-gradient(ellipse at 50% 100%, rgba(6, 182, 212, .24), transparent 58%),
+            radial-gradient(ellipse at 72% 80%, rgba(37, 99, 235, .14), transparent 48%);
           filter: blur(28px);
-          opacity: .88;
-          transform: rotate(-5deg);
+          opacity: .86;
         }
 
         .glass {
-          border: 1px solid var(--line);
-          background: linear-gradient(180deg, rgba(11, 18, 41, .77), rgba(5, 10, 27, .68));
-          box-shadow: 0 22px 80px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
-          backdrop-filter: blur(24px) saturate(1.25);
+          border: 1px solid rgba(255,255,255,.68);
+          background:
+            radial-gradient(circle at 82% 0%, rgba(6,182,212,.08), transparent 32%),
+            linear-gradient(180deg, rgba(255,255,255,.82), rgba(223,246,255,.68));
+          box-shadow: 0 22px 74px rgba(37,99,235,.11), inset 0 1px 0 rgba(255,255,255,.96);
+          backdrop-filter: blur(24px) saturate(1.22);
+          color: #0f172a;
         }
 
         .nova-app {
@@ -244,7 +531,7 @@ export function NovaHome() {
           display: flex;
           align-items: center;
           gap: 12px;
-          color: #eaf5ff;
+          color: #0f172a;
           text-decoration: none;
         }
 
@@ -256,9 +543,9 @@ export function NovaHome() {
           justify-content: center;
           overflow: hidden;
           border-radius: 18px;
-          border: 1px solid rgba(255,255,255,.12);
-          background: rgba(9, 15, 35, .72);
-          box-shadow: 0 0 24px rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.08);
+          border: 1px solid rgba(6,182,212,.22);
+          background: rgba(255,255,255,.72);
+          box-shadow: 0 0 24px rgba(6,182,212,.15), inset 0 1px 0 rgba(255,255,255,.9);
           flex-shrink: 0;
         }
 
@@ -273,23 +560,7 @@ export function NovaHome() {
           font-size: 20px;
           font-weight: 900;
           letter-spacing: .28em;
-          color: #ffffff;
-          text-shadow: 0 0 18px rgba(34,211,238,.18);
-        }
-
-        .brand:hover .brand-logo-box {
-          border-color: rgba(34,211,238,.32);
-          box-shadow: 0 0 32px rgba(34,211,238,.28), inset 0 1px 0 rgba(255,255,255,.08);
-        }
-
-        .brand-orb {
-          width: 26px;
-          height: 26px;
-          border-radius: 999px;
-          border: 5px solid transparent;
-          background: linear-gradient(#020617,#020617) padding-box, conic-gradient(from 0deg, var(--cyan), var(--violet), var(--pink), var(--cyan)) border-box;
-          box-shadow: 0 0 22px rgba(34,211,238,.62), 0 0 28px rgba(236,72,153,.45);
-          margin-left: -12px;
+          color: #0f172a;
         }
 
         .top-actions {
@@ -307,28 +578,28 @@ export function NovaHome() {
           width: 49px;
           height: 49px;
           border-radius: 18px;
-          border: 1px solid rgba(255,255,255,.14);
-          background: rgba(9, 15, 35, .72);
-          color: white;
+          border: 1px solid rgba(15,23,42,.1);
+          background: rgba(255,255,255,.68);
+          color: #0f172a;
           display: grid;
           place-items: center;
           font-size: 19px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
           text-decoration: none;
         }
 
         .profile-orb-wrap {
           border-radius: 999px;
           overflow: hidden;
-          background: radial-gradient(circle at 30% 20%, #f8b4ff, #7c3aed 38%, #0f172a 70%);
-          box-shadow: 0 0 28px rgba(139,92,246,.42);
+          background: radial-gradient(circle at 30% 20%, #fbcfe8, #8f7cff 38%, #58c4ff 70%);
+          box-shadow: 0 0 28px rgba(124,58,237,.22);
         }
 
         .sidebar {
           display: flex;
           flex-direction: column;
           min-height: 0;
-          border-radius: 18px;
+          border-radius: 22px;
           padding: 20px 16px;
           margin-top: 88px;
           position: sticky;
@@ -341,7 +612,7 @@ export function NovaHome() {
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(130deg, rgba(34,211,238,.12), transparent 36%, rgba(139,92,246,.09));
+          background: linear-gradient(130deg, rgba(6,182,212,.10), transparent 36%, rgba(124,58,237,.08));
           pointer-events: none;
         }
 
@@ -359,24 +630,24 @@ export function NovaHome() {
           height: 52px;
           padding: 0 14px;
           border-radius: 16px;
-          color: rgba(255,255,255,.82);
+          color: rgba(15,23,42,.72);
           font-size: 16px;
-          font-weight: 750;
+          font-weight: 800;
           text-decoration: none;
         }
 
         .nav-item:hover,
         .nav-item.active {
-          color: #e7fbff;
-          background: linear-gradient(90deg, rgba(34,211,238,.18), rgba(139,92,246,.09));
-          box-shadow: inset 0 0 0 1px rgba(34,211,238,.18), 0 0 22px rgba(34,211,238,.18);
+          color: #075985;
+          background: linear-gradient(90deg, rgba(6,182,212,.16), rgba(124,58,237,.08));
+          box-shadow: inset 0 0 0 1px rgba(6,182,212,.16), 0 12px 28px rgba(37,99,235,.08);
         }
 
         .nav-icon {
           width: 23px;
           text-align: center;
           font-size: 18px;
-          filter: drop-shadow(0 0 8px rgba(34,211,238,.5));
+          filter: drop-shadow(0 0 8px rgba(6,182,212,.24));
         }
 
         .nav-badge {
@@ -386,9 +657,10 @@ export function NovaHome() {
           min-width: 30px;
           height: 30px;
           border-radius: 999px;
-          background: rgba(148, 163, 184, .22);
-          color: rgba(255,255,255,.88);
+          background: #a3e635;
+          color: #10220a;
           font-size: 12px;
+          font-weight: 900;
         }
 
         .open-call {
@@ -401,15 +673,15 @@ export function NovaHome() {
           justify-content: space-between;
           padding: 0 17px;
           border: 0;
-          border-radius: 15px;
-          color: #fff;
+          border-radius: 18px;
+          color: #0f172a;
           font-size: 21px;
           line-height: 1.15;
-          font-weight: 850;
+          font-weight: 900;
           text-align: left;
           text-decoration: none;
-          background: linear-gradient(135deg, rgba(251,113,133,1), rgba(139,92,246,1) 58%, rgba(34,211,238,1));
-          box-shadow: 0 0 32px rgba(34,211,238,.44), 0 0 38px rgba(236,72,153,.32);
+          background: linear-gradient(135deg, #a3e635, #7de3ff 72%);
+          box-shadow: 0 18px 34px rgba(6,182,212,.18);
         }
 
         .online {
@@ -418,13 +690,14 @@ export function NovaHome() {
           margin-top: 20px;
           border-radius: 999px;
           padding: 10px 13px;
-          color: rgba(255,255,255,.68);
-          background: rgba(255,255,255,.05);
+          color: #475569;
+          background: rgba(255,255,255,.52);
           display: flex;
           gap: 10px;
           align-items: center;
           font-size: 12px;
           letter-spacing: .08em;
+          font-weight: 800;
         }
 
         .dot {
@@ -432,7 +705,7 @@ export function NovaHome() {
           height: 8px;
           border-radius: 99px;
           background: var(--green);
-          box-shadow: 0 0 12px var(--green);
+          box-shadow: 0 0 12px rgba(16,185,129,.45);
         }
 
         .nova-center {
@@ -445,47 +718,35 @@ export function NovaHome() {
           font-size: clamp(52px, 5.2vw, 83px);
           line-height: .98;
           letter-spacing: -.065em;
-          font-weight: 780;
+          font-weight: 900;
         }
 
         .gradient-text {
-          background: linear-gradient(92deg, var(--cyan), #60a5fa 22%, #a78bfa 56%, var(--pink));
+          background: linear-gradient(92deg, var(--cyan), var(--blue) 26%, var(--violet) 64%, var(--pink));
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          text-shadow: 0 0 42px rgba(34,211,238,.12);
         }
 
         .subtitle {
           margin: 8px 0 18px;
           color: var(--muted);
           font-size: 16px;
-          font-weight: 650;
+          font-weight: 750;
         }
 
         .composer {
           position: relative;
           height: 140px;
-          border-radius: 26px;
+          border-radius: 30px;
           padding: 22px;
           overflow: hidden;
-          border: 1px solid rgba(34,211,238,.55);
+          border: 1px solid rgba(6,182,212,.26);
           background:
-            radial-gradient(ellipse at 46% 4%, rgba(34,211,238,.95), transparent 24%),
-            radial-gradient(ellipse at 70% 50%, rgba(236,72,153,.6), transparent 28%),
-            linear-gradient(135deg, rgba(20,27,64,.92), rgba(6,13,32,.9));
-          box-shadow: 0 0 28px rgba(34,211,238,.36), 0 0 44px rgba(139,92,246,.33), inset 0 1px 0 rgba(255,255,255,.12);
-        }
-
-        .composer::before {
-          content: "";
-          position: absolute;
-          inset: -45px -20px auto -20px;
-          height: 122px;
-          background: linear-gradient(98deg, transparent 5%, rgba(34,211,238,.8), rgba(99,102,241,.7), rgba(236,72,153,.72), transparent 95%);
-          filter: blur(19px);
-          transform: rotate(7deg);
-          opacity: .9;
+            radial-gradient(ellipse at 38% 6%, rgba(6,182,212,.22), transparent 28%),
+            radial-gradient(ellipse at 74% 54%, rgba(219,39,119,.14), transparent 32%),
+            rgba(255,255,255,.84);
+          box-shadow: 0 0 28px rgba(6,182,212,.10), 0 18px 45px rgba(37,99,235,.08);
         }
 
         .composer-content {
@@ -504,14 +765,14 @@ export function NovaHome() {
           border: 0;
           outline: none;
           background: transparent;
-          color: rgba(226,232,240,.9);
+          color: #0f172a;
           font-size: 16px;
-          font-weight: 650;
+          font-weight: 700;
           font-family: inherit;
         }
 
         .composer-input::placeholder {
-          color: rgba(226,232,240,.72);
+          color: rgba(100,116,139,.82);
         }
 
         .composer-actions {
@@ -527,14 +788,15 @@ export function NovaHome() {
           gap: 9px;
           height: 38px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.16);
-          background: rgba(2,6,23,.5);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(248,250,252,.82);
           padding: 0 16px;
-          color: rgba(255,255,255,.84);
+          color: #475569;
           font-size: 14px;
-          font-weight: 760;
+          font-weight: 850;
           cursor: pointer;
           font-family: inherit;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
         }
 
         .hidden-file {
@@ -545,9 +807,9 @@ export function NovaHome() {
           width: 42px;
           height: 42px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.18);
-          background: rgba(255,255,255,.08);
-          color: white;
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.72);
+          color: #0f172a;
           font-size: 26px;
           display: grid;
           place-items: center;
@@ -564,9 +826,9 @@ export function NovaHome() {
           display: grid;
           place-items: center;
           font-size: 26px;
-          background: radial-gradient(circle, rgba(2,6,23,.85), rgba(15,23,42,.5));
-          border: 1px solid rgba(255,255,255,.17);
-          box-shadow: 0 0 28px rgba(139,92,246,.38);
+          background: radial-gradient(circle, rgba(255,255,255,.96), rgba(226,232,240,.74));
+          border: 1px solid rgba(15,23,42,.08);
+          box-shadow: 0 16px 36px rgba(124,58,237,.14);
           cursor: pointer;
         }
 
@@ -583,21 +845,22 @@ export function NovaHome() {
           align-items: center;
           gap: 10px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.12);
-          background: rgba(7,13,31,.68);
-          color: rgba(255,255,255,.86);
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.64);
+          color: #475569;
           padding: 0 19px;
           font-size: 14px;
-          font-weight: 780;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+          font-weight: 850;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
           cursor: pointer;
           font-family: inherit;
         }
 
         .chip.active {
-          border-color: rgba(99,102,241,.55);
-          background: linear-gradient(135deg, rgba(59,130,246,.62), rgba(139,92,246,.62));
-          box-shadow: 0 0 28px rgba(99,102,241,.36);
+          border-color: rgba(6,182,212,.24);
+          background: linear-gradient(135deg, rgba(6,182,212,.18), rgba(124,58,237,.12));
+          color: #075985;
+          box-shadow: 0 14px 28px rgba(37,99,235,.10);
         }
 
         .featured {
@@ -605,13 +868,12 @@ export function NovaHome() {
           min-height: 310px;
           border-radius: var(--radius-xl);
           overflow: hidden;
-          border: 1px solid rgba(139,92,246,.45);
+          border: 1px solid rgba(255,255,255,.18);
           background:
-            linear-gradient(90deg, rgba(4,8,20,.88), rgba(4,8,20,.26)),
-            radial-gradient(circle at 76% 45%, rgba(139,92,246,.42), transparent 22%),
-            radial-gradient(circle at 90% 44%, rgba(34,211,238,.24), transparent 20%),
-            linear-gradient(135deg, #071027, #11114a 47%, #080b1c);
-          box-shadow: 0 0 42px rgba(139,92,246,.42), inset 0 1px 0 rgba(255,255,255,.09);
+            radial-gradient(circle at 80% 0%, rgba(6,182,212,.20), transparent 30%),
+            linear-gradient(180deg, rgba(27,68,105,.90), rgba(21,49,79,.88));
+          box-shadow: 0 24px 90px rgba(37,99,235,.12), inset 0 1px 0 rgba(255,255,255,.12);
+          color: #eff6ff;
         }
 
         .featured::before {
@@ -619,12 +881,10 @@ export function NovaHome() {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse at 78% 36%, rgba(236,72,153,.65), transparent 12%),
-            radial-gradient(ellipse at 82% 26%, rgba(34,211,238,.5), transparent 23%),
-            linear-gradient(165deg, transparent 0 42%, rgba(34,211,238,.18), transparent 57%);
-          background-size: cover;
-          background-position: center bottom;
-          opacity: .92;
+            radial-gradient(ellipse at 78% 36%, rgba(219,39,119,.34), transparent 14%),
+            radial-gradient(ellipse at 82% 26%, rgba(6,182,212,.34), transparent 26%),
+            linear-gradient(165deg, transparent 0 42%, rgba(125,227,255,.14), transparent 57%);
+          opacity: .88;
         }
 
         .featured-content {
@@ -641,14 +901,14 @@ export function NovaHome() {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          height: 34px;
+          min-height: 34px;
           border-radius: 999px;
-          background: rgba(255,255,255,.08);
-          border: 1px solid rgba(255,255,255,.11);
+          background: rgba(255,255,255,.10);
+          border: 1px solid rgba(255,255,255,.12);
           padding: 0 15px;
-          color: rgba(255,255,255,.86);
+          color: rgba(255,255,255,.92);
           font-size: 13px;
-          font-weight: 820;
+          font-weight: 900;
         }
 
         .status {
@@ -662,14 +922,14 @@ export function NovaHome() {
           font-size: 40px;
           line-height: 1;
           letter-spacing: -.045em;
-          font-weight: 900;
+          font-weight: 950;
         }
 
         .featured p {
           margin: 0;
-          color: var(--muted);
+          color: #dbeafe;
           font-size: 17px;
-          font-weight: 600;
+          font-weight: 650;
         }
 
         .call-meta {
@@ -684,26 +944,11 @@ export function NovaHome() {
           align-items: center;
         }
 
-        .avatar-small {
-          width: 35px;
-          height: 35px;
-          margin-right: -9px;
-          border: 2px solid rgba(4,8,20,.9);
-          border-radius: 999px;
-          background: linear-gradient(135deg, var(--cyan), var(--pink));
-          box-shadow: 0 0 12px rgba(34,211,238,.25);
-        }
-
-        .avatar-small:nth-child(2) { background: linear-gradient(135deg, #f472b6, #7c3aed); }
-        .avatar-small:nth-child(3) { background: linear-gradient(135deg, #22c55e, #06b6d4); }
-        .avatar-small:nth-child(4) { background: linear-gradient(135deg, #fb7185, #f59e0b); }
-
         .plus-count {
-          margin-left: 14px;
           border-radius: 999px;
-          background: rgba(255,255,255,.09);
+          background: rgba(255,255,255,.12);
           padding: 10px 14px;
-          font-weight: 800;
+          font-weight: 900;
           color: white;
         }
 
@@ -711,8 +956,8 @@ export function NovaHome() {
           border-left: 1px solid rgba(255,255,255,.14);
           padding-left: 18px;
           font-size: 14px;
-          color: rgba(255,255,255,.9);
-          font-weight: 700;
+          color: rgba(255,255,255,.92);
+          font-weight: 750;
         }
 
         .active-count b {
@@ -721,9 +966,9 @@ export function NovaHome() {
         }
 
         .speaking {
-          color: var(--muted);
+          color: #bfdbfe;
           display: block;
-          font-weight: 600;
+          font-weight: 650;
         }
 
         .call-actions {
@@ -737,15 +982,16 @@ export function NovaHome() {
           min-width: 140px;
           height: 52px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.11);
-          background: rgba(7,13,31,.64);
-          color: rgba(255,255,255,.88);
-          font-weight: 840;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          color: rgba(255,255,255,.92);
+          font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 10px;
           text-decoration: none;
+          padding: 0 18px;
         }
 
         .primary-cta {
@@ -754,11 +1000,11 @@ export function NovaHome() {
           height: 58px;
           border-radius: 999px;
           border: 0;
-          color: white;
-          font-size: 22px;
-          font-weight: 820;
-          background: linear-gradient(100deg, #4f46e5, #8b5cf6 42%, #22d3ee 82%, #bef264);
-          box-shadow: 0 0 34px rgba(34,211,238,.34), 0 0 35px rgba(139,92,246,.38);
+          color: #0f172a;
+          font-size: 21px;
+          font-weight: 950;
+          background: linear-gradient(100deg, #a3e635, #7de3ff);
+          box-shadow: 0 18px 34px rgba(6,182,212,.18);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -767,13 +1013,39 @@ export function NovaHome() {
 
         .host-card {
           margin-top: 16px;
-          border-radius: 22px;
-          padding: 17px 22px;
+          border-radius: 24px;
+          padding: 18px 22px;
           display: grid;
           grid-template-columns: 1fr 1.2fr;
           gap: 18px;
           align-items: center;
-          background: linear-gradient(90deg, rgba(12, 18, 42, .86), rgba(24, 14, 58, .74));
+        }
+
+        .trend-grid {
+          grid-column: 1 / -1;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          width: 100%;
+        }
+
+        .trend-item {
+          border-radius: 18px;
+          padding: 16px;
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.58);
+        }
+
+        .trend-title {
+          font-weight: 950;
+          margin-bottom: 6px;
+        }
+
+        .trend-text {
+          color: #475569;
+          line-height: 1.5;
+          font-weight: 700;
+          font-size: 13px;
         }
 
         .host-left {
@@ -786,39 +1058,51 @@ export function NovaHome() {
           width: 92px;
           height: 92px;
           border-radius: 999px;
-          background: radial-gradient(circle at 34% 25%, #a5f3fc, #a855f7 32%, #db2777 54%, #020617 78%);
-          box-shadow: 0 0 34px rgba(236,72,153,.32), inset 0 0 16px rgba(255,255,255,.16);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          color: #fff;
+          font-size: 26px;
+          font-weight: 950;
+          background: radial-gradient(circle at 34% 25%, #7de3ff, #8f7cff 32%, #e77bcf 54%, #15314f 78%);
+          box-shadow: 0 0 34px rgba(6,182,212,.18), inset 0 0 16px rgba(255,255,255,.16);
+        }
+
+        .host-orb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
         .host-name {
           font-size: 24px;
-          font-weight: 900;
+          font-weight: 950;
           margin-bottom: 2px;
         }
 
-        .host-title {
-          color: var(--muted);
+        .host-title,
+        .host-bio {
+          color: #475569;
           font-size: 14px;
-          font-weight: 650;
+          font-weight: 700;
         }
 
         .host-bio {
-          color: rgba(255,255,255,.7);
           font-size: 13px;
           line-height: 1.35;
-          max-width: 250px;
+          max-width: 300px;
         }
 
         .metrics {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0;
-          border-left: 1px solid rgba(255,255,255,.09);
+          border-left: 1px solid rgba(15,23,42,.08);
         }
 
         .metric {
           padding-left: 22px;
-          border-right: 1px solid rgba(255,255,255,.08);
+          border-right: 1px solid rgba(15,23,42,.08);
         }
 
         .metric:last-child {
@@ -827,9 +1111,9 @@ export function NovaHome() {
 
         .metric span {
           display: block;
-          color: rgba(255,255,255,.52);
+          color: #64748b;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .metric b {
@@ -839,15 +1123,21 @@ export function NovaHome() {
           color: var(--cyan);
         }
 
-        .metric:nth-child(2) b { color: var(--lime); }
-        .metric:nth-child(3) b { color: #67e8f9; }
+        .metric:nth-child(2) b {
+          color: #65a30d;
+        }
+
+        .metric:nth-child(3) b {
+          color: #2563eb;
+        }
 
         .live-strip {
           margin-top: 16px;
-          border-radius: 22px;
+          border-radius: 24px;
           padding: 14px 16px;
-          background: linear-gradient(180deg, rgba(14, 20, 50, .75), rgba(6, 11, 26, .75));
-          border: 1px solid rgba(139,92,246,.25);
+          background: rgba(255,255,255,.58);
+          border: 1px solid rgba(255,255,255,.64);
+          box-shadow: 0 20px 50px rgba(37,99,235,.08);
         }
 
         .strip-head {
@@ -859,13 +1149,13 @@ export function NovaHome() {
 
         .strip-title {
           font-size: 19px;
-          font-weight: 850;
+          font-weight: 950;
         }
 
         .see-all {
-          color: var(--muted);
+          color: #475569;
           font-size: 13px;
-          font-weight: 800;
+          font-weight: 900;
           text-decoration: none;
         }
 
@@ -877,23 +1167,18 @@ export function NovaHome() {
 
         .mini-card {
           min-height: 84px;
-          border-radius: 15px;
+          border-radius: 16px;
           padding: 10px;
-          border: 1px solid rgba(255,255,255,.12);
-          background: linear-gradient(135deg, rgba(34,211,238,.23), rgba(6,12,29,.75));
+          border: 1px solid rgba(15,23,42,.08);
+          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(255,255,255,.70));
           overflow: hidden;
           position: relative;
-          font-weight: 820;
+          font-weight: 900;
           font-size: 13px;
           line-height: 1.15;
-          color: white;
+          color: #0f172a;
           text-decoration: none;
         }
-
-        .mini-card:nth-child(2) { background: linear-gradient(135deg, rgba(59,130,246,.24), rgba(6,12,29,.75)); }
-        .mini-card:nth-child(3) { background: linear-gradient(135deg, rgba(139,92,246,.35), rgba(6,12,29,.75)); }
-        .mini-card:nth-child(4) { background: linear-gradient(135deg, rgba(251,113,133,.35), rgba(6,12,29,.75)); }
-        .mini-card:nth-child(5) { background: linear-gradient(135deg, rgba(14,165,233,.36), rgba(6,12,29,.75)); }
 
         .mini-card::after {
           content: "";
@@ -902,14 +1187,14 @@ export function NovaHome() {
           right: 0;
           bottom: 8px;
           height: 18px;
-          background: repeating-linear-gradient(90deg, rgba(34,211,238,.9) 0 2px, transparent 2px 9px);
-          opacity: .35;
+          background: repeating-linear-gradient(90deg, rgba(6,182,212,.65) 0 2px, transparent 2px 9px);
+          opacity: .28;
           transform: skewX(-8deg);
         }
 
         .mini-status {
           font-size: 10px;
-          color: var(--lime);
+          color: #047857;
           display: block;
           margin-bottom: 8px;
         }
@@ -918,7 +1203,7 @@ export function NovaHome() {
           position: absolute;
           left: 11px;
           bottom: 7px;
-          color: var(--lime);
+          color: #0369a1;
           font-size: 11px;
         }
 
@@ -931,7 +1216,7 @@ export function NovaHome() {
         }
 
         .panel {
-          border-radius: 22px;
+          border-radius: 24px;
           padding: 22px;
           overflow: hidden;
           position: relative;
@@ -944,14 +1229,14 @@ export function NovaHome() {
           justify-content: space-between;
           margin-bottom: 18px;
           font-size: 28px;
-          font-weight: 850;
+          font-weight: 950;
           letter-spacing: -.03em;
         }
 
         .panel-title small {
           font-size: 14px;
-          color: var(--muted);
-          font-weight: 750;
+          color: #475569;
+          font-weight: 850;
           letter-spacing: 0;
         }
 
@@ -963,15 +1248,15 @@ export function NovaHome() {
         }
 
         .inner {
-          border: 1px solid rgba(255,255,255,.1);
-          background: rgba(5,10,26,.42);
-          border-radius: 15px;
+          border: 1px solid rgba(15,23,42,.08);
+          background: rgba(255,255,255,.48);
+          border-radius: 18px;
           padding: 16px;
         }
 
         .inner h4 {
           margin: 0 0 15px;
-          color: var(--soft);
+          color: #64748b;
           font-size: 14px;
           letter-spacing: .04em;
         }
@@ -982,10 +1267,10 @@ export function NovaHome() {
           gap: 13px;
           align-items: start;
           margin-bottom: 18px;
-          color: rgba(255,255,255,.87);
+          color: #0f172a;
           font-size: 15px;
           line-height: 1.45;
-          font-weight: 650;
+          font-weight: 700;
         }
 
         .insight-icon {
@@ -994,9 +1279,9 @@ export function NovaHome() {
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: rgba(34,211,238,.16);
+          background: rgba(6,182,212,.12);
           color: var(--cyan);
-          border: 1px solid rgba(34,211,238,.25);
+          border: 1px solid rgba(6,182,212,.18);
         }
 
         .mood-wrap {
@@ -1013,11 +1298,10 @@ export function NovaHome() {
           text-align: center;
           color: white;
           background:
-            radial-gradient(circle at 28% 30%, rgba(34,211,238,.95), transparent 31%),
-            radial-gradient(circle at 75% 35%, rgba(236,72,153,.9), transparent 32%),
-            radial-gradient(circle at 60% 70%, rgba(139,92,246,.92), transparent 42%),
-            rgba(15,23,42,.8);
-          filter: drop-shadow(0 0 22px rgba(236,72,153,.5));
+            radial-gradient(circle at 28% 30%, rgba(6,182,212,.94), transparent 31%),
+            radial-gradient(circle at 75% 35%, rgba(219,39,119,.76), transparent 32%),
+            radial-gradient(circle at 60% 70%, rgba(124,58,237,.78), transparent 42%);
+          filter: drop-shadow(0 0 18px rgba(219,39,119,.24));
           border-radius: 45% 55% 52% 48% / 46% 38% 62% 54%;
           animation: morph 7s ease-in-out infinite;
         }
@@ -1030,7 +1314,7 @@ export function NovaHome() {
           display: block;
           margin-top: 9px;
           font-size: 13px;
-          color: rgba(255,255,255,.72);
+          color: rgba(255,255,255,.82);
         }
 
         @keyframes morph {
@@ -1045,7 +1329,7 @@ export function NovaHome() {
           justify-content: center;
           gap: 14px;
           font-size: 11px;
-          color: var(--muted);
+          color: #64748b;
         }
 
         .legend i {
@@ -1057,81 +1341,12 @@ export function NovaHome() {
           background: var(--cyan);
         }
 
-        .legend span:nth-child(2) i { background: var(--coral); }
-        .legend span:nth-child(3) i { background: var(--pink); }
-
-        .outcome {
-          display: grid;
-          grid-template-columns: 1fr 220px;
-          gap: 20px;
-          align-items: center;
+        .legend span:nth-child(2) i {
+          background: var(--coral);
         }
 
-        .decision-label {
-          color: var(--soft);
-          font-size: 14px;
-          font-weight: 650;
-        }
-
-        .decision {
-          margin: 14px 0 6px;
-          font-size: 21px;
-          font-weight: 900;
-        }
-
-        .decision .check {
-          color: var(--lime);
-          margin-right: 10px;
-        }
-
-        .steps {
-          margin-top: 16px;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-        }
-
-        .step {
-          border-radius: 11px;
-          padding: 11px 12px;
-          background: rgba(34,211,238,.07);
-          border: 1px solid rgba(255,255,255,.08);
-          font-size: 11px;
-          color: rgba(255,255,255,.7);
-        }
-
-        .step b {
-          color: var(--cyan);
-          font-size: 16px;
-          margin-right: 5px;
-        }
-
-        .result-orb {
-          justify-self: center;
-          width: 170px;
-          height: 170px;
-          border-radius: 999px;
-          display: grid;
-          place-items: center;
-          font-size: 64px;
-          color: var(--blue);
-          background:
-            radial-gradient(circle at 32% 20%, rgba(255,255,255,.32), transparent 18%),
-            radial-gradient(circle at 65% 55%, rgba(139,92,246,.75), transparent 38%),
-            radial-gradient(circle at 40% 60%, rgba(34,211,238,.85), transparent 40%),
-            rgba(15,23,42,.86);
-          box-shadow: 0 0 34px rgba(34,211,238,.35), 0 0 58px rgba(236,72,153,.23);
-          position: relative;
-        }
-
-        .result-orb::after {
-          content: "";
-          position: absolute;
-          inset: -16px;
-          border-radius: inherit;
-          border: 1px solid rgba(236,72,153,.35);
-          transform: rotate(-18deg) scaleX(1.45);
-          opacity: .6;
+        .legend span:nth-child(3) i {
+          background: var(--pink);
         }
 
         .pulse {
@@ -1151,10 +1366,10 @@ export function NovaHome() {
           place-items: center;
           position: relative;
           background:
-            repeating-radial-gradient(circle, transparent 0 12px, rgba(34,211,238,.16) 13px 14px),
+            repeating-radial-gradient(circle, transparent 0 12px, rgba(6,182,212,.13) 13px 14px),
             conic-gradient(from -15deg, transparent 0 18deg, var(--cyan) 38deg, var(--lime) 120deg, var(--pink) 240deg, transparent 310deg),
-            radial-gradient(circle, rgba(34,211,238,.18), transparent 52%);
-          box-shadow: 0 0 45px rgba(34,211,238,.26);
+            radial-gradient(circle, rgba(6,182,212,.16), transparent 52%);
+          box-shadow: 0 0 36px rgba(6,182,212,.18);
         }
 
         .radial::before {
@@ -1162,8 +1377,8 @@ export function NovaHome() {
           position: absolute;
           inset: 42px;
           border-radius: inherit;
-          background: rgba(2,6,23,.82);
-          box-shadow: inset 0 0 20px rgba(255,255,255,.08);
+          background: rgba(255,255,255,.88);
+          box-shadow: inset 0 0 20px rgba(15,23,42,.06);
         }
 
         .radial::after {
@@ -1171,7 +1386,7 @@ export function NovaHome() {
           position: absolute;
           width: 8px;
           height: 126%;
-          background: linear-gradient(transparent, rgba(34,211,238,.9), rgba(139,92,246,.8), transparent);
+          background: linear-gradient(transparent, rgba(6,182,212,.65), rgba(124,58,237,.52), transparent);
           filter: blur(2px);
         }
 
@@ -1180,35 +1395,37 @@ export function NovaHome() {
           z-index: 1;
           text-align: center;
           font-size: 35px;
-          font-weight: 850;
+          font-weight: 950;
+          color: #0f172a;
         }
 
         .pulse-score span {
           display: block;
           font-size: 13px;
-          color: var(--muted);
-          font-weight: 700;
+          color: #64748b;
+          font-weight: 800;
         }
 
         .momentum h4 {
           margin: 0 0 8px;
           font-size: 16px;
-          font-weight: 750;
+          font-weight: 850;
         }
 
         .momentum p {
           margin: 0 0 28px;
-          color: var(--muted);
+          color: #475569;
           font-size: 13px;
+          font-weight: 700;
         }
 
         .chart {
           width: 100%;
           height: 86px;
-          border-radius: 12px;
+          border-radius: 14px;
           position: relative;
           overflow: hidden;
-          background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+          background: linear-gradient(180deg, rgba(255,255,255,.60), rgba(255,255,255,.24));
         }
 
         .chart svg {
@@ -1227,7 +1444,7 @@ export function NovaHome() {
 
           .right {
             grid-column: 2;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             padding-top: 0;
           }
 
@@ -1239,20 +1456,6 @@ export function NovaHome() {
             display: flex;
             flex-direction: column;
             height: auto;
-          }
-
-          .outcome {
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .result-orb {
-            width: 128px;
-            height: 128px;
-            font-size: 50px;
-            align-self: center;
-            order: -1;
           }
 
           .pulse {
@@ -1285,7 +1488,8 @@ export function NovaHome() {
             grid-template-columns: 210px minmax(0, 1fr);
           }
 
-          .right {
+          .right,
+          .trend-grid {
             grid-template-columns: 1fr;
           }
         }
@@ -1316,13 +1520,6 @@ export function NovaHome() {
           .brand-word {
             font-size: 18px;
             letter-spacing: .22em;
-          }
-
-          .brand-orb {
-            width: 22px;
-            height: 22px;
-            border-width: 4px;
-            margin-left: -8px;
           }
 
           .top-actions {
@@ -1363,9 +1560,9 @@ export function NovaHome() {
             height: auto;
             border-radius: 24px;
             padding: 9px;
-            background: rgba(4, 9, 24, .78);
+            background: rgba(255,255,255,.80);
             backdrop-filter: blur(26px) saturate(1.4);
-            box-shadow: 0 18px 60px rgba(0,0,0,.48), 0 0 34px rgba(34,211,238,.16), inset 0 1px 0 rgba(255,255,255,.1);
+            box-shadow: 0 18px 60px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.9);
           }
 
           .sidebar::before,
@@ -1544,16 +1741,6 @@ export function NovaHome() {
             margin-top: 20px;
           }
 
-          .avatar-small {
-            width: 32px;
-            height: 32px;
-          }
-
-          .plus-count {
-            padding: 8px 12px;
-            font-size: 13px;
-          }
-
           .active-count {
             border-left: 0;
             padding-left: 0;
@@ -1566,7 +1753,7 @@ export function NovaHome() {
 
           .call-actions {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 8px;
             width: 100%;
           }
@@ -1613,7 +1800,7 @@ export function NovaHome() {
           .metrics {
             grid-template-columns: repeat(3, 1fr);
             border-left: 0;
-            border-top: 1px solid rgba(255,255,255,.09);
+            border-top: 1px solid rgba(15,23,42,.08);
             padding-top: 14px;
           }
 
@@ -1690,24 +1877,6 @@ export function NovaHome() {
             height: 122px;
           }
 
-          .outcome {
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .steps {
-            grid-template-columns: 1fr;
-          }
-
-          .result-orb {
-            width: 128px;
-            height: 128px;
-            font-size: 50px;
-            align-self: center;
-            order: -1;
-          }
-
           .pulse {
             display: flex;
             flex-direction: column;
@@ -1779,7 +1948,7 @@ function TopChrome() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ notificationCount }: { notificationCount: number }) {
   return (
     <aside className="sidebar glass">
       <nav className="nav">
@@ -1787,7 +1956,7 @@ function Sidebar() {
           <Link key={label} href={href} className={`nav-item ${index === 0 ? 'active' : ''}`}>
             <span className="nav-icon">{icon}</span>
             {label}
-            {label === 'Notifiche' && <span className="nav-badge">3</span>}
+            {label === 'Notifiche' && notificationCount > 0 && <span className="nav-badge">{notificationCount}</span>}
           </Link>
         ))}
       </nav>
@@ -1796,7 +1965,7 @@ function Sidebar() {
         <span>
           Apri
           <br />
-          una Call
+          uno Spunto
         </span>
         <span>✦</span>
       </Link>
@@ -1809,110 +1978,156 @@ function Sidebar() {
   );
 }
 
-function FeaturedCall({ call }: { call: NovaCall }) {
+function FeaturedThought({
+  thought,
+  currentUserId,
+  onCloseEarly,
+  closingSlug,
+}: {
+  thought: LiveThought;
+  currentUserId: string | null;
+  onCloseEarly: (slug: string) => void;
+  closingSlug: string | null;
+}) {
+  const canClose = Boolean(currentUserId && thought.host_id === currentUserId);
+
   return (
     <article className="featured">
       <div className="featured-content">
-        <span className="badge">★ Call in evidenza</span>
+        <span className="badge">★ Spunto in evidenza</span>
         <span className="badge status">
           <span className="dot" /> In corso
         </span>
 
-        <h2>{call.title}</h2>
-        <p>{call.description}</p>
+        <h2>{thought.title}</h2>
+        <p>{thought.description || 'Spunto aperto su NOVA.'}</p>
 
         <div className="call-meta">
           <div className="avatars">
-            <span className="avatar-small" />
-            <span className="avatar-small" />
-            <span className="avatar-small" />
-            <span className="avatar-small" />
-            <span className="plus-count">+{Math.max(call.participants - 4, 12)}</span>
+            <span className="plus-count">↯ Pulse {thought.pulse_score || 0}</span>
           </div>
 
           <div className="active-count">
             <span className="dot" style={{ display: 'inline-block', marginRight: 8 }} />
-            <b>{call.participants}</b> partecipanti attivi
-            <span className="speaking">24 stanno parlando</span>
+            <b>{thought.participants || 0}</b> partecipanti attivi
+            <span className="speaking">Host: {thought.host_name || 'Utente Nova'}</span>
           </div>
         </div>
 
         <div className="call-actions">
-          <Link href={`/c/${call.slug}?mode=audio`} className="call-action">
-            ▥ Audio
-          </Link>
-          <Link href={`/c/${call.slug}?mode=video`} className="call-action">
-            ▣ Video
-          </Link>
-          <Link href={`/c/${call.slug}?mode=chat`} className="call-action">
+          <Link href={`/c/${thought.slug}?mode=chat`} className="call-action">
             ▱ Chat
           </Link>
-          <Link href={`/c/${call.slug}`} className="primary-cta">
-            Apri la Call →
+          <Link href={`/c/${thought.slug}`} className="primary-cta">
+            Apri lo Spunto →
           </Link>
+
+          {canClose && (
+            <button type="button" onClick={() => onCloseEarly(thought.slug)} className="call-action">
+              {closingSlug === thought.slug ? 'Chiusura…' : 'Chiudi → Outcome'}
+            </button>
+          )}
         </div>
       </div>
     </article>
   );
 }
 
-function HostCard() {
+function TrendEchoSection({ echoes }: { echoes: TrendEcho[] }) {
+  return (
+    <section className="host-card glass">
+      <div className="trend-grid">
+        {echoes.map((echo) => (
+          <div className="trend-item" key={echo.title}>
+            <div className="trend-title">✦ {echo.title}</div>
+            <div className="trend-text">{echo.text}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HostOfMomentSection({ host }: { host: HostMoment | null }) {
+  if (!host) {
+    return (
+      <section className="host-card glass">
+        <div className="host-left">
+          <div className="host-orb">N</div>
+          <div>
+            <div className="badge" style={{ marginBottom: 10, color: '#0f172a' }}>
+              ✦ Host del momento
+            </div>
+            <div className="host-name">In raccolta dati</div>
+            <div className="host-title">Servono più Spunti reali per calcolare il miglior Host.</div>
+            <div className="host-bio">
+              NOVA userà partecipazione, Pulse medio e numero di Spunti aperti per aggiornare questa sezione.
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="host-card glass">
       <div className="host-left">
-        <div className="host-orb" />
+        <div className="host-orb">
+          {host.hostAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={host.hostAvatar} alt="" />
+          ) : (
+            host.hostName.slice(0, 1).toUpperCase()
+          )}
+        </div>
 
         <div>
-          <div className="badge" style={{ marginBottom: 10 }}>
-            ✦ Host
+          <div className="badge" style={{ marginBottom: 10, color: '#0f172a' }}>
+            ✦ Host del momento
           </div>
 
-          <div className="host-name">
-            Giulia R.{' '}
-            <span className="mini-pill" style={{ height: 22, padding: '0 9px', fontSize: 10 }}>
-              Host
-            </span>
+          <div className="host-name">{host.hostName}</div>
+          <div className="host-title">Riconosciuto automaticamente dai dati della community</div>
+          <div className="host-bio">
+            Selezionato in base a partecipazione, Pulse medio e numero di Spunti aperti.
           </div>
-
-          <div className="host-title">Designer • Milano</div>
-          <div className="host-bio">Creator di spazi che aiutano le persone a prendere decisioni migliori.</div>
         </div>
       </div>
 
       <div className="metrics">
         <div className="metric">
-          <span>Call ospitate</span>
-          <b>47</b>
+          <span>Spunti aperti</span>
+          <b>{host.hostedCount}</b>
         </div>
         <div className="metric">
-          <span>Outcome generati</span>
-          <b>23</b>
+          <span>Partecipanti totali</span>
+          <b>{host.totalParticipants}</b>
         </div>
         <div className="metric">
-          <span>Persone aiutate</span>
-          <b>1.2K</b>
+          <span>Pulse medio</span>
+          <b>{host.avgPulse}</b>
         </div>
       </div>
     </section>
   );
 }
 
-function LiveStrip({ calls }: { calls: NovaCall[] }) {
+function LiveStrip({ thoughts }: { thoughts: LiveThought[] }) {
   return (
     <section className="live-strip">
       <div className="strip-head">
-        <div className="strip-title">⌁ Live adesso</div>
+        <div className="strip-title">⌁ Spunti attivi</div>
         <Link href="/spaces" className="see-all">
-          Vedi tutte →
+          Vedi tutti →
         </Link>
       </div>
 
       <div className="call-grid">
-        {calls.slice(0, 6).map((call, index) => (
-          <Link href={`/c/${call.slug}`} key={`${call.slug}-${index}`} className="mini-card">
+        {thoughts.slice(0, 6).map((thought, index) => (
+          <Link href={`/c/${thought.slug}`} key={`${thought.slug}-${index}`} className="mini-card">
             <span className="mini-status">● In corso</span>
-            {call.title}
-            <span className="mini-score">↯ {call.pulse}</span>
+            {thought.title}
+            <span className="mini-score">↯ {thought.pulse_score}</span>
           </Link>
         ))}
       </div>
@@ -1920,48 +2135,36 @@ function LiveStrip({ calls }: { calls: NovaCall[] }) {
   );
 }
 
-function RightPanels() {
+function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes: TrendEcho[] }) {
   return (
     <aside className="right">
       <section className="panel glass">
         <div className="panel-title">
-          ✣ Echo{' '}
-          <small>
-            <span className="dot" style={{ display: 'inline-block', marginRight: 8 }} />
-            In tempo reale
-          </small>
+          ✣ Echo <small>In tempo reale</small>
         </div>
 
         <div className="echo-body">
           <div className="inner">
-            <h4>Insight dell&apos;AI</h4>
+            <h4>Insight del momento</h4>
 
-            {[
-              'Hai bisogno di stabilità finanziaria nei primi mesi.',
-              'Il tuo network a Milano potrebbe accelerare tutto.',
-              'Il 68% vede in te il profilo giusto per il cambio.',
-            ].map((item, index) => (
-              <div className="insight" key={item}>
+            {trendEchoes.map((item, index) => (
+              <div className="insight" key={item.title}>
                 <span className="insight-icon">{index === 0 ? '◎' : index === 1 ? '♙' : '◉'}</span>
-                <span>{item}</span>
+                <span>{item.text}</span>
               </div>
             ))}
-
-            <Link href="/echo" className="see-all">
-              Analisi completa →
-            </Link>
           </div>
 
           <div className="inner">
-            <h4>Clima della stanza</h4>
+            <h4>Clima della rete</h4>
             <div className="mood-wrap">
               <div className="mood-blob">
                 <div>
-                  <b>Fiducioso</b>
+                  <b>Attivo</b>
                   <span>
-                    Energia positiva e
+                    Conversazioni vive e
                     <br />
-                    curiosità alta.
+                    segnali in crescita.
                   </span>
                 </div>
               </div>
@@ -1970,7 +2173,7 @@ function RightPanels() {
             <div className="legend">
               <span>
                 <i />
-                Speranza
+                Ascolto
               </span>
               <span>
                 <i />
@@ -1978,92 +2181,50 @@ function RightPanels() {
               </span>
               <span>
                 <i />
-                Determinazione
+                Decisione
               </span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="panel glass outcome">
-        <div>
-          <div className="panel-title" style={{ marginBottom: 14 }}>
-            🏆 Outcome{' '}
-            <small className="mini-pill" style={{ height: 22, fontSize: 10, color: 'var(--lime)' }}>
-              Completata
-            </small>
-          </div>
-
-          <div className="decision-label">Decisione della stanza</div>
-          <div className="decision">
-            <span className="check">✓</span>
-            Vai. È il momento.
-          </div>
-          <div style={{ color: 'var(--soft)', fontSize: 13, fontWeight: 700 }}>
-            Approvato dal 76% dei partecipanti
-          </div>
-
-          <div className="steps">
-            <div className="step">
-              <b>1</b>Piano finanziario
-              <br />
-              90 giorni
-            </div>
-            <div className="step">
-              <b>2</b>Visita esplorativa
-              <br />2 settimane
-            </div>
-            <div className="step">
-              <b>3</b>Costruisci rete locale
-              <br />
-              Subito
-            </div>
-          </div>
-
-          <Link href="/outcome" className="see-all" style={{ display: 'inline-flex', marginTop: 18 }}>
-            Riepilogo completo →
-          </Link>
-        </div>
-
-        <div className="result-orb">✓</div>
-      </section>
-
       <section className="panel glass">
         <div className="panel-title">
-          〽 Pulse <small>Energia della stanza</small>
+          〽 Pulse <small>Media reale delle stanze</small>
         </div>
 
         <div className="pulse">
           <div className="radial">
             <div className="pulse-score">
-              92<span>Alta</span>
+              {avgPulse}
+              <span>{avgPulse >= 75 ? 'Alta' : avgPulse >= 45 ? 'Media' : 'In crescita'}</span>
             </div>
           </div>
 
           <div className="momentum">
-            <h4>Momentum in crescita</h4>
-            <p>+28% negli ultimi 10 minuti</p>
+            <h4>Media Pulse attuale</h4>
+            <p>Dato calcolato sugli Spunti pubblici attivi.</p>
 
             <div className="chart">
               <svg viewBox="0 0 280 100" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="line" x1="0" x2="1">
-                    <stop stopColor="#a78bfa" />
-                    <stop offset=".55" stopColor="#22d3ee" />
-                    <stop offset="1" stopColor="#bef264" />
+                    <stop stopColor="#8f7cff" />
+                    <stop offset=".55" stopColor="#58c4ff" />
+                    <stop offset="1" stopColor="#c8f36b" />
                   </linearGradient>
                   <linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
-                    <stop stopColor="#22d3ee" stopOpacity=".28" />
-                    <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+                    <stop stopColor="#58c4ff" stopOpacity=".22" />
+                    <stop offset="1" stopColor="#58c4ff" stopOpacity="0" />
                   </linearGradient>
                 </defs>
 
                 <path
-                  d="M0 79 L34 53 L66 72 L96 49 L130 52 L162 29 L195 36 L225 15 L280 9 L280 100 L0 100 Z"
+                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24 L280 100 L0 100 Z"
                   fill="url(#area)"
                 />
                 <path
-                  d="M0 79 L34 53 L66 72 L96 49 L130 52 L162 29 L195 36 L225 15 L280 9"
+                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24"
                   fill="none"
                   stroke="url(#line)"
                   strokeWidth="4"
