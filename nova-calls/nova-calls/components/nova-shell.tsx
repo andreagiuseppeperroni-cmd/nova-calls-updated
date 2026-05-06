@@ -309,28 +309,40 @@ export function NovaHome() {
     }
   }
 
-  async function closeThoughtEarly(slug: string) {
-    try {
-      setClosingSlug(slug);
+async function closeThoughtEarly(slug: string) {
+  try {
+    setClosingSlug(slug);
 
-      const response = await fetch(`/api/calls/${slug}/close`, {
-        method: 'POST',
-      });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
-        return;
-      }
-
-      window.location.href = `/outcome?slug=${slug}`;
-    } catch {
-      alert('Errore durante la chiusura dello Spunto.');
-    } finally {
-      setClosingSlug(null);
+    if (!session?.access_token) {
+      alert('Devi essere loggato per chiudere lo Spunto.');
+      return;
     }
+
+    const response = await fetch(`/api/calls/${slug}/close`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
+      return;
+    }
+
+    window.location.href = `/outcome?slug=${slug}`;
+  } catch {
+    alert('Errore durante la chiusura dello Spunto.');
+  } finally {
+    setClosingSlug(null);
   }
+}
 
   function openThought() {
     const title = text.trim() || 'Nuovo Spunto Nova';
