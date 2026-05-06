@@ -14,6 +14,7 @@ type MessageKind = 'host' | 'guest' | 'ai' | 'system';
 
 type Message = {
   id: string;
+  userId?: string | null;
   author: string;
   text: string;
   kind: MessageKind;
@@ -31,21 +32,39 @@ type DbMessage = {
   created_at: string;
 };
 
+type PublicProfile = {
+  id: string;
+  full_name: string | null;
+  username?: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  passions: string[] | null;
+  city: string | null;
+  role?: string | null;
+  nova_points: number | null;
+  contributions: number | null;
+  calls_joined: number | null;
+  outcomes_helped: number | null;
+};
+
 const starterMessages: Message[] = [
   {
     id: 'starter-host',
+    userId: null,
     author: 'Giulia · Host',
     text: 'Partiamo dal punto: che cosa renderebbe questa decisione davvero sicura?',
     kind: 'host',
   },
   {
     id: 'starter-marco',
+    userId: null,
     author: 'Marco',
     text: 'Io separerei desiderio, vincoli economici e rete locale. Sono tre decisioni diverse.',
     kind: 'guest',
   },
   {
     id: 'starter-ai',
+    userId: null,
     author: 'Nova Echo',
     text: 'Sto rilevando un tema dominante: stabilità prima, esplorazione subito dopo.',
     kind: 'ai',
@@ -87,6 +106,7 @@ function getUserAvatar(user: User | null) {
 function mapDbMessage(message: DbMessage): Message {
   return {
     id: message.id,
+    userId: message.user_id,
     author: message.user_name || 'Utente Nova',
     text: message.body,
     kind: 'guest',
@@ -104,6 +124,30 @@ function uniqueMessages(messages: Message[]) {
   });
 }
 
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'ME';
+}
+
+function splitProfileTags(profile: PublicProfile | null) {
+  if (!profile) return [];
+
+  const passions = Array.isArray(profile.passions) ? profile.passions : [];
+  const roleTags = profile.role
+    ? profile.role
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+
+  return [...passions, ...roleTags].slice(0, 8);
+}
+
 export function CallRoom({ slug }: { slug: string }) {
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -118,6 +162,11 @@ export function CallRoom({ slug }: { slug: string }) {
   const [outcome, setOutcome] = useState('');
   const [roomError, setRoomError] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(true);
+
+  const [selectedProfile, setSelectedProfile] = useState<PublicProfile | null>(null);
+  const [profileFallback, setProfileFallback] = useState<Message | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     setCall(readCall(slug) || demoCalls[0]);
@@ -203,7 +252,6 @@ export function CallRoom({ slug }: { slug: string }) {
         },
         (payload) => {
           const nextMessage = mapDbMessage(payload.new as DbMessage);
-
           setMessages((current) => uniqueMessages([...current, nextMessage]));
         }
       )
@@ -261,6 +309,43 @@ export function CallRoom({ slug }: { slug: string }) {
     return true;
   }
 
+  async function openProfileFromMessage(message: Message) {
+    if (!message.userId) {
+      setSelectedProfile(null);
+      setProfileFallback(message);
+      setProfileError('Questo messaggio demo non è collegato a un profilo reale.');
+      return;
+    }
+
+    setProfileFallback(message);
+    setSelectedProfile(null);
+    setProfileError(null);
+    setProfileLoading(true);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(
+        'id, full_name, username, avatar_url, bio, passions, city, role, nova_points, contributions, calls_joined, outcomes_helped'
+      )
+      .eq('id', message.userId)
+      .maybeSingle();
+
+    if (error) {
+      setProfileError(error.message);
+      setProfileLoading(false);
+      return;
+    }
+
+    if (!data) {
+      setProfileError('Profilo non ancora completato.');
+      setProfileLoading(false);
+      return;
+    }
+
+    setSelectedProfile(data as PublicProfile);
+    setProfileLoading(false);
+  }
+
   async function joinCall() {
     if (joined) return;
 
@@ -299,6 +384,10 @@ export function CallRoom({ slug }: { slug: string }) {
       }. Step: 1) definisci il vincolo più forte, 2) chiedi feedback a due persone esperte, 3) fissa una scadenza chiara.`
     );
   }
+
+  const profileName = selectedProfile?.full_name || profileFallback?.author || 'Profilo Nova';
+  const profileAvatar = selectedProfile?.avatar_url || profileFallback?.avatar || '';
+  const profileTags = splitProfileTags(selectedProfile);
 
   if (!call || !authReady) {
     return (
@@ -389,17 +478,24 @@ export function CallRoom({ slug }: { slug: string }) {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {message.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={message.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-                    ) : (
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-xs font-black">
-                        {message.author.slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openProfileFromMessage(message)}
+                      className="group relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-white/10 text-xs font-black outline-none ring-0 transition hover:scale-105 hover:ring-4 hover:ring-cyan-300/20"
+                      title={`Vedi profilo di ${message.author}`}
+                    >
+                      {message.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={message.avatar} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span>{initials(message.author)}</span>
+                      )}
+                    </button>
 
-                    <div>
-                      <div className="text-xs font-black uppercase tracking-wide text-white/45">{message.author}</div>
+                    <button type="button" onClick={() => openProfileFromMessage(message)} className="text-left">
+                      <div className="text-xs font-black uppercase tracking-wide text-white/45 hover:text-cyan-200">
+                        {message.author}
+                      </div>
                       {message.createdAt && (
                         <div className="text-[11px] font-bold text-white/30">
                           {new Date(message.createdAt).toLocaleTimeString('it-IT', {
@@ -408,7 +504,7 @@ export function CallRoom({ slug }: { slug: string }) {
                           })}
                         </div>
                       )}
-                    </div>
+                    </button>
                   </div>
 
                   <p className="mt-3 font-semibold leading-7 text-slate-100">{message.text}</p>
@@ -459,6 +555,98 @@ export function CallRoom({ slug }: { slug: string }) {
           </div>
         </aside>
       </section>
+
+      {(profileFallback || profileLoading) && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/75 px-4 backdrop-blur-xl">
+          <div className="relative w-[min(560px,100%)] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 p-6 shadow-[0_0_60px_rgba(34,211,238,.22)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(34,211,238,.2),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(236,72,153,.16),transparent_30%)]" />
+
+            <div className="relative z-10">
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileFallback(null);
+                  setSelectedProfile(null);
+                  setProfileError(null);
+                  setProfileLoading(false);
+                }}
+                className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/10 text-xl font-black hover:bg-white/15"
+                aria-label="Chiudi profilo"
+              >
+                ×
+              </button>
+
+              {profileLoading ? (
+                <div className="py-16 text-center">
+                  <p className="text-sm font-black uppercase tracking-[.24em] text-cyan-200/75">Profilo Nova</p>
+                  <h3 className="mt-3 text-3xl font-black">Carico profilo…</h3>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start gap-5 pr-12">
+                    <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[radial-gradient(circle_at_30%_20%,#f8b4ff,#7c3aed_38%,#0f172a_70%)] text-xl font-black">
+                      {profileAvatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={profileAvatar} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        initials(profileName)
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[.24em] text-cyan-200/75">Profilo pubblico</p>
+                      <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-.04em]">{profileName}</h3>
+                      <p className="mt-1 text-sm font-bold text-cyan-200">
+                        {selectedProfile?.city || 'NOVA'} · {selectedProfile?.nova_points || 0} punti Nova
+                      </p>
+                    </div>
+                  </div>
+
+                  {profileError && (
+                    <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100">
+                      {profileError}
+                    </div>
+                  )}
+
+                  <p className="mt-5 font-semibold leading-7 text-slate-300">
+                    {selectedProfile?.bio ||
+                      'Questo utente non ha ancora completato la biografia del profilo.'}
+                  </p>
+
+                  {profileTags.length > 0 && (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {profileTags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-200">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <b className="text-2xl text-cyan-300">{selectedProfile?.contributions || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Messaggi utili</span>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <b className="text-2xl text-lime-300">{selectedProfile?.calls_joined || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Call entrate</span>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <b className="text-2xl text-pink-300">{selectedProfile?.outcomes_helped || 0}</b>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-400">Outcome</span>
+                    </div>
+                  </div>
+
+                  <p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-slate-500">
+                    Solo visualizzazione · nessun follow · nessuna richiesta amicizia
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
