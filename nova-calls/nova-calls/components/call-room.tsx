@@ -11,6 +11,7 @@ import { createBrowserSupabase } from '@/lib/supabase-browser';
 const STORAGE_KEY = 'nova:calls';
 
 type MessageKind = 'host' | 'guest' | 'ai' | 'system';
+type LinkStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected';
 
 type Message = {
   id: string;
@@ -45,6 +46,13 @@ type PublicProfile = {
   contributions: number | null;
   calls_joined: number | null;
   outcomes_helped: number | null;
+};
+
+type UserLinkRow = {
+  id: string;
+  requester_id: string;
+  receiver_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
 };
 
 const starterMessages: Message[] = [
@@ -125,13 +133,15 @@ function uniqueMessages(messages: Message[]) {
 }
 
 function initials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'ME';
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'ME'
+  );
 }
 
 function splitProfileTags(profile: PublicProfile | null) {
@@ -146,6 +156,16 @@ function splitProfileTags(profile: PublicProfile | null) {
     : [];
 
   return [...passions, ...roleTags].slice(0, 8);
+}
+
+function getRelationshipStatus(link: UserLinkRow | null, currentUserId: string | undefined): LinkStatus {
+  if (!link || !currentUserId) return 'none';
+
+  if (link.status === 'accepted') return 'accepted';
+  if (link.status === 'rejected') return 'rejected';
+
+  if (link.requester_id === currentUserId) return 'pending_sent';
+  return 'pending_received';
 }
 
 export function CallRoom({ slug }: { slug: string }) {
@@ -167,6 +187,10 @@ export function CallRoom({ slug }: { slug: string }) {
   const [profileFallback, setProfileFallback] = useState<Message | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  const [linkRow, setLinkRow] = useState<UserLinkRow | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkMessage, setLinkMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setCall(readCall(slug) || demoCalls[0]);
@@ -309,7 +333,33 @@ export function CallRoom({ slug }: { slug: string }) {
     return true;
   }
 
+  async function loadLinkWithProfile(profileId: string) {
+    if (!user || user.id === profileId) {
+      setLinkRow(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('user_links')
+      .select('id, requester_id, receiver_id, status')
+      .or(
+        `and(requester_id.eq.${user.id},receiver_id.eq.${profileId}),and(requester_id.eq.${profileId},receiver_id.eq.${user.id})`
+      )
+      .maybeSingle();
+
+    if (error) {
+      setLinkMessage(`Non riesco a verificare il legame: ${error.message}`);
+      setLinkRow(null);
+      return;
+    }
+
+    setLinkRow((data as UserLinkRow | null) || null);
+  }
+
   async function openProfileFromMessage(message: Message) {
+    setLinkRow(null);
+    setLinkMessage(null);
+
     if (!message.userId) {
       setSelectedProfile(null);
       setProfileFallback(message);
@@ -344,6 +394,64 @@ export function CallRoom({ slug }: { slug: string }) {
 
     setSelectedProfile(data as PublicProfile);
     setProfileLoading(false);
+    await loadLinkWithProfile(message.userId);
+  }
+
+  async function requestLink() {
+    if (!user || !selectedProfile || selectedProfile.id === user.id) return;
+
+    setLinkLoading(true);
+    setLinkMessage(null);
+
+    const { data: existing, error: existingError } = await supabase
+      .from('user_links')
+      .select('id, requester_id, receiver_id, status')
+      .or(
+        `and(requester_id.eq.${user.id},receiver_id.eq.${selectedProfile.id}),and(requester_id.eq.${selectedProfile.id},receiver_id.eq.${user.id})`
+      )
+      .maybeSingle();
+
+    if (existingError) {
+      setLinkMessage(`Non riesco a verificare il legame: ${existingError.message}`);
+      setLinkLoading(false);
+      return;
+    }
+
+    if (existing) {
+      setLinkRow(existing as UserLinkRow);
+      const status = getRelationshipStatus(existing as UserLinkRow, user.id);
+      setLinkMessage(
+        status === 'accepted'
+          ? 'Il legame è già attivo. Potete aprire una chat privata dalla sezione Messaggi.'
+          : status === 'pending_sent'
+            ? 'Hai già inviato una richiesta di legame.'
+            : status === 'pending_received'
+              ? 'Questa persona ti ha già inviato una richiesta: la trovi nelle Notifiche.'
+              : 'Il legame era stato rifiutato.'
+      );
+      setLinkLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('user_links')
+      .insert({
+        requester_id: user.id,
+        receiver_id: selectedProfile.id,
+        status: 'pending',
+      })
+      .select('id, requester_id, receiver_id, status')
+      .single();
+
+    if (error) {
+      setLinkMessage(`Richiesta non inviata: ${error.message}`);
+      setLinkLoading(false);
+      return;
+    }
+
+    setLinkRow(data as UserLinkRow);
+    setLinkMessage('Richiesta di legame inviata. La persona la vedrà nella sezione Notifiche.');
+    setLinkLoading(false);
   }
 
   async function joinCall() {
@@ -388,6 +496,8 @@ export function CallRoom({ slug }: { slug: string }) {
   const profileName = selectedProfile?.full_name || profileFallback?.author || 'Profilo Nova';
   const profileAvatar = selectedProfile?.avatar_url || profileFallback?.avatar || '';
   const profileTags = splitProfileTags(selectedProfile);
+  const linkStatus = getRelationshipStatus(linkRow, user?.id);
+  const canRequestLink = Boolean(selectedProfile && user && selectedProfile.id !== user.id && linkStatus === 'none');
 
   if (!call || !authReady) {
     return (
@@ -558,7 +668,7 @@ export function CallRoom({ slug }: { slug: string }) {
 
       {(profileFallback || profileLoading) && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/75 px-4 backdrop-blur-xl">
-          <div className="relative w-[min(560px,100%)] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 p-6 shadow-[0_0_60px_rgba(34,211,238,.22)]">
+          <div className="relative w-[min(580px,100%)] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 p-6 shadow-[0_0_60px_rgba(34,211,238,.22)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(34,211,238,.2),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(236,72,153,.16),transparent_30%)]" />
 
             <div className="relative z-10">
@@ -569,6 +679,8 @@ export function CallRoom({ slug }: { slug: string }) {
                   setSelectedProfile(null);
                   setProfileError(null);
                   setProfileLoading(false);
+                  setLinkRow(null);
+                  setLinkMessage(null);
                 }}
                 className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/10 text-xl font-black hover:bg-white/15"
                 aria-label="Chiudi profilo"
@@ -609,8 +721,7 @@ export function CallRoom({ slug }: { slug: string }) {
                   )}
 
                   <p className="mt-5 font-semibold leading-7 text-slate-300">
-                    {selectedProfile?.bio ||
-                      'Questo utente non ha ancora completato la biografia del profilo.'}
+                    {selectedProfile?.bio || 'Questo utente non ha ancora completato la biografia del profilo.'}
                   </p>
 
                   {profileTags.length > 0 && (
@@ -638,8 +749,56 @@ export function CallRoom({ slug }: { slug: string }) {
                     </div>
                   </div>
 
+                  {selectedProfile && user?.id !== selectedProfile.id && (
+                    <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-black uppercase tracking-[.2em] text-slate-500">Legame personale</p>
+
+                      {canRequestLink && (
+                        <button
+                          type="button"
+                          onClick={requestLink}
+                          disabled={linkLoading}
+                          className="mt-3 w-full rounded-full bg-lime-300 px-5 py-3 text-sm font-black text-slate-950 disabled:opacity-60"
+                        >
+                          {linkLoading ? 'Invio richiesta…' : 'Richiedi legame'}
+                        </button>
+                      )}
+
+                      {linkStatus === 'pending_sent' && (
+                        <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100">
+                          Richiesta inviata. Quando l&apos;altra persona accetta, si sbloccherà la chat privata.
+                        </div>
+                      )}
+
+                      {linkStatus === 'pending_received' && (
+                        <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100">
+                          Questa persona ti ha già inviato una richiesta. Vai in Notifiche per accettarla o rifiutarla.
+                        </div>
+                      )}
+
+                      {linkStatus === 'accepted' && (
+                        <Link
+                          href="/messages"
+                          className="mt-3 block rounded-full bg-gradient-to-r from-violet-500 to-cyan-300 px-5 py-3 text-center text-sm font-black text-white"
+                        >
+                          Legame attivo · Apri Messaggi
+                        </Link>
+                      )}
+
+                      {linkStatus === 'rejected' && (
+                        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-300">
+                          Questo legame non è attivo.
+                        </div>
+                      )}
+
+                      {linkMessage && (
+                        <p className="mt-3 text-sm font-bold text-slate-300">{linkMessage}</p>
+                      )}
+                    </div>
+                  )}
+
                   <p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-slate-500">
-                    Solo visualizzazione · nessun follow · nessuna richiesta amicizia
+                    Solo legami reciproci · nessun follow pubblico · chat privata solo dopo accettazione
                   </p>
                 </>
               )}
