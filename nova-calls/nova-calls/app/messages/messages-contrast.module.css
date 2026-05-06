@@ -1,0 +1,177 @@
+.messagesContrast {
+  min-height: 100vh;
+  color: #10213a;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(56, 214, 255, 0.24), transparent 24%),
+    radial-gradient(circle at 82% 14%, rgba(143, 124, 255, 0.16), transparent 26%),
+    radial-gradient(circle at 58% 95%, rgba(56, 214, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #eefbff 0%, #f7fbff 38%, #d9f2ff 100%);
+}
+
+.messagesContrast,
+.messagesContrast * {
+  text-shadow: none !important;
+}
+
+.messagesContrast h1,
+.messagesContrast h2,
+.messagesContrast h3,
+.messagesContrast h4,
+.messagesContrast b,
+.messagesContrast strong {
+  color: #10213a !important;
+}
+
+.messagesContrast p,
+.messagesContrast span,
+.messagesContrast div,
+.messagesContrast label {
+  color: #31435f;
+}
+
+.messagesContrast :global([class*="text-white"]),
+.messagesContrast :global([class*="text-slate-100"]),
+.messagesContrast :global([class*="text-slate-200"]),
+.messagesContrast :global([class*="text-slate-300"]),
+.messagesContrast :global([class*="text-slate-400"]),
+.messagesContrast :global([class*="text-white/"]) {
+  color: #31435f !important;
+}
+
+.messagesContrast :global([class*="text-cyan"]),
+.messagesContrast :global([class*="text-sky"]) {
+  color: #0284c7 !important;
+}
+
+.messagesContrast :global([class*="text-lime"]) {
+  color: #4d7c0f !important;
+}
+
+.messagesContrast :global([class*="text-pink"]) {
+  color: #be185d !important;
+}
+
+.messagesContrast :global(.nova-card),
+.messagesContrast :global([class*="bg-white/5"]),
+.messagesContrast :global([class*="bg-white/10"]),
+.messagesContrast :global([class*="bg-white/15"]),
+.messagesContrast :global([class*="bg-white/20"]),
+.messagesContrast :global([class*="bg-slate"]),
+.messagesContrast :global([class*="bg-[#"]),
+.messagesContrast :global([class*="bg-["]) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 251, 255, 0.8)) !important;
+  border-color: rgba(90, 132, 185, 0.26) !important;
+  box-shadow:
+    0 22px 70px rgba(68, 115, 180, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+.messagesContrast aside,
+.messagesContrast section,
+.messagesContrast article {
+  border-color: rgba(90, 132, 185, 0.24) !important;
+}
+
+.messagesContrast button,
+.messagesContrast a {
+  color: inherit;
+}
+
+.messagesContrast button[class*="bg-lime"],
+.messagesContrast a[class*="bg-lime"],
+.messagesContrast :global([class*="bg-nova-lime"]) {
+  background: linear-gradient(180deg, #c9f45a, #a3e635) !important;
+  color: #1f2d05 !important;
+  border-color: rgba(101, 163, 13, 0.24) !important;
+  box-shadow:
+    0 14px 30px rgba(132, 204, 22, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+}
+
+.messagesContrast input,
+.messagesContrast textarea {
+  background: rgba(255, 255, 255, 0.86) !important;
+  color: #10213a !important;
+  border: 1px solid rgba(90, 132, 185, 0.28) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+}
+
+.messagesContrast input::placeholder,
+.messagesContrast textarea::placeholder {
+  color: #74849d !important;
+}
+
+.messagesContrast input:focus,
+.messagesContrast textarea:focus {
+  outline: none !important;
+  border-color: rgba(56, 214, 255, 0.58) !important;
+  box-shadow:
+    0 0 0 4px rgba(56, 214, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+}
+
+/* Messaggi ricevuti */
+.messagesContrast :global([class*="self-start"]),
+.messagesContrast :global([class*="mr-auto"]) {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #10213a !important;
+  border: 1px solid rgba(90, 132, 185, 0.28) !important;
+  box-shadow: 0 10px 28px rgba(68, 115, 180, 0.12) !important;
+}
+
+/* Messaggi inviati */
+.messagesContrast :global([class*="self-end"]),
+.messagesContrast :global([class*="ml-auto"]) {
+  background: linear-gradient(180deg, #eefac7, #def48b) !important;
+  color: #243306 !important;
+  border: 1px solid rgba(132, 204, 22, 0.28) !important;
+  box-shadow: 0 12px 30px rgba(132, 204, 22, 0.16) !important;
+}
+
+.messagesContrast :global([class*="self-start"] *),
+.messagesContrast :global([class*="mr-auto"] *),
+.messagesContrast :global([class*="self-end"] *),
+.messagesContrast :global([class*="ml-auto"] *) {
+  color: inherit !important;
+}
+
+/* Card legame selezionato */
+.messagesContrast :global([class*="border-cyan"]),
+.messagesContrast :global([class*="border-sky"]) {
+  border-color: rgba(14, 165, 233, 0.44) !important;
+  background:
+    linear-gradient(180deg, rgba(231, 248, 255, 0.96), rgba(245, 252, 255, 0.9)) !important;
+  box-shadow:
+    0 0 0 1px rgba(56, 214, 255, 0.18),
+    0 16px 36px rgba(56, 214, 255, 0.12) !important;
+}
+
+/* Header */
+.messagesContrast header {
+  background: rgba(24, 35, 56, 0.78) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 30px rgba(8, 19, 44, 0.14) !important;
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.messagesContrast header a,
+.messagesContrast header span,
+.messagesContrast header div {
+  color: rgba(255, 255, 255, 0.86) !important;
+}
+
+.messagesContrast header h1,
+.messagesContrast header b,
+.messagesContrast header strong {
+  color: white !important;
+}
+
+.messagesContrast main {
+  color: #10213a;
+}
+
+.messagesContrast img {
+  color: transparent !important;
+}
