@@ -57,12 +57,19 @@ export function Card({
 
 export function Logo() {
   return (
-    <Link href="/" className="group flex items-center" aria-label="NOVA home">
-      <img
-        src="/nova-logo.png"
-        alt="NOVA"
-        className="h-[46px] w-auto object-contain drop-shadow-[0_0_18px_rgba(34,211,238,.28)] transition group-hover:brightness-110 md:h-[52px]"
-      />
+    <Link href="/" className="group flex items-center gap-3" aria-label="NOVA home">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-cyan-200/20 bg-[#050816] shadow-[0_0_24px_rgba(34,211,238,.16)] backdrop-blur-xl transition group-hover:border-cyan-200/35 group-hover:shadow-[0_0_30px_rgba(34,211,238,.26)]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/nova-logo.png"
+          alt=""
+          className="h-10 w-10 object-contain"
+        />
+      </span>
+
+      <span className="text-xl font-black tracking-[.18em] text-white">
+        NOVA
+      </span>
     </Link>
   );
 }
