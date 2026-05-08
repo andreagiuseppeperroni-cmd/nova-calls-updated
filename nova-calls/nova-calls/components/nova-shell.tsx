@@ -2363,6 +2363,141 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             font-size: 9px;
           }
         }
+        /* =========================
+   FIX MOBILE SIDEBAR SCROLL
+   Incolla questo blocco subito prima di:
+   `}</style>
+   ========================= */
+
+@media (max-width: 860px) {
+  .nova-app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    padding: 0 14px 124px;
+    gap: 16px;
+  }
+
+  .sidebar {
+    order: 3;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+    z-index: 50;
+    margin: 0;
+    min-height: 0;
+    height: auto;
+    max-width: calc(100vw - 24px);
+    border-radius: 24px;
+    padding: 9px;
+    background: rgba(255,255,255,.88);
+    backdrop-filter: blur(26px) saturate(1.4);
+    box-shadow: 0 18px 60px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.9);
+    overflow: hidden;
+  }
+
+  .sidebar::before,
+  .online {
+    display: none;
+  }
+
+  .nav {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    grid-template-columns: none;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 2px 2px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item,
+  .nav-item:nth-child(n+6) {
+    position: relative;
+    display: flex !important;
+    flex: 0 0 76px;
+    width: 76px;
+    height: 58px;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    padding: 6px 4px;
+    border-radius: 18px;
+    font-size: 10px;
+    line-height: 1;
+    gap: 5px;
+    text-align: center;
+    scroll-snap-align: start;
+  }
+
+  .nav-icon {
+    width: auto;
+    font-size: 21px;
+    line-height: 1;
+    filter: none;
+  }
+
+  .nav-label {
+    display: block;
+    max-width: 68px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(15, 23, 42, .72);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .nav-item.active .nav-label,
+  .nav-item:hover .nav-label {
+    color: #075985;
+  }
+
+  .nav-badge {
+    position: absolute;
+    right: 7px;
+    top: 5px;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    font-size: 10px;
+  }
+
+  .open-call {
+    position: fixed;
+    right: 18px;
+    bottom: 84px;
+    width: 64px;
+    min-height: 64px;
+    height: 64px;
+    border-radius: 24px;
+    padding: 0;
+    justify-content: center;
+    text-align: center;
+    font-size: 0;
+  }
+
+  .open-call::before {
+    content: "+";
+    font-size: 36px;
+    line-height: 1;
+  }
+
+  .open-call span {
+    display: none;
+  }
+}
       `}</style>
     </div>
   );
