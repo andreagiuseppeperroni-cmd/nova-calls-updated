@@ -154,7 +154,10 @@ export default function NewsPage() {
             {articles.map((article) => (
               <article
                 key={article.id}
-                className="overflow-hidden rounded-[28px] border border-cyan-200/10 bg-[#07101f] shadow-[0_18px_60px_rgba(0,0,0,.48)] backdrop-blur-xl"
+                className="overflow-hidden rounded-[28px] border border-cyan-200/10 shadow-[0_18px_60px_rgba(0,0,0,.55)] backdrop-blur-xl"
+                style={{
+                  background: '#07101f',
+                }}
               >
                 <div className="relative h-52 overflow-hidden bg-slate-950">
                   {article.imageUrl ? (
@@ -164,10 +167,18 @@ export default function NewsPage() {
                         src={article.imageUrl}
                         alt={article.title}
                         className="h-full w-full object-cover"
+                        style={{
+                          filter: 'brightness(.82) contrast(1.08)',
+                        }}
                       />
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#07101f] via-[#07101f]/45 to-black/10" />
-                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#07101f] to-transparent" />
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background:
+                            'linear-gradient(180deg, rgba(2,6,23,.08) 0%, rgba(2,6,23,.16) 35%, rgba(7,16,31,.78) 78%, rgba(7,16,31,1) 100%)',
+                        }}
+                      />
                     </>
                   ) : (
                     <div className="grid h-full place-items-center bg-gradient-to-br from-cyan-500/25 via-violet-500/25 to-pink-500/25 text-4xl font-black text-white">
@@ -176,24 +187,58 @@ export default function NewsPage() {
                   )}
                 </div>
 
-                <div className="flex min-h-[340px] flex-col bg-[#07101f] p-6">
+                <div
+                  className="flex min-h-[350px] flex-col p-6"
+                  style={{
+                    background:
+                      'linear-gradient(180deg, #07101f 0%, #081426 55%, #07101f 100%)',
+                  }}
+                >
                   <div className="mb-4 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-wide">
-                    <span className="truncate text-slate-100 drop-shadow-[0_2px_8px_rgba(0,0,0,.75)]">
+                    <span
+                      className="truncate"
+                      style={{
+                        color: '#ffffff',
+                        textShadow: '0 2px 10px rgba(0,0,0,.95)',
+                        opacity: 1,
+                      }}
+                    >
                       {article.sourceName}
                     </span>
 
-                    <span className="shrink-0 text-slate-300 drop-shadow-[0_2px_8px_rgba(0,0,0,.75)]">
+                    <span
+                      className="shrink-0"
+                      style={{
+                        color: 'rgba(255,255,255,.86)',
+                        textShadow: '0 2px 10px rgba(0,0,0,.95)',
+                        opacity: 1,
+                      }}
+                    >
                       {article.publishedAt
                         ? new Date(article.publishedAt).toLocaleDateString('it-IT')
                         : 'Ora'}
                     </span>
                   </div>
 
-                  <h2 className="text-[23px] font-black leading-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,.95)]">
+                  <h2
+                    className="text-[24px] font-black leading-tight"
+                    style={{
+                      color: '#ffffff',
+                      textShadow: '0 4px 18px rgba(0,0,0,.98), 0 1px 3px rgba(0,0,0,1)',
+                      opacity: 1,
+                    }}
+                  >
                     {article.title}
                   </h2>
 
-                  <p className="mt-4 line-clamp-5 text-[15px] font-semibold leading-7 text-slate-200 drop-shadow-[0_2px_10px_rgba(0,0,0,.72)]">
+                  <p
+                    className="mt-4 line-clamp-5 text-[15px] font-semibold leading-7"
+                    style={{
+                      color: 'rgba(255,255,255,.92)',
+                      textShadow: '0 3px 12px rgba(0,0,0,.88)',
+                      opacity: 1,
+                    }}
+                  >
                     {article.description || 'Descrizione non disponibile. Apri la fonte per leggere la notizia completa.'}
                   </p>
 
@@ -209,7 +254,11 @@ export default function NewsPage() {
                       href={article.sourceUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-white/10 bg-white/10 px-5 py-3 text-center text-sm font-black text-white shadow-[0_8px_24px_rgba(0,0,0,.18)] transition hover:bg-white/15"
+                      className="rounded-full border border-white/10 px-5 py-3 text-center text-sm font-black shadow-[0_8px_24px_rgba(0,0,0,.18)] transition hover:bg-white/20"
+                      style={{
+                        background: 'rgba(255,255,255,.14)',
+                        color: '#ffffff',
+                      }}
                     >
                       Leggi fonte
                     </a>
