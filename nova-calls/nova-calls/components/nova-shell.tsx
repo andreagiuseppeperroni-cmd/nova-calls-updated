@@ -18,6 +18,7 @@ const navItems = [
   ['👥', 'Persone', '/people'],
   ['🌐', 'Spazi', '/spaces'],
   ['📰', 'News', '/world-news'],
+  ['📍', 'Eventi', '/events']
   ['🔔', 'Notifiche', '/notifications'],
   ['💬', 'Messaggi', '/messages'],
   ['👤', 'Profilo', '/profile'],
