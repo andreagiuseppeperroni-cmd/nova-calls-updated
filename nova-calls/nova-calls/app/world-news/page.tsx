@@ -148,60 +148,65 @@ export default function NewsPage() {
         {!isLoading && !error && articles.length > 0 && (
           <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {articles.map((article) => (
-              <article
-                key={article.id}
-                className="overflow-hidden rounded-3xl border border-white/10 bg-white/[.06] shadow-[0_20px_70px_rgba(0,0,0,.28)] backdrop-blur-xl"
-              >
-                <div className="h-44 bg-slate-900">
-                  {article.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={article.imageUrl}
-                      alt={article.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="grid h-full place-items-center bg-gradient-to-br from-cyan-500/20 via-violet-500/20 to-pink-500/20 text-4xl">
-                      NOVA
-                    </div>
-                  )}
-                </div>
+            <article
+  key={article.id}
+  className="overflow-hidden rounded-[28px] border border-cyan-200/10 bg-[#081120] shadow-[0_18px_60px_rgba(0,0,0,.42)] backdrop-blur-xl"
+>
+  <div className="relative h-52 overflow-hidden bg-slate-900">
+    {article.imageUrl ? (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={article.imageUrl}
+          alt={article.title}
+          className="h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#081120] via-[#081120]/25 to-transparent" />
+      </>
+    ) : (
+      <div className="grid h-full place-items-center bg-gradient-to-br from-cyan-500/20 via-violet-500/20 to-pink-500/20 text-4xl font-black text-white">
+        NOVA
+      </div>
+    )}
+  </div>
 
-                <div className="flex min-h-[310px] flex-col p-5">
-                  <div className="mb-3 flex items-center justify-between gap-3 text-xs font-bold text-slate-400">
-                    <span>{article.sourceName}</span>
-                    <span>
-                      {article.publishedAt
-                        ? new Date(article.publishedAt).toLocaleDateString('it-IT')
-                        : 'Ora'}
-                    </span>
-                  </div>
+  <div className="flex min-h-[320px] flex-col bg-[#081120] p-6">
+    <div className="mb-4 flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-slate-300">
+      <span className="truncate text-slate-200">{article.sourceName}</span>
+      <span className="shrink-0 text-slate-400">
+        {article.publishedAt
+          ? new Date(article.publishedAt).toLocaleDateString('it-IT')
+          : 'Ora'}
+      </span>
+    </div>
 
-                  <h2 className="text-xl font-black leading-tight text-white">{article.title}</h2>
+    <h2 className="text-[22px] font-black leading-tight text-white">
+      {article.title}
+    </h2>
 
-                  <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-slate-300">
-                    {article.description}
-                  </p>
+    <p className="mt-4 line-clamp-4 text-[15px] font-medium leading-7 text-slate-300">
+      {article.description}
+    </p>
 
-                  <div className="mt-auto flex flex-col gap-3 pt-5">
-                    <Link
-                      href={buildSpuntoUrl(article)}
-                      className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 px-5 py-3 text-center text-sm font-black text-white shadow-[0_0_26px_rgba(34,211,238,.24)]"
-                    >
-                      Apri uno Spunto →
-                    </Link>
+    <div className="mt-auto flex flex-col gap-3 pt-6">
+      <Link
+        href={buildSpuntoUrl(article)}
+        className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 px-5 py-3 text-center text-sm font-black text-white shadow-[0_0_26px_rgba(34,211,238,.24)]"
+      >
+        Apri uno Spunto →
+      </Link>
 
-                    <a
-                      href={article.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-center text-sm font-black text-slate-200 hover:bg-white/10"
-                    >
-                      Leggi fonte
-                    </a>
-                  </div>
-                </div>
-              </article>
+      <a
+        href={article.sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-center text-sm font-black text-slate-100 hover:bg-white/10"
+      >
+        Leggi fonte
+      </a>
+    </div>
+  </div>
+</article>
             ))}
           </section>
         )}
