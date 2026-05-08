@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { demoCalls, makeSlug, type NovaCall } from '@/lib/local-call';
 import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
@@ -10,7 +10,7 @@ const STORAGE_KEY = 'nova:calls';
 
 const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
 
-const navItems = [
+const navItems: Array<[string, string, string]> = [
   ['🏠', 'Home', '/'],
   ['💡', 'Spunti', '/calls/new'],
   ['🧠', 'Echo', '/echo'],
@@ -508,10 +508,30 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         <Sidebar notificationCount={notificationCount} />
 
         <section className="nova-center">
-          <h1>
-            Di cosa hai bisogno <span className="gradient-text">adesso?</span>
-          </h1>
-          <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
+          <section className="hero-refresh">
+            <div>
+              <p className="ai-eyebrow">NOVA Home</p>
+              <h1>
+                Di cosa hai bisogno <span className="gradient-text">adesso?</span>
+              </h1>
+              <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
+            </div>
+
+            <div className="hero-mini-stats">
+              <div>
+                <b>{liveThoughts.length || demoCalls.length}</b>
+                <span>Spunti attivi</span>
+              </div>
+              <div>
+                <b>{avgPulse}</b>
+                <span>Pulse medio</span>
+              </div>
+              <div>
+                <b>{worldNews.length || 3}</b>
+                <span>News utili</span>
+              </div>
+            </div>
+          </section>
 
           <div className="composer ai-composer">
             <div className="composer-content">
@@ -621,6 +641,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
               closingSlug={closingSlug}
             />
           )}
+
+          <HomeSectionsPreview
+            thoughts={liveThoughts}
+            trendEchoes={trendEchoes}
+            worldNews={worldNews}
+            notificationCount={notificationCount}
+            currentUserId={currentUserId}
+          />
 
           <TrendEchoSection echoes={trendEchoes} />
           <WorldNewsSection items={worldNews} loading={newsLoading} />
@@ -915,6 +943,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           padding-top: 78px;
         }
 
+        .hero-refresh {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 360px;
+          gap: 18px;
+          align-items: end;
+          margin-bottom: 18px;
+        }
+
         .nova-center h1 {
           margin: 0;
           font-size: clamp(52px, 5.2vw, 83px);
@@ -931,10 +967,49 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .subtitle {
-          margin: 8px 0 18px;
+          margin: 8px 0 0;
           color: var(--muted);
           font-size: 16px;
           font-weight: 750;
+        }
+
+        .hero-mini-stats {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 9px;
+          border-radius: 24px;
+          padding: 12px;
+          border: 1px solid rgba(255,255,255,.66);
+          background: rgba(255,255,255,.58);
+          box-shadow: 0 16px 45px rgba(37,99,235,.08), inset 0 1px 0 rgba(255,255,255,.9);
+          backdrop-filter: blur(22px);
+        }
+
+        .hero-mini-stats div {
+          border-radius: 18px;
+          padding: 12px 10px;
+          text-align: center;
+          background: rgba(255,255,255,.62);
+          border: 1px solid rgba(15,23,42,.06);
+        }
+
+        .hero-mini-stats b {
+          display: block;
+          color: #0f172a;
+          font-size: 22px;
+          line-height: 1;
+          font-weight: 950;
+        }
+
+        .hero-mini-stats span {
+          display: block;
+          margin-top: 5px;
+          color: #64748b;
+          font-size: 10px;
+          line-height: 1.2;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: .08em;
         }
 
         .composer {
@@ -1321,6 +1396,162 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           align-items: center;
           justify-content: center;
           text-decoration: none;
+        }
+
+        .home-preview {
+          margin-top: 18px;
+          border-radius: 28px;
+          padding: 22px;
+          border: 1px solid rgba(255,255,255,.64);
+          background:
+            radial-gradient(circle at 8% 0%, rgba(6,182,212,.14), transparent 28%),
+            radial-gradient(circle at 92% 20%, rgba(124,58,237,.12), transparent 30%),
+            linear-gradient(180deg, rgba(255,255,255,.78), rgba(224,246,255,.62));
+          box-shadow: 0 22px 74px rgba(37,99,235,.10), inset 0 1px 0 rgba(255,255,255,.92);
+          backdrop-filter: blur(24px) saturate(1.2);
+        }
+
+        .home-preview-head {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 18px;
+        }
+
+        .home-preview-head h2 {
+          margin: 0;
+          color: #10213a;
+          font-size: clamp(28px, 2.8vw, 46px);
+          line-height: .95;
+          letter-spacing: -.05em;
+          font-weight: 950;
+        }
+
+        .home-preview-head p:last-child {
+          max-width: 430px;
+          margin: 0;
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.55;
+          font-weight: 750;
+        }
+
+        .home-preview-grid {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .preview-card {
+          position: relative;
+          min-height: 210px;
+          overflow: hidden;
+          border-radius: 22px;
+          padding: 16px;
+          border: 1px solid rgba(15,23,42,.08);
+          background:
+            radial-gradient(circle at 12% 0%, rgba(255,255,255,.72), transparent 38%),
+            linear-gradient(180deg, rgba(255,255,255,.74), rgba(238,249,255,.58));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 16px 38px rgba(37,99,235,.08);
+        }
+
+        .preview-card::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          opacity: .85;
+          pointer-events: none;
+        }
+
+        .preview-cyan::before {
+          background: radial-gradient(circle at 100% 0%, rgba(6,182,212,.18), transparent 42%);
+        }
+
+        .preview-violet::before {
+          background: radial-gradient(circle at 100% 0%, rgba(124,58,237,.18), transparent 42%);
+        }
+
+        .preview-pink::before {
+          background: radial-gradient(circle at 100% 0%, rgba(219,39,119,.16), transparent 42%);
+        }
+
+        .preview-blue::before {
+          background: radial-gradient(circle at 100% 0%, rgba(37,99,235,.16), transparent 42%);
+        }
+
+        .preview-green::before {
+          background: radial-gradient(circle at 100% 0%, rgba(163,230,53,.22), transparent 42%);
+        }
+
+        .preview-card-top,
+        .preview-card-body {
+          position: relative;
+          z-index: 1;
+        }
+
+        .preview-card-top {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .preview-icon {
+          display: grid;
+          place-items: center;
+          width: 44px;
+          height: 44px;
+          flex: 0 0 auto;
+          border-radius: 16px;
+          background: rgba(255,255,255,.78);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 12px 28px rgba(37,99,235,.08);
+          font-size: 21px;
+        }
+
+        .preview-card h3 {
+          margin: 0 0 6px;
+          color: #0f172a;
+          font-size: 18px;
+          line-height: 1;
+          letter-spacing: -.025em;
+          font-weight: 950;
+        }
+
+        .preview-card a {
+          color: #075985;
+          font-size: 12px;
+          font-weight: 950;
+          text-decoration: none;
+        }
+
+        .preview-card-body {
+          display: grid;
+          gap: 9px;
+        }
+
+        .mini-preview-line {
+          border-radius: 15px;
+          padding: 11px 12px;
+          background: rgba(255,255,255,.62);
+          border: 1px solid rgba(15,23,42,.06);
+        }
+
+        .mini-preview-line strong {
+          display: block;
+          color: #10213a;
+          font-size: 13px;
+          line-height: 1.25;
+          font-weight: 950;
+        }
+
+        .mini-preview-line span {
+          display: block;
+          margin-top: 4px;
+          color: #475569;
+          font-size: 12px;
+          line-height: 1.4;
+          font-weight: 700;
         }
 
         .host-card,
@@ -1908,6 +2139,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           .world-news-grid {
             grid-template-columns: 1fr;
           }
+
+          .hero-refresh {
+            grid-template-columns: 1fr;
+          }
+
+          .home-preview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
 
         @media (max-width: 860px) {
@@ -2102,6 +2341,15 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             padding-top: 4px;
           }
 
+          .hero-refresh {
+            grid-template-columns: 1fr;
+            text-align: center;
+          }
+
+          .hero-mini-stats {
+            grid-template-columns: repeat(3, 1fr);
+          }
+
           .nova-center h1 {
             max-width: 360px;
             margin: 0 auto;
@@ -2245,6 +2493,28 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             font-size: 19px;
           }
 
+          .home-preview {
+            border-radius: 25px;
+            padding: 18px;
+          }
+
+          .home-preview-head {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .home-preview-head p:last-child {
+            max-width: none;
+          }
+
+          .home-preview-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .preview-card {
+            min-height: auto;
+          }
+
           .host-card {
             grid-template-columns: 1fr;
             gap: 17px;
@@ -2370,6 +2640,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             display: none;
           }
 
+          .hero-mini-stats {
+            grid-template-columns: 1fr;
+          }
+
           .featured h2 {
             font-size: 31px;
           }
@@ -2434,13 +2708,15 @@ function Sidebar({ notificationCount }: { notificationCount: number }) {
   return (
     <aside className="sidebar glass">
       <nav className="nav">
-        {navItems.map(([icon, label, href], index) => (
-          <Link key={label} href={href} className={`nav-item ${index === 0 ? 'active' : ''}`}>
-            <span className="nav-icon">{icon}</span>
-            <span className="nav-label">{label}</span>
-            {label === 'Notifiche' && notificationCount > 0 && <span className="nav-badge">{notificationCount}</span>}
-          </Link>
-        ))}
+        {navItems
+          .filter((item): item is [string, string, string] => Array.isArray(item) && item.length >= 3)
+          .map(([icon, label, href], index) => (
+            <Link key={label} href={href} className={`nav-item ${index === 0 ? 'active' : ''}`}>
+              <span className="nav-icon">{icon}</span>
+              <span className="nav-label">{label}</span>
+              {label === 'Notifiche' && notificationCount > 0 && <span className="nav-badge">{notificationCount}</span>}
+            </Link>
+          ))}
       </nav>
 
       <Link href="/calls/new" className="open-call">
@@ -2516,6 +2792,150 @@ function FeaturedThought({
   );
 }
 
+function HomeSectionsPreview({
+  thoughts,
+  trendEchoes,
+  worldNews,
+  notificationCount,
+  currentUserId,
+}: {
+  thoughts: LiveThought[];
+  trendEchoes: TrendEcho[];
+  worldNews: WorldNewsItem[];
+  notificationCount: number;
+  currentUserId: string | null;
+}) {
+  const firstThought = thoughts[0];
+  const secondThought = thoughts[1];
+  const firstNews = worldNews[0];
+  const secondNews = worldNews[1];
+
+  return (
+    <section className="home-preview">
+      <div className="home-preview-head">
+        <div>
+          <p className="ai-eyebrow">Esplora NOVA</p>
+          <h2>La tua dashboard viva</h2>
+        </div>
+
+        <p>Tutte le sezioni principali in anteprima: entra, scopri cosa sta succedendo e apri nuovi Spunti.</p>
+      </div>
+
+      <div className="home-preview-grid">
+        <PreviewCard icon="💡" title="Spunti" href="/spaces" cta="Vedi Spunti" accent="cyan">
+          {firstThought ? (
+            <>
+              <MiniPreviewLine
+                title={firstThought.title}
+                text={`Pulse ${firstThought.pulse_score || 0} · ${firstThought.participants || 0} partecipanti`}
+              />
+              {secondThought && (
+                <MiniPreviewLine title={secondThought.title} text={`Host: ${secondThought.host_name || 'Utente NOVA'}`} />
+              )}
+            </>
+          ) : (
+            <MiniPreviewLine title="Nessuno Spunto attivo" text="Apri il primo Spunto e avvia la conversazione." />
+          )}
+        </PreviewCard>
+
+        <PreviewCard icon="🧠" title="Echo" href="/echo" cta="Apri Echo" accent="violet">
+          {trendEchoes.slice(0, 2).map((echo) => (
+            <MiniPreviewLine key={echo.title} title={echo.title} text={echo.text} />
+          ))}
+        </PreviewCard>
+
+        <PreviewCard icon="🏁" title="Outcome" href="/outcome" cta="Vedi Outcome" accent="green">
+          <MiniPreviewLine title="Decisioni finali" text="Qui trovi sintesi, direzioni e risultati generati dagli Spunti." />
+          <MiniPreviewLine title="Azioni concrete" text="Trasforma le conversazioni in prossimi passi." />
+        </PreviewCard>
+
+        <PreviewCard icon="📰" title="News dal mondo" href="/world-news" cta="Apri News" accent="pink">
+          {firstNews ? (
+            <>
+              <MiniPreviewLine title={firstNews.title} text={firstNews.source || 'Fonte news'} />
+              {secondNews && <MiniPreviewLine title={secondNews.title} text={secondNews.source || 'Fonte news'} />}
+            </>
+          ) : (
+            <MiniPreviewLine title="News in arrivo" text="Le notizie diventano Spunti per la community." />
+          )}
+        </PreviewCard>
+
+        <PreviewCard icon="📍" title="Eventi" href="/events" cta="Scopri Eventi" accent="blue">
+          <MiniPreviewLine title="Centro Italia" text="Roma, Firenze, Perugia, Ancona, Pescara e altre città." />
+          <MiniPreviewLine title="Organizziamoci" text="Ogni evento può diventare uno Spunto condiviso." />
+        </PreviewCard>
+
+        <PreviewCard icon="👥" title="Persone" href="/people" cta="Vedi Persone" accent="cyan">
+          <MiniPreviewLine title="Interazioni reali" text="Scopri le persone con cui hai condiviso Spunti." />
+          <MiniPreviewLine title="Nessun follow" text="Profili visibili, ma niente logiche da social classico." />
+        </PreviewCard>
+
+        <PreviewCard icon="🌐" title="Spazi" href="/spaces" cta="Apri Spazi" accent="violet">
+          <MiniPreviewLine title="Stanze attive" text="Trova Spunti collegati ai tuoi interessi." />
+          <MiniPreviewLine title="Community locali" text="Luoghi digitali dove organizzarsi e confrontarsi." />
+        </PreviewCard>
+
+        <PreviewCard icon="💬" title="Messaggi" href="/messages" cta="Apri Messaggi" accent="blue">
+          <MiniPreviewLine title="Conversazioni private" text="Rimani in contatto con chi hai incontrato negli Spunti." />
+          <MiniPreviewLine title="Chat dirette" text="Messaggi più leggibili, ordinati e personali." />
+        </PreviewCard>
+
+        <PreviewCard icon="🔔" title="Notifiche" href="/notifications" cta="Vedi Notifiche" accent="pink">
+          <MiniPreviewLine
+            title={notificationCount > 0 ? `${notificationCount} notifiche attive` : 'Tutto tranquillo'}
+            text={notificationCount > 0 ? 'Hai nuove attività da controllare.' : 'Qui appariranno inviti, risposte e aggiornamenti.'}
+          />
+        </PreviewCard>
+
+        <PreviewCard icon="👤" title="Profilo" href={currentUserId ? '/profile' : '/login'} cta={currentUserId ? 'Vai al Profilo' : 'Accedi'} accent="green">
+          <MiniPreviewLine title="Identità NOVA" text="Bio, passioni, contributi e punteggio personale." />
+          <MiniPreviewLine title="Livello Nova" text="Il livello resta solo nella tua pagina personale." />
+        </PreviewCard>
+      </div>
+    </section>
+  );
+}
+
+function PreviewCard({
+  icon,
+  title,
+  href,
+  cta,
+  accent,
+  children,
+}: {
+  icon: string;
+  title: string;
+  href: string;
+  cta: string;
+  accent: 'cyan' | 'violet' | 'pink' | 'blue' | 'green';
+  children: ReactNode;
+}) {
+  return (
+    <article className={`preview-card preview-${accent}`}>
+      <div className="preview-card-top">
+        <div className="preview-icon">{icon}</div>
+
+        <div>
+          <h3>{title}</h3>
+          <Link href={href}>{cta} →</Link>
+        </div>
+      </div>
+
+      <div className="preview-card-body">{children}</div>
+    </article>
+  );
+}
+
+function MiniPreviewLine({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="mini-preview-line">
+      <strong>{title}</strong>
+      <span>{text}</span>
+    </div>
+  );
+}
+
 function TrendEchoSection({ echoes }: { echoes: TrendEcho[] }) {
   return (
     <section className="host-card glass">
@@ -2566,8 +2986,8 @@ function WorldNewsSection({ items, loading }: { items: WorldNewsItem[]; loading:
           <h2>Notizie dal mondo per dare spunto… a un nuovo Spunto</h2>
         </div>
 
-        <Link href="/calls/new" className="world-news-main-cta">
-          Apri uno Spunto →
+        <Link href="/world-news" className="world-news-main-cta">
+          Apri News →
         </Link>
       </div>
 
