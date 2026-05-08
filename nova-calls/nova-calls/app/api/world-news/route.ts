@@ -1,96 +1,88 @@
 import { NextResponse } from 'next/server';
 
-type WorldNewsItem = {
-  title: string;
-  description: string;
-  source: string;
-  url: string;
-  publishedAt: string;
-};
-
 export const dynamic = 'force-dynamic';
 
-function decodeHtml(value: string) {
-  return value
-    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/<[^>]*>/g, '')
-    .trim();
-}
+type NewsApiArticle = {
+  title?: string;
+  description?: string;
+  url?: string;
+  urlToImage?: string;
+  publishedAt?: string;
+  source?: {
+    name?: string;
+  };
+};
 
-function pickTag(item: string, tag: string) {
-  const match = item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-  return match ? decodeHtml(match[1]) : '';
-}
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
 
-function extractGoogleNewsSource(item: string) {
-  const source = pickTag(item, 'source');
-  return source || 'Google News';
-}
+  const category = searchParams.get('category') || 'general';
+  const country = searchParams.get('country') || 'it';
 
-function parseRss(xml: string): WorldNewsItem[] {
-  const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)];
+  const apiKey = process.env.NEWS_API_KEY;
 
-  return items
-    .map((match) => {
-      const raw = match[0];
-
-      const title = pickTag(raw, 'title');
-      const description = pickTag(raw, 'description');
-      const link = pickTag(raw, 'link');
-      const pubDate = pickTag(raw, 'pubDate');
-      const source = extractGoogleNewsSource(raw);
-
-      return {
-        title,
-        description: description || 'Apri la notizia per leggere il contesto completo.',
-        source,
-        url: link,
-        publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-      };
-    })
-    .filter((item) => item.title && item.url)
-    .slice(0, 9);
-}
-
-export async function GET() {
-  try {
-    const rssUrl =
-      'https://news.google.com/rss?hl=it&gl=IT&ceid=IT:it';
-
-    const response = await fetch(rssUrl, {
-      next: { revalidate: 900 },
-      headers: {
-        Accept: 'application/rss+xml, application/xml, text/xml',
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error: 'NEWS_API_KEY non configurata su Netlify.',
+        articles: [],
       },
+      { status: 500 }
+    );
+  }
+
+  const endpoint = new URL('https://newsapi.org/v2/top-headlines');
+
+  endpoint.searchParams.set('country', country);
+  endpoint.searchParams.set('category', category);
+  endpoint.searchParams.set('pageSize', '20');
+  endpoint.searchParams.set('apiKey', apiKey);
+
+  try {
+    const response = await fetch(endpoint.toString(), {
+      cache: 'no-store',
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+
       return NextResponse.json(
         {
-          news: [],
-          error: 'Feed RSS non disponibile in questo momento.',
+          error: 'Errore nel recupero delle news.',
+          details: errorText,
+          articles: [],
         },
-        { status: 200 }
+        { status: response.status }
       );
     }
 
-    const xml = await response.text();
-    const news = parseRss(xml);
+    const data = await response.json();
 
-    return NextResponse.json({ news });
-  } catch {
+    const articles = (data.articles || [])
+      .filter((article: NewsApiArticle) => article.title && article.url)
+      .map((article: NewsApiArticle, index: number) => ({
+        id: `${Date.now()}-${index}`,
+        title: article.title || 'Notizia senza titolo',
+        description: article.description || 'Descrizione non disponibile.',
+        sourceName: article.source?.name || 'Fonte non disponibile',
+        sourceUrl: article.url || '#',
+        imageUrl: article.urlToImage || '',
+        publishedAt: article.publishedAt || '',
+        category,
+        country,
+      }));
+
+    return NextResponse.json({
+      articles,
+    });
+  } catch (error) {
     return NextResponse.json(
       {
-        news: [],
-        error: 'Errore durante la lettura del feed RSS.',
+        error: 'Errore interno durante il recupero delle news.',
+        details: error instanceof Error ? error.message : 'Errore sconosciuto',
+        articles: [],
       },
-      { status: 200 }
+      { status: 500 }
     );
   }
 }
