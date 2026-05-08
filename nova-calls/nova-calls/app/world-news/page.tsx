@@ -93,16 +93,20 @@ export default function NewsPage() {
               ← Torna alla Home
             </Link>
 
-            <h1 className="text-4xl font-black tracking-tight md:text-6xl">
-              News dal <span className="bg-gradient-to-r from-cyan-300 via-violet-300 to-pink-400 bg-clip-text text-transparent">mondo</span>
+            <h1 className="text-4xl font-black tracking-tight text-white md:text-6xl">
+              News dal{' '}
+              <span className="bg-gradient-to-r from-cyan-300 via-violet-300 to-pink-400 bg-clip-text text-transparent">
+                mondo
+              </span>
             </h1>
 
-            <p className="mt-3 max-w-2xl text-base font-semibold text-slate-300">
-              Le notizie più importanti diventano conversazioni. Scegli una news e trasformala in uno Spunto per discuterne con la community.
+            <p className="mt-3 max-w-2xl text-base font-semibold leading-8 text-slate-200">
+              Le notizie più importanti diventano conversazioni. Scegli una news e trasformala in uno Spunto per
+              discuterne con la community.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-300">
+          <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-slate-100 shadow-[0_8px_30px_rgba(0,0,0,.18)]">
             Categoria attiva: <span className="text-white">{selectedCategoryLabel}</span>
           </div>
         </header>
@@ -115,7 +119,7 @@ export default function NewsPage() {
               className={`shrink-0 rounded-full border px-5 py-2 text-sm font-black transition ${
                 category === item.value
                   ? 'border-cyan-300/60 bg-cyan-300/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,.22)]'
-                  : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                  : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
               }`}
             >
               {item.label}
@@ -124,23 +128,23 @@ export default function NewsPage() {
         </section>
 
         {isLoading && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center text-slate-300">
+          <div className="rounded-3xl border border-white/10 bg-[#081120] p-8 text-center text-slate-200 shadow-[0_18px_60px_rgba(0,0,0,.32)]">
             Caricamento news in corso...
           </div>
         )}
 
         {error && !isLoading && (
           <div className="rounded-3xl border border-red-400/30 bg-red-500/10 p-6 text-red-100">
-            <h2 className="text-xl font-black">Non riesco a caricare le news</h2>
-            <p className="mt-2 text-sm">{error}</p>
-            <p className="mt-3 text-sm text-red-100/70">
+            <h2 className="text-xl font-black text-white">Non riesco a caricare le news</h2>
+            <p className="mt-2 text-sm text-red-100">{error}</p>
+            <p className="mt-3 text-sm text-red-100/80">
               Controlla che su Netlify sia presente la variabile <strong>NEWS_API_KEY</strong> con scope attivo.
             </p>
           </div>
         )}
 
         {!isLoading && !error && articles.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center text-slate-300">
+          <div className="rounded-3xl border border-white/10 bg-[#081120] p-8 text-center text-slate-200 shadow-[0_18px_60px_rgba(0,0,0,.32)]">
             Nessuna notizia disponibile per questa categoria.
           </div>
         )}
@@ -148,65 +152,70 @@ export default function NewsPage() {
         {!isLoading && !error && articles.length > 0 && (
           <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {articles.map((article) => (
-            <article
-  key={article.id}
-  className="overflow-hidden rounded-[28px] border border-cyan-200/10 bg-[#081120] shadow-[0_18px_60px_rgba(0,0,0,.42)] backdrop-blur-xl"
->
-  <div className="relative h-52 overflow-hidden bg-slate-900">
-    {article.imageUrl ? (
-      <>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={article.imageUrl}
-          alt={article.title}
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#081120] via-[#081120]/25 to-transparent" />
-      </>
-    ) : (
-      <div className="grid h-full place-items-center bg-gradient-to-br from-cyan-500/20 via-violet-500/20 to-pink-500/20 text-4xl font-black text-white">
-        NOVA
-      </div>
-    )}
-  </div>
+              <article
+                key={article.id}
+                className="overflow-hidden rounded-[28px] border border-cyan-200/10 bg-[#07101f] shadow-[0_18px_60px_rgba(0,0,0,.48)] backdrop-blur-xl"
+              >
+                <div className="relative h-52 overflow-hidden bg-slate-950">
+                  {article.imageUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={article.imageUrl}
+                        alt={article.title}
+                        className="h-full w-full object-cover"
+                      />
 
-  <div className="flex min-h-[320px] flex-col bg-[#081120] p-6">
-    <div className="mb-4 flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-slate-300">
-      <span className="truncate text-slate-200">{article.sourceName}</span>
-      <span className="shrink-0 text-slate-400">
-        {article.publishedAt
-          ? new Date(article.publishedAt).toLocaleDateString('it-IT')
-          : 'Ora'}
-      </span>
-    </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#07101f] via-[#07101f]/45 to-black/10" />
+                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#07101f] to-transparent" />
+                    </>
+                  ) : (
+                    <div className="grid h-full place-items-center bg-gradient-to-br from-cyan-500/25 via-violet-500/25 to-pink-500/25 text-4xl font-black text-white">
+                      NOVA
+                    </div>
+                  )}
+                </div>
 
-    <h2 className="text-[22px] font-black leading-tight text-white">
-      {article.title}
-    </h2>
+                <div className="flex min-h-[340px] flex-col bg-[#07101f] p-6">
+                  <div className="mb-4 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-wide">
+                    <span className="truncate text-slate-100 drop-shadow-[0_2px_8px_rgba(0,0,0,.75)]">
+                      {article.sourceName}
+                    </span>
 
-    <p className="mt-4 line-clamp-4 text-[15px] font-medium leading-7 text-slate-300">
-      {article.description}
-    </p>
+                    <span className="shrink-0 text-slate-300 drop-shadow-[0_2px_8px_rgba(0,0,0,.75)]">
+                      {article.publishedAt
+                        ? new Date(article.publishedAt).toLocaleDateString('it-IT')
+                        : 'Ora'}
+                    </span>
+                  </div>
 
-    <div className="mt-auto flex flex-col gap-3 pt-6">
-      <Link
-        href={buildSpuntoUrl(article)}
-        className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 px-5 py-3 text-center text-sm font-black text-white shadow-[0_0_26px_rgba(34,211,238,.24)]"
-      >
-        Apri uno Spunto →
-      </Link>
+                  <h2 className="text-[23px] font-black leading-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,.95)]">
+                    {article.title}
+                  </h2>
 
-      <a
-        href={article.sourceUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-center text-sm font-black text-slate-100 hover:bg-white/10"
-      >
-        Leggi fonte
-      </a>
-    </div>
-  </div>
-</article>
+                  <p className="mt-4 line-clamp-5 text-[15px] font-semibold leading-7 text-slate-200 drop-shadow-[0_2px_10px_rgba(0,0,0,.72)]">
+                    {article.description || 'Descrizione non disponibile. Apri la fonte per leggere la notizia completa.'}
+                  </p>
+
+                  <div className="mt-auto flex flex-col gap-3 pt-6">
+                    <Link
+                      href={buildSpuntoUrl(article)}
+                      className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-cyan-300 px-5 py-3 text-center text-sm font-black text-white shadow-[0_0_26px_rgba(34,211,238,.28)] transition hover:scale-[1.01]"
+                    >
+                      Apri uno Spunto →
+                    </Link>
+
+                    <a
+                      href={article.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-white/10 bg-white/10 px-5 py-3 text-center text-sm font-black text-white shadow-[0_8px_24px_rgba(0,0,0,.18)] transition hover:bg-white/15"
+                    >
+                      Leggi fonte
+                    </a>
+                  </div>
+                </div>
+              </article>
             ))}
           </section>
         )}
