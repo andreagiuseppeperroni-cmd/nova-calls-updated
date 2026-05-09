@@ -1,28 +1,33 @@
-'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { demoCalls, makeSlug, type NovaCall } from '@/lib/local-call';
-import { ProfileOrb } from '@/components/profile-store';
-import { createBrowserSupabase } from '@/lib/supabase-browser';
+# Scrivo il file migliorato con animazioni, architettura pulita e design premium
+# Nota: richiede 'framer-motion' installato (npm i framer-motion)
 
-const STORAGE_KEY = 'nova:calls';
+code = r'''"use client";
 
-const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
+import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+  useSpring,
+  useMotionValue,
+  useInView,
+} from "framer-motion";
+import { demoCalls, makeSlug, type NovaCall } from "@/lib/local-call";
+import { ProfileOrb } from "@/components/profile-store";
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 
-const navItems: Array<[string, string, string]> = [
-  ['🏛️', 'Piazza', '/'],
-  ['💡', 'Spunti', '/calls/new'],
-  ['🧠', 'Echo', '/echo'],
-  ['🏁', 'Outcome', '/outcome'],
-  ['👥', 'Persone', '/people'],
-  ['🌐', 'Spazi', '/spaces'],
-  ['📰', 'News', '/world-news'],
-  ['📍', 'Eventi', '/events'],
-  ['🔔', 'Notifiche', '/notifications'],
-  ['💬', 'Messaggi', '/messages'],
-  ['👤', 'Profilo', '/profile'],
-];
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 type LiveThought = {
   id?: string;
@@ -40,10 +45,7 @@ type LiveThought = {
   created_at: string;
 };
 
-type TrendEcho = {
-  title: string;
-  text: string;
-};
+type TrendEcho = { title: string; text: string };
 
 type HostMoment = {
   hostId: string;
@@ -63,7 +65,36 @@ type WorldNewsItem = {
   category?: string;
 };
 
-type AiAnswerKey = 'situation' | 'block' | 'desiredOutcome';
+type AiAnswerKey = "situation" | "block" | "desiredOutcome";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSTANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY = "nova:calls";
+
+const thoughtTypes = [
+  "Decidere",
+  "Capire",
+  "Feedback",
+  "Trovare persone",
+  "Fare ora",
+  "Creare insieme",
+];
+
+const navItems: Array<[string, string, string]> = [
+  ["🏛️", "Piazza", "/"],
+  ["💡", "Spunti", "/calls/new"],
+  ["🧠", "Echo", "/echo"],
+  ["🏁", "Outcome", "/outcome"],
+  ["👥", "Persone", "/people"],
+  ["🌐", "Spazi", "/spaces"],
+  ["📰", "News", "/world-news"],
+  ["📍", "Eventi", "/events"],
+  ["🔔", "Notifiche", "/notifications"],
+  ["💬", "Messaggi", "/messages"],
+  ["👤", "Profilo", "/profile"],
+];
 
 const aiQuestions: Array<{
   key: AiAnswerKey;
@@ -71,27 +102,114 @@ const aiQuestions: Array<{
   placeholder: string;
 }> = [
   {
-    key: 'situation',
-    label: 'Che cosa vuoi portare in piazza?',
-    placeholder: 'Esempio: sto valutando se cambiare lavoro, città o progetto...',
+    key: "situation",
+    label: "Che cosa vuoi portare in piazza?",
+    placeholder:
+      "Esempio: sto valutando se cambiare lavoro, città o progetto...",
   },
   {
-    key: 'block',
-    label: 'Qual è il nodo che vuoi sciogliere?',
-    placeholder: 'Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...',
+    key: "block",
+    label: "Qual è il nodo che vuoi sciogliere?",
+    placeholder:
+      "Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...",
   },
   {
-    key: 'desiredOutcome',
-    label: 'Che tipo di risposta cerchi dagli altri?',
-    placeholder: 'Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...',
+    key: "desiredOutcome",
+    label: "Che tipo di risposta cerchi dagli altri?",
+    placeholder:
+      "Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...",
   },
 ];
 
-function readStoredCalls() {
-  if (typeof window === 'undefined') return [] as NovaCall[];
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANIMATION VARIANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.6 } },
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.1 },
+  },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.92 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const cardHover = {
+  rest: { y: 0, scale: 1 },
+  hover: {
+    y: -6,
+    scale: 1.01,
+    transition: { type: "spring", stiffness: 350, damping: 18 },
+  },
+};
+
+const pulseRing = {
+  animate: {
+    scale: [1, 1.12, 1],
+    opacity: [0.45, 0.15, 0.45],
+    transition: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+  },
+};
+
+const blobMorph = {
+  animate: {
+    borderRadius: [
+      "45% 55% 52% 48% / 46% 38% 62% 54%",
+      "56% 44% 44% 56% / 35% 57% 43% 65%",
+      "45% 55% 52% 48% / 46% 38% 62% 54%",
+    ],
+    rotate: [0, 2, 0],
+    scale: [1, 1.04, 1],
+    transition: { duration: 7, repeat: Infinity, ease: "easeInOut" },
+  },
+};
+
+const numberSpring = {
+  type: "spring",
+  stiffness: 60,
+  damping: 14,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function readStoredCalls() {
+  if (typeof window === "undefined") return [] as NovaCall[];
   try {
-    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]') as NovaCall[];
+    return JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) || "[]"
+    ) as NovaCall[];
   } catch {
     return [];
   }
@@ -99,7 +217,10 @@ function readStoredCalls() {
 
 function saveLocalThought(call: NovaCall) {
   const calls = readStoredCalls();
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify([call, ...calls].slice(0, 12)));
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify([call, ...calls].slice(0, 12))
+  );
 }
 
 function localCallToThought(call: NovaCall): LiveThought {
@@ -108,12 +229,12 @@ function localCallToThought(call: NovaCall): LiveThought {
     title: call.title,
     description: call.description,
     call_type: call.type,
-    access_type: call.accessType || 'public',
-    status: 'live',
+    access_type: call.accessType || "public",
+    status: "live",
     pulse_score: call.pulse || 12,
     participants: call.participants || 1,
     host_id: null,
-    host_name: 'The Square',
+    host_name: "The Square",
     host_avatar: null,
     created_at: call.createdAt || new Date().toISOString(),
   };
@@ -122,58 +243,28 @@ function localCallToThought(call: NovaCall): LiveThought {
 function normalizeText(value: string) {
   return value
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\w\s]/g, ' ')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
     .trim();
 }
 
 function extractKeywords(thoughts: LiveThought[]) {
   const stopwords = new Set([
-    'adesso',
-    'alla',
-    'allo',
-    'anche',
-    'avere',
-    'capire',
-    'cosa',
-    'come',
-    'con',
-    'da',
-    'dei',
-    'del',
-    'della',
-    'delle',
-    'dopo',
-    'dove',
-    'essere',
-    'fare',
-    'fra',
-    'gli',
-    'hai',
-    'ho',
-    'per',
-    'piu',
-    'prima',
-    'quando',
-    'sono',
-    'tra',
-    'una',
-    'uno',
+    "adesso", "alla", "allo", "anche", "avere", "capire", "cosa", "come",
+    "con", "da", "dei", "del", "della", "delle", "dopo", "dove", "essere",
+    "fare", "fra", "gli", "hai", "ho", "per", "piu", "prima", "quando",
+    "sono", "tra", "una", "uno",
   ]);
-
   const map = new Map<string, number>();
-
   for (const thought of thoughts) {
-    const raw = `${thought.title} ${thought.description || ''}`;
+    const raw = `${thought.title} ${thought.description || ""}`;
     const words = normalizeText(raw).split(/\s+/);
-
     for (const word of words) {
       if (!word || word.length < 4 || stopwords.has(word)) continue;
       map.set(word, (map.get(word) || 0) + 1);
     }
   }
-
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
@@ -183,40 +274,38 @@ function extractKeywords(thoughts: LiveThought[]) {
 function buildTrendEchoes(thoughts: LiveThought[]): TrendEcho[] {
   const keywords = extractKeywords(thoughts);
   const byType = thoughts.reduce<Record<string, number>>((acc, thought) => {
-    const type = thought.call_type || 'Capire';
+    const type = thought.call_type || "Capire";
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
-
-  const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Capire';
+  const topType =
+    Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || "Capire";
 
   return [
     {
-      title: 'Tema della piazza',
+      title: "Tema della piazza",
       text: keywords.length
-        ? `In piazza si parla soprattutto di: ${keywords.slice(0, 3).join(', ')}.`
-        : 'La piazza si sta accendendo: apri il primo Spunto per dare direzione alla conversazione.',
+        ? `In piazza si parla soprattutto di: ${keywords.slice(0, 3).join(", ")}.`
+        : "La piazza si sta accendendo: apri il primo Spunto per dare direzione alla conversazione.",
     },
     {
-      title: 'Energia collettiva',
-      text: `La zona più attiva ora è “${topType}”: le persone cercano confronto immediato.`,
+      title: "Energia collettiva",
+      text: `La zona più attiva ora è "${topType}": le persone cercano confronto immediato.`,
     },
     {
-      title: 'Spunto suggerito',
+      title: "Spunto suggerito",
       text: keywords[0]
-        ? `Porta “${keywords[0]}” al centro della piazza: è un segnale già presente nella community.`
-        : 'Porta una decisione concreta in piazza: è il formato che genera più partecipazione.',
+        ? `Porta "${keywords[0]}" al centro della piazza: è un segnale già presente nella community.`
+        : "Porta una decisione concreta in piazza: è il formato che genera più partecipazione.",
     },
   ];
 }
 
 function computeHostOfMoment(thoughts: LiveThought[]): HostMoment | null {
   const grouped = new Map<string, HostMoment>();
-
   for (const thought of thoughts) {
     if (!thought.host_id || !thought.host_name) continue;
-
-    const current = grouped.get(thought.host_id) || {
+    const cur = grouped.get(thought.host_id) || {
       hostId: thought.host_id,
       hostName: thought.host_name,
       hostAvatar: thought.host_avatar || null,
@@ -225,102 +314,1325 @@ function computeHostOfMoment(thoughts: LiveThought[]): HostMoment | null {
       avgPulse: 0,
       popularityScore: 0,
     };
-
-    current.hostedCount += 1;
-    current.totalParticipants += thought.participants || 0;
-    current.avgPulse += thought.pulse_score || 0;
-
-    grouped.set(thought.host_id, current);
+    cur.hostedCount += 1;
+    cur.totalParticipants += thought.participants || 0;
+    cur.avgPulse += thought.pulse_score || 0;
+    grouped.set(thought.host_id, cur);
   }
-
   const hosts = [...grouped.values()].map((host) => {
-    const avgPulse = host.hostedCount ? Math.round(host.avgPulse / host.hostedCount) : 0;
-    const popularityScore = host.hostedCount * 12 + host.totalParticipants * 2 + avgPulse * 3;
-
+    const avgPulse = host.hostedCount
+      ? Math.round(host.avgPulse / host.hostedCount)
+      : 0;
+    const popularityScore =
+      host.hostedCount * 12 + host.totalParticipants * 2 + avgPulse * 3;
     return { ...host, avgPulse, popularityScore };
   });
-
   return hosts.sort((a, b) => b.popularityScore - a.popularityScore)[0] || null;
 }
 
 function avgPulseValue(thoughts: LiveThought[]) {
   if (!thoughts.length) return 0;
-  const total = thoughts.reduce((sum, item) => sum + (item.pulse_score || 0), 0);
+  const total = thoughts.reduce(
+    (sum, item) => sum + (item.pulse_score || 0),
+    0
+  );
   return Math.round(total / thoughts.length);
 }
 
 function getThoughtTypeIcon(item: string) {
-  return item === 'Decidere'
-    ? '◈'
-    : item === 'Capire'
-      ? '⚭'
-      : item === 'Feedback'
-        ? '▱'
-        : item === 'Trovare persone'
-          ? '♙'
-          : item === 'Fare ora'
-            ? '☆'
-            : '▣';
+  return item === "Decidere"
+    ? "◈"
+    : item === "Capire"
+      ? "⚭"
+      : item === "Feedback"
+        ? "▱"
+        : item === "Trovare persone"
+          ? "♙"
+          : item === "Fare ora"
+            ? "☆"
+            : "▣";
 }
 
 function inferThoughtType(value: string) {
   const normalized = normalizeText(value);
-
   if (
-    normalized.includes('decid') ||
-    normalized.includes('scelta') ||
-    normalized.includes('scegliere') ||
-    normalized.includes('dubbio')
-  ) {
-    return 'Decidere';
-  }
-
-  if (normalized.includes('feedback') || normalized.includes('opinione') || normalized.includes('parere')) {
-    return 'Feedback';
-  }
-
+    normalized.includes("decid") ||
+    normalized.includes("scelta") ||
+    normalized.includes("scegliere") ||
+    normalized.includes("dubbio")
+  )
+    return "Decidere";
   if (
-    normalized.includes('persone') ||
-    normalized.includes('network') ||
-    normalized.includes('contatti') ||
-    normalized.includes('conoscere')
-  ) {
-    return 'Trovare persone';
-  }
-
+    normalized.includes("feedback") ||
+    normalized.includes("opinione") ||
+    normalized.includes("parere")
+  )
+    return "Feedback";
   if (
-    normalized.includes('subito') ||
-    normalized.includes('oggi') ||
-    normalized.includes('urgente') ||
-    normalized.includes('ora')
-  ) {
-    return 'Fare ora';
-  }
-
+    normalized.includes("persone") ||
+    normalized.includes("network") ||
+    normalized.includes("contatti") ||
+    normalized.includes("conoscere")
+  )
+    return "Trovare persone";
   if (
-    normalized.includes('creare') ||
-    normalized.includes('costruire') ||
-    normalized.includes('progetto') ||
-    normalized.includes('idea')
-  ) {
-    return 'Creare insieme';
-  }
-
-  return 'Capire';
+    normalized.includes("subito") ||
+    normalized.includes("oggi") ||
+    normalized.includes("urgente") ||
+    normalized.includes("ora")
+  )
+    return "Fare ora";
+  if (
+    normalized.includes("creare") ||
+    normalized.includes("costruire") ||
+    normalized.includes("progetto") ||
+    normalized.includes("idea")
+  )
+    return "Creare insieme";
+  return "Capire";
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AnimatedCounter({ value }: { value: number }) {
+  const motionValue = useMotionValue(0);
+  const springValue = useSpring(motionValue, numberSpring);
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    motionValue.set(value);
+  }, [value, motionValue]);
+
+  useEffect(() => {
+    const unsub = springValue.on("change", (v) => setDisplay(Math.round(v)));
+    return unsub;
+  }, [springValue]);
+
+  return <span>{display}</span>;
+}
+
+function MotionCard({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      custom={delay}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-40px" }}
+      whileHover="hover"
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Link href="/" className="brand" aria-label="The Square home">
+          <span className="brand-logo-box">
+            <span className="square-logo-mark">□</span>
+          </span>
+          <span className="brand-word">THE SQUARE</span>
+        </Link>
+      </motion.div>
+
+      <motion.div
+        className="top-actions"
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Link href="/search" className="icon-btn" aria-label="Cerca">
+          🔎
+        </Link>
+        <Link href="/events" className="icon-btn" aria-label="Eventi">
+          📍
+        </Link>
+        <Link href="/people" className="icon-btn" aria-label="Persone">
+          👥
+        </Link>
+
+        {isLoggedIn ? (
+          <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>
+            <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
+              <ProfileOrb className="h-full w-full" />
+            </Link>
+          </motion.div>
+        ) : (
+          <div className="auth-actions">
+            <Link href="/login" className="auth-btn auth-login">
+              Login
+            </Link>
+            <Link href="/login?mode=register" className="auth-btn auth-register">
+              Entra in piazza
+            </Link>
+          </div>
+        )}
+      </motion.div>
+    </>
+  );
+}
+
+function Sidebar({ notificationCount }: { notificationCount: number }) {
+  return (
+    <motion.aside
+      className="sidebar glass"
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.65, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <nav className="nav">
+        {navItems.map(([icon, label, href], index) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              delay: 0.3 + index * 0.04,
+              duration: 0.4,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
+            <Link
+              href={href}
+              className={`nav-item ${index === 0 ? "active" : ""}`}
+            >
+              <span className="nav-icon">{icon}</span>
+              <span className="nav-label">{label}</span>
+              {label === "Notifiche" && notificationCount > 0 && (
+                <motion.span
+                  className="nav-badge"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                >
+                  {notificationCount}
+                </motion.span>
+              )}
+            </Link>
+          </motion.div>
+        ))}
+      </nav>
+
+      <motion.div
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      >
+        <Link href="/calls/new" className="open-call">
+          <span>
+            Apri
+            <br />
+            uno Spunto
+          </span>
+          <span>✦</span>
+        </Link>
+      </motion.div>
+
+      <motion.div
+        className="online"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1 }}
+      >
+        <motion.span
+          className="dot"
+          animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        The Square aperta
+      </motion.div>
+    </motion.aside>
+  );
+}
+
+function FeaturedThought({
+  thought,
+  currentUserId,
+  onCloseEarly,
+  closingSlug,
+}: {
+  thought: LiveThought;
+  currentUserId: string | null;
+  onCloseEarly: (slug: string) => void;
+  closingSlug: string | null;
+}) {
+  const canClose = Boolean(
+    currentUserId && thought.host_id === currentUserId
+  );
+
+  return (
+    <motion.article
+      className="featured"
+      variants={scaleIn}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-60px" }}
+      whileHover="hover"
+    >
+      <div className="featured-content">
+        <span className="badge">★ Spunto in piazza</span>
+        <span className="badge status">
+          <motion.span
+            className="dot"
+            animate={{ scale: [1, 1.4, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />{" "}
+          In corso
+        </span>
+
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.15, duration: 0.6 }}
+        >
+          {thought.title}
+        </motion.h2>
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.25 }}
+        >
+          {thought.description || "Spunto aperto su The Square."}
+        </motion.p>
+
+        <div className="call-meta">
+          <div className="avatars">
+            <span className="plus-count">↯ Pulse {thought.pulse_score || 0}</span>
+          </div>
+          <div className="active-count">
+            <motion.span
+              className="dot"
+              style={{ display: "inline-block", marginRight: 8 }}
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            <b>{thought.participants || 0}</b> partecipanti attivi
+            <span className="speaking">
+              Host: {thought.host_name || "Utente Square"}
+            </span>
+          </div>
+        </div>
+
+        <div className="call-actions">
+          <Link href={`/c/${thought.slug}?mode=chat`} className="call-action">
+            ▱ Chat
+          </Link>
+          <motion.div style={{ marginLeft: "auto" }} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+            <Link href={`/c/${thought.slug}`} className="primary-cta">
+              Entra nello Spunto →
+            </Link>
+          </motion.div>
+          {canClose && (
+            <motion.button
+              type="button"
+              onClick={() => onCloseEarly(thought.slug)}
+              className="call-action"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              disabled={closingSlug === thought.slug}
+            >
+              {closingSlug === thought.slug ? "Chiusura…" : "Chiudi → Outcome"}
+            </motion.button>
+          )}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+function SquareMap() {
+  const zones = [
+    { href: "/spaces", cls: "square-fountain", icon: "⛲", title: "Fontana", sub: "Spunti caldi" },
+    { href: "/messages", cls: "square-cafe", icon: "☕", title: "Caffè", sub: "Chat e messaggi" },
+    { href: "/events", cls: "square-stage", icon: "🎤", title: "Palco", sub: "Eventi live" },
+    { href: "/world-news", cls: "square-board", icon: "📰", title: "Bacheca", sub: "News dal mondo" },
+    { href: "/people", cls: "square-people", icon: "👥", title: "Panchine", sub: "Persone affini" },
+    { href: "/echo", cls: "square-terrace", icon: "🧠", title: "Terrazza", sub: "Echo e trend" },
+  ];
+
+  return (
+    <motion.section
+      className="square-section"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-80px" }}
+    >
+      <div className="square-head">
+        <div>
+          <p className="square-eyebrow">Piazza live</p>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            La piazza si muove intorno a te
+          </motion.h2>
+        </div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+        >
+          Ogni area è un punto vivo della community: entra in una conversazione,
+          trova persone, scopri eventi o trasforma una notizia in uno Spunto.
+        </motion.p>
+      </div>
+
+      <div className="square-map">
+        <motion.div
+          className="square-floor"
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        {zones.map((z, i) => (
+          <motion.div
+            key={z.title}
+            initial={{ opacity: 0, scale: 0.7 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{
+              delay: 0.2 + i * 0.1,
+              type: "spring",
+              stiffness: 200,
+              damping: 15,
+            }}
+          >
+            <Link href={z.href} className={`square-zone ${z.cls}`}>
+              <motion.span
+                whileHover={{ rotate: [0, -10, 10, 0], scale: 1.2 }}
+                transition={{ duration: 0.5 }}
+              >
+                {z.icon}
+              </motion.span>
+              <b>{z.title}</b>
+              <small>{z.sub}</small>
+            </Link>
+          </motion.div>
+        ))}
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.8 }}
+        >
+          <Link href="/calls/new" className="square-center-cta">
+            <strong>Apri uno Spunto</strong>
+            <span>Porta qualcosa in piazza →</span>
+          </Link>
+        </motion.div>
+      </div>
+
+      <motion.div
+        className="square-bottom"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.4 }}
+      >
+        <p>
+          <strong>La piazza è aperta</strong> · conversazioni, eventi e segnali
+          aggiornati in tempo reale
+        </p>
+        <div className="square-actions">
+          <Link href="/spaces" className="square-cta primary">
+            Esplora la piazza →
+          </Link>
+          <Link href="/calls/new" className="square-cta">
+            Crea uno Spunto
+          </Link>
+        </div>
+      </motion.div>
+    </motion.section>
+  );
+}
+
+function NeedSomeoneSection() {
+  const cards = [
+    { href: "/calls/new?title=Ho%20bisogno%20di%20un%20consiglio&type=Capire", icon: "🧭", title: "Chiedi consiglio", text: "Porta un dubbio in piazza e ricevi punti di vista utili." },
+    { href: "/calls/new?title=Voglio%20confrontarmi%20con%20esperienze%20simili&type=Feedback", icon: "🪞", title: "Trova esperienze simili", text: "Incontra chi ha vissuto qualcosa di vicino al tuo momento." },
+    { href: "/events", icon: "📍", title: "Scopri eventi", text: "Dal Centro Italia alla tua community: eventi che diventano conversazioni." },
+    { href: "/world-news", icon: "📰", title: "Parti da una notizia", text: "Trasforma una news in uno Spunto da discutere con gli altri." },
+  ];
+
+  return (
+    <motion.section
+      className="need-section"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-60px" }}
+    >
+      <div className="need-head">
+        <div>
+          <p className="square-eyebrow">Cosa vuoi fare in piazza?</p>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            Scegli un punto di partenza
+          </motion.h2>
+        </div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+        >
+          The Square non ti chiede di pubblicare per forza. Ti aiuta a partire da
+          un bisogno reale.
+        </motion.p>
+      </div>
+
+      <div className="need-grid">
+        {cards.map((c, i) => (
+          <motion.div
+            key={c.title}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.15 + i * 0.08, duration: 0.5 }}
+          >
+            <Link href={c.href} className="need-card">
+              <motion.div
+                className="need-icon"
+                whileHover={{ rotate: [0, -8, 8, 0], scale: 1.1 }}
+                transition={{ duration: 0.4 }}
+              >
+                {c.icon}
+              </motion.div>
+              <b>{c.title}</b>
+              <span>{c.text}</span>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function AIComposer({
+  text,
+  setText,
+  type,
+  setType,
+  attachmentName,
+  setAttachmentName,
+  openThought,
+}: {
+  text: string;
+  setText: (v: string) => void;
+  type: string;
+  setType: (v: string) => void;
+  attachmentName: string;
+  setAttachmentName: (v: string) => void;
+  openThought: () => void;
+}) {
+  const [aiStep, setAiStep] = useState(0);
+  const [aiAnswers, setAiAnswers] = useState<Record<AiAnswerKey, string>>({
+    situation: "",
+    block: "",
+    desiredOutcome: "",
+  });
+  const [showPreview, setShowPreview] = useState(false);
+
+  const updateAiAnswer = useCallback((key: AiAnswerKey, value: string) => {
+    setAiAnswers((cur) => ({ ...cur, [key]: value }));
+  }, []);
+
+  const buildAiThought = useCallback(() => {
+    const situation = aiAnswers.situation.trim();
+    const block = aiAnswers.block.trim();
+    const desiredOutcome = aiAnswers.desiredOutcome.trim();
+    if (!situation || !block || !desiredOutcome) {
+      alert("Rispondi alle tre domande per generare uno Spunto.");
+      return;
+    }
+    const fullText = `${situation} ${block} ${desiredOutcome}`.trim();
+    const inferred = inferThoughtType(fullText);
+    const title = situation.length > 82 ? `${situation.slice(0, 79).trim()}...` : situation;
+    const generated = `${title}\n\nNodo principale: ${block}\n\nAiuto che cerco dalla piazza: ${desiredOutcome}`;
+    setText(generated);
+    setType(inferred);
+    setShowPreview(true);
+  }, [aiAnswers, setText, setType]);
+
+  const currentQuestion = aiQuestions[aiStep];
+  const direction = 1;
+
+  return (
+    <>
+      <motion.div
+        className="composer ai-composer"
+        variants={fadeUp}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-40px" }}
+      >
+        <div className="composer-content">
+          <div className="ai-builder-head">
+            <div>
+              <p className="square-eyebrow">AI Spunto Builder</p>
+              <motion.h2
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+              >
+                Ti aiuto a trasformare un pensiero in uno Spunto
+              </motion.h2>
+            </div>
+            <motion.span
+              className="ai-step-pill"
+              key={aiStep}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            >
+              {aiStep + 1}/{aiQuestions.length}
+            </motion.span>
+          </div>
+
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={aiStep}
+              custom={direction}
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="ai-question-box"
+            >
+              <label className="ai-question-label">{currentQuestion.label}</label>
+              <textarea
+                value={aiAnswers[currentQuestion.key]}
+                onChange={(e) => updateAiAnswer(currentQuestion.key, e.target.value)}
+                placeholder={currentQuestion.placeholder}
+                rows={3}
+                className="composer-input ai-input"
+              />
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="composer-actions ai-actions">
+            <motion.button
+              type="button"
+              onClick={() => setAiStep((v) => Math.max(0, v - 1))}
+              className="mini-pill"
+              disabled={aiStep === 0}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              ← Indietro
+            </motion.button>
+
+            {aiStep < aiQuestions.length - 1 ? (
+              <motion.button
+                type="button"
+                onClick={() => setAiStep((v) => Math.min(aiQuestions.length - 1, v + 1))}
+                className="mini-pill ai-primary-pill"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Continua →
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                onClick={buildAiThought}
+                className="mini-pill ai-primary-pill"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Genera Spunto
+              </motion.button>
+            )}
+
+            <label className="mini-pill attachment-pill">
+              ⌘ {attachmentName || "Allega"}
+              <input
+                type="file"
+                className="hidden-file"
+                onChange={(e) => setAttachmentName(e.target.files?.[0]?.name || "")}
+              />
+            </label>
+
+            <motion.button
+              type="button"
+              onClick={() => setType(type === "Anonima" ? "Decidere" : "Anonima")}
+              className="mini-pill anon-pill"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              ◒ Anonima
+            </motion.button>
+          </div>
+        </div>
+
+        <motion.button
+          type="button"
+          onClick={openThought}
+          className="mic ai-open-button"
+          whileHover={{ scale: 1.12, rotate: 15 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+        >
+          ✦
+        </motion.button>
+      </motion.div>
+
+      <AnimatePresence>
+        {showPreview && text && (
+          <motion.div
+            className="ai-preview glass"
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          >
+            <div>
+              <p className="square-eyebrow">Spunto generato</p>
+              <h3>{text.split("\n")[0]}</h3>
+              <p>{text}</p>
+            </div>
+            <motion.button
+              type="button"
+              onClick={openThought}
+              className="ai-open-cta"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+            >
+              Apri lo Spunto →
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+function HomeSectionsPreview({
+  thoughts,
+  trendEchoes,
+  worldNews,
+  notificationCount,
+  currentUserId,
+}: {
+  thoughts: LiveThought[];
+  trendEchoes: TrendEcho[];
+  worldNews: WorldNewsItem[];
+  notificationCount: number;
+  currentUserId: string | null;
+}) {
+  const firstThought = thoughts[0];
+  const secondThought = thoughts[1];
+  const firstNews = worldNews[0];
+  const secondNews = worldNews[1];
+
+  return (
+    <motion.section
+      className="home-preview"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-40px" }}
+    >
+      <div className="home-preview-head">
+        <div>
+          <p className="square-eyebrow">Esplora The Square</p>
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            La tua piazza viva
+          </motion.h2>
+        </div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+        >
+          Tutte le aree principali in anteprima: entra, scopri cosa sta succedendo
+          e apri nuovi Spunti.
+        </motion.p>
+      </div>
+
+      <div className="home-preview-grid">
+        <PreviewCard icon="⛲" title="Fontana" href="/spaces" cta="Vedi Spunti" accent="cyan">
+          {firstThought ? (
+            <>
+              <MiniPreviewLine
+                title={firstThought.title}
+                text={`Pulse ${firstThought.pulse_score || 0} · ${firstThought.participants || 0} partecipanti`}
+              />
+              {secondThought && (
+                <MiniPreviewLine
+                  title={secondThought.title}
+                  text={`Host: ${secondThought.host_name || "Utente Square"}`}
+                />
+              )}
+            </>
+          ) : (
+            <MiniPreviewLine
+              title="Nessuno Spunto attivo"
+              text="Apri il primo Spunto e avvia la conversazione."
+            />
+          )}
+        </PreviewCard>
+
+        <PreviewCard icon="🧠" title="Terrazza Echo" href="/echo" cta="Apri Echo" accent="violet">
+          {trendEchoes.slice(0, 2).map((echo) => (
+            <MiniPreviewLine key={echo.title} title={echo.title} text={echo.text} />
+          ))}
+        </PreviewCard>
+
+        <PreviewCard icon="🏁" title="Outcome" href="/outcome" cta="Vedi Outcome" accent="green">
+          <MiniPreviewLine title="Decisioni finali" text="Qui trovi sintesi, direzioni e risultati generati dagli Spunti." />
+          <MiniPreviewLine title="Azioni concrete" text="Trasforma le conversazioni in prossimi passi." />
+        </PreviewCard>
+
+        <PreviewCard icon="📰" title="Bacheca News" href="/world-news" cta="Apri News" accent="pink">
+          {firstNews ? (
+            <>
+              <MiniPreviewLine title={firstNews.title} text={firstNews.source || "Fonte news"} />
+              {secondNews && <MiniPreviewLine title={secondNews.title} text={secondNews.source || "Fonte news"} />}
+            </>
+          ) : (
+            <MiniPreviewLine title="News in arrivo" text="Le notizie diventano Spunti per la community." />
+          )}
+        </PreviewCard>
+
+        <PreviewCard icon="🎤" title="Palco Eventi" href="/events" cta="Scopri Eventi" accent="blue">
+          <MiniPreviewLine title="Centro Italia" text="Roma, Firenze, Perugia, Ancona, Pescara e altre città." />
+          <MiniPreviewLine title="Organizziamoci" text="Ogni evento può diventare uno Spunto condiviso." />
+        </PreviewCard>
+
+        <PreviewCard icon="👥" title="Panchine" href="/people" cta="Vedi Persone" accent="cyan">
+          <MiniPreviewLine title="Interazioni reali" text="Scopri le persone con cui hai condiviso Spunti." />
+          <MiniPreviewLine title="Nessun follow" text="Profili visibili, ma niente logiche da social classico." />
+        </PreviewCard>
+
+        <PreviewCard icon="🌐" title="Spazi" href="/spaces" cta="Apri Spazi" accent="violet">
+          <MiniPreviewLine title="Stanze attive" text="Trova Spunti collegati ai tuoi interessi." />
+          <MiniPreviewLine title="Community locali" text="Luoghi digitali dove organizzarsi e confrontarsi." />
+        </PreviewCard>
+
+        <PreviewCard icon="☕" title="Caffè" href="/messages" cta="Apri Messaggi" accent="blue">
+          <MiniPreviewLine title="Conversazioni private" text="Rimani in contatto con chi hai incontrato negli Spunti." />
+          <MiniPreviewLine title="Chat dirette" text="Messaggi più leggibili, ordinati e personali." />
+        </PreviewCard>
+
+        <PreviewCard icon="🔔" title="Notifiche" href="/notifications" cta="Vedi Notifiche" accent="pink">
+          <MiniPreviewLine
+            title={notificationCount > 0 ? `${notificationCount} notifiche attive` : "Tutto tranquillo"}
+            text={notificationCount > 0 ? "Hai nuove attività da controllare." : "Qui appariranno inviti, risposte e aggiornamenti."}
+          />
+        </PreviewCard>
+
+        <PreviewCard
+          icon="👤"
+          title="Profilo"
+          href={currentUserId ? "/profile" : "/login"}
+          cta={currentUserId ? "Vai al Profilo" : "Accedi"}
+          accent="green"
+        >
+          <MiniPreviewLine title="Identità Square" text="Bio, passioni, contributi e punteggio personale." />
+          <MiniPreviewLine title="Livello personale" text="Il livello resta solo nella tua pagina personale." />
+        </PreviewCard>
+      </div>
+    </motion.section>
+  );
+}
+
+function PreviewCard({
+  icon,
+  title,
+  href,
+  cta,
+  accent,
+  children,
+}: {
+  icon: string;
+  title: string;
+  href: string;
+  cta: string;
+  accent: "cyan" | "violet" | "pink" | "blue" | "green";
+  children: ReactNode;
+}) {
+  return (
+    <motion.div variants={cardHover} initial="rest" whileHover="hover">
+      <article className={`preview-card preview-${accent}`}>
+        <div className="preview-card-top">
+          <motion.div
+            className="preview-icon"
+            whileHover={{ rotate: [0, -10, 10, 0], scale: 1.15 }}
+            transition={{ duration: 0.4 }}
+          >
+            {icon}
+          </motion.div>
+          <div>
+            <h3>{title}</h3>
+            <Link href={href}>{cta} →</Link>
+          </div>
+        </div>
+        <div className="preview-card-body">{children}</div>
+      </article>
+    </motion.div>
+  );
+}
+
+function MiniPreviewLine({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="mini-preview-line">
+      <strong>{title}</strong>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function TrendEchoSection({ echoes }: { echoes: TrendEcho[] }) {
+  return (
+    <motion.section
+      className="host-card glass"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-40px" }}
+    >
+      <div className="trend-grid">
+        {echoes.map((echo, i) => (
+          <motion.div
+            className="trend-item"
+            key={echo.title}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1, duration: 0.5 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <div className="trend-title">✦ {echo.title}</div>
+            <div className="trend-text">{echo.text}</div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function WorldNewsSection({
+  items,
+  loading,
+}: {
+  items: WorldNewsItem[];
+  loading: boolean;
+}) {
+  const fallbackItems: WorldNewsItem[] = [
+    {
+      title: "Tecnologia, lavoro e relazioni stanno cambiando più velocemente delle abitudini sociali.",
+      source: "The Square Echo",
+      url: "/calls/new",
+      description: "Uno spunto utile per aprire conversazioni su futuro, scelte personali e nuove priorità.",
+      category: "Società",
+    },
+    {
+      title: "Sempre più persone cercano comunità piccole, fidate e orientate a decisioni concrete.",
+      source: "The Square Echo",
+      url: "/calls/new",
+      description: "Può diventare uno Spunto su amicizie, lavoro, fiducia o appartenenza.",
+      category: "Community",
+    },
+    {
+      title: "Il tema del cambiamento personale resta centrale: città, lavoro, coppia, famiglia, denaro.",
+      source: "The Square Echo",
+      url: "/calls/new",
+      description: "Perfetto per generare Spunti dove la rete può portare esperienze reali.",
+      category: "Vita",
+    },
+  ];
+
+  const visibleItems = items.length ? items : fallbackItems;
+
+  return (
+    <motion.section
+      className="world-news-card glass"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-40px" }}
+    >
+      <div className="world-news-head">
+        <div>
+          <p className="square-eyebrow">Bacheca News</p>
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            Notizie dal mondo per dare spunto… a un nuovo Spunto
+          </motion.h2>
+        </div>
+        <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+          <Link href="/world-news" className="world-news-main-cta">
+            Apri News →
+          </Link>
+        </motion.div>
+      </div>
+
+      <div className="world-news-grid">
+        {loading ? (
+          <motion.div
+            className="world-news-empty"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            Carico notizie e segnali dal mondo…
+          </motion.div>
+        ) : (
+          visibleItems.slice(0, 6).map((item, i) => (
+            <motion.article
+              className="world-news-item"
+              key={`${item.title}-${item.source}`}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.08, duration: 0.5 }}
+              whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            >
+              <div className="world-news-meta">
+                <span>{item.category || "Mondo"}</span>
+                <span>{item.source}</span>
+              </div>
+              <h3>{item.title}</h3>
+              {item.description && <p>{item.description}</p>}
+              <div className="world-news-actions">
+                <a href={item.url} target="_blank" rel="noreferrer">
+                  Leggi
+                </a>
+                <Link
+                  href={`/calls/new?title=${encodeURIComponent(item.title)}&type=${encodeURIComponent("Capire")}`}
+                >
+                  Usa come Spunto
+                </Link>
+              </div>
+            </motion.article>
+          ))
+        )}
+      </div>
+    </motion.section>
+  );
+}
+
+function HostOfMomentSection({ host }: { host: HostMoment | null }) {
+  if (!host) {
+    return (
+      <motion.section
+        className="host-card glass"
+        variants={fadeUp}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+      >
+        <div className="host-left">
+          <div className="host-orb">S</div>
+          <div>
+            <div className="badge" style={{ marginBottom: 10, color: "#18212f" }}>
+              ✦ Host del momento
+            </div>
+            <div className="host-name">In raccolta dati</div>
+            <div className="host-title">
+              Servono più Spunti reali per calcolare il miglior Host.
+            </div>
+            <div className="host-bio">
+              The Square userà partecipazione, Pulse medio e numero di Spunti
+              aperti per aggiornare questa sezione.
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    );
+  }
+
+  return (
+    <motion.section
+      className="host-card glass"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true }}
+    >
+      <div className="host-left">
+        <motion.div
+          className="host-orb"
+          whileHover={{ scale: 1.08, rotate: 5 }}
+          transition={{ type: "spring", stiffness: 300, damping: 15 }}
+        >
+          {host.hostAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={host.hostAvatar} alt="" />
+          ) : (
+            host.hostName.slice(0, 1).toUpperCase()
+          )}
+        </motion.div>
+        <div>
+          <div className="badge" style={{ marginBottom: 10, color: "#18212f" }}>
+            ✦ Host del momento
+          </div>
+          <div className="host-name">{host.hostName}</div>
+          <div className="host-title">
+            Riconosciuto automaticamente dai dati della community
+          </div>
+          <div className="host-bio">
+            Selezionato in base a partecipazione, Pulse medio e numero di Spunti
+            aperti.
+          </div>
+        </div>
+      </div>
+
+      <div className="metrics">
+        {[
+          { label: "Spunti aperti", value: host.hostedCount, color: "#0891b2" },
+          { label: "Partecipanti totali", value: host.totalParticipants, color: "#65a30d" },
+          { label: "Pulse medio", value: host.avgPulse, color: "#2563eb" },
+        ].map((m, i) => (
+          <motion.div
+            className="metric"
+            key={m.label}
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 + i * 0.1 }}
+          >
+            <span>{m.label}</span>
+            <motion.b style={{ color: m.color }}>
+              <AnimatedCounter value={m.value} />
+            </motion.b>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function LiveStrip({ thoughts }: { thoughts: LiveThought[] }) {
+  return (
+    <motion.section
+      className="live-strip"
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true }}
+    >
+      <div className="strip-head">
+        <div className="strip-title">⌁ Spunti attivi in piazza</div>
+        <Link href="/spaces" className="see-all">
+          Vedi tutti →
+        </Link>
+      </div>
+
+      <div className="call-grid">
+        {thoughts.slice(0, 6).map((thought, index) => (
+          <motion.div
+            key={`${thought.slug}-${index}`}
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: index * 0.06, duration: 0.4 }}
+            whileHover={{ y: -4, scale: 1.02 }}
+          >
+            <Link href={`/c/${thought.slug}`} className="mini-card">
+              <span className="mini-status">● In corso</span>
+              {thought.title}
+              <span className="mini-score">↯ {thought.pulse_score}</span>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function RightPanels({
+  avgPulse,
+  trendEchoes,
+}: {
+  avgPulse: number;
+  trendEchoes: TrendEcho[];
+}) {
+  return (
+    <aside className="right">
+      <motion.section
+        className="panel glass"
+        variants={slideInRight}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+      >
+        <div className="panel-title">
+          ✣ Echo <small>Voci dalla piazza</small>
+        </div>
+        <div className="echo-body">
+          <div className="inner">
+            <h4>Insight del momento</h4>
+            {trendEchoes.map((item, index) => (
+              <motion.div
+                className="insight"
+                key={item.title}
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 + index * 0.1 }}
+              >
+                <motion.span
+                  className="insight-icon"
+                  whileHover={{ rotate: 360, scale: 1.2 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  {index === 0 ? "◎" : index === 1 ? "♙" : "◉"}
+                </motion.span>
+                <span>{item.text}</span>
+              </motion.div>
+            ))}
+          </div>
+          <div className="inner">
+            <h4>Clima della piazza</h4>
+            <div className="mood-wrap">
+              <motion.div
+                className="mood-blob"
+                variants={blobMorph}
+                animate="animate"
+              >
+                <div>
+                  <b>Viva</b>
+                  <span>
+                    Conversazioni attive e
+                    <br />
+                    segnali in crescita.
+                  </span>
+                </div>
+              </motion.div>
+            </div>
+            <div className="legend">
+              <span>
+                <i /> Ascolto
+              </span>
+              <span>
+                <i /> Curiosità
+              </span>
+              <span>Decisione</span>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section
+        className="panel glass"
+        variants={slideInRight}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+      >
+        <div className="panel-title">
+          〽 Pulse <small>Energia della piazza</small>
+        </div>
+        <div className="pulse">
+          <div className="radial-wrap">
+            <motion.div
+              className="radial-ring"
+              variants={pulseRing}
+              animate="animate"
+            />
+            <div className="radial">
+              <div className="pulse-score">
+                <AnimatedCounter value={avgPulse} />
+                <span>
+                  {avgPulse >= 75 ? "Alta" : avgPulse >= 45 ? "Media" : "In crescita"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="momentum">
+            <h4>Media Pulse attuale</h4>
+            <p>Dato calcolato sugli Spunti pubblici attivi.</p>
+            <div className="chart">
+              <svg viewBox="0 0 280 100" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="line" x1="0" x2="1">
+                    <stop stopColor="#facc15" />
+                    <stop offset=".55" stopColor="#58c4ff" />
+                    <stop offset="1" stopColor="#c8f36b" />
+                  </linearGradient>
+                  <linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
+                    <stop stopColor="#facc15" stopOpacity=".22" />
+                    <stop offset="1" stopColor="#58c4ff" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24 L280 100 L0 100 Z"
+                  fill="url(#area)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1 }}
+                />
+                <motion.path
+                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24"
+                  fill="none"
+                  stroke="url(#line)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 1.8, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    </aside>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function NovaHome() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
-  const [text, setText] = useState('');
-  const [type, setType] = useState('Decidere');
-  const [attachmentName, setAttachmentName] = useState('');
-  const [aiStep, setAiStep] = useState(0);
-  const [aiAnswers, setAiAnswers] = useState<Record<AiAnswerKey, string>>({
-    situation: '',
-    block: '',
-    desiredOutcome: '',
-  });
+  const [text, setText] = useState("");
+  const [type, setType] = useState("Decidere");
+  const [attachmentName, setAttachmentName] = useState("");
 
   const [liveThoughts, setLiveThoughts] = useState<LiveThought[]>([]);
   const [worldNews, setWorldNews] = useState<WorldNewsItem[]>([]);
@@ -340,39 +1652,32 @@ export function NovaHome() {
 
   async function loadDashboardData() {
     const localThoughts = [...readStoredCalls(), ...demoCalls].map(localCallToThought);
-
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
 
       const { data: thoughts, error } = await supabase
-        .from('calls')
+        .from("calls")
         .select(
-          'id, slug, title, description, call_type, access_type, status, pulse_score, participants, host_id, host_name, host_avatar, created_at'
+          "id, slug, title, description, call_type, access_type, status, pulse_score, participants, host_id, host_name, host_avatar, created_at"
         )
-        .eq('access_type', 'public')
-        .in('status', ['live', 'open'])
-        .order('participants', { ascending: false })
-        .order('pulse_score', { ascending: false })
+        .eq("access_type", "public")
+        .in("status", ["live", "open"])
+        .order("participants", { ascending: false })
+        .order("pulse_score", { ascending: false })
         .limit(24);
 
       let pendingCount = 0;
-
       if (user) {
         const { count } = await supabase
-          .from('user_links')
-          .select('id', { count: 'exact', head: true })
-          .eq('receiver_id', user.id)
-          .eq('status', 'pending');
-
+          .from("user_links")
+          .select("id", { count: "exact", head: true })
+          .eq("receiver_id", user.id)
+          .eq("status", "pending");
         pendingCount = count || 0;
       }
 
       const safeThoughts = error || !thoughts?.length ? localThoughts : (thoughts as LiveThought[]);
-
       setLiveThoughts(safeThoughts);
       setAvgPulse(avgPulseValue(safeThoughts));
       setTrendEchoes(buildTrendEchoes(safeThoughts));
@@ -390,19 +1695,12 @@ export function NovaHome() {
   async function loadWorldNews() {
     try {
       setNewsLoading(true);
-
-      const response = await fetch('/api/world-news', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-
+      const response = await fetch("/api/world-news", { method: "GET", cache: "no-store" });
       const data = await response.json().catch(() => null);
-
       if (!response.ok || !Array.isArray(data?.items)) {
         setWorldNews([]);
         return;
       }
-
       setWorldNews(data.items);
     } catch {
       setWorldNews([]);
@@ -414,91 +1712,46 @@ export function NovaHome() {
   async function closeThoughtEarly(slug: string) {
     try {
       setClosingSlug(slug);
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        alert('Devi essere loggato per chiudere lo Spunto.');
+        alert("Devi essere loggato per chiudere lo Spunto.");
         return;
       }
-
       const response = await fetch(`/api/calls/${slug}/close`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-
       const data = await response.json().catch(() => null);
-
       if (!response.ok) {
-        alert(data?.error || 'Non sono riuscito a chiudere lo Spunto.');
+        alert(data?.error || "Non sono riuscito a chiudere lo Spunto.");
         return;
       }
-
       window.location.href = `/outcome?slug=${slug}`;
     } catch {
-      alert('Errore durante la chiusura dello Spunto.');
+      alert("Errore durante la chiusura dello Spunto.");
     } finally {
       setClosingSlug(null);
     }
   }
 
-  function updateAiAnswer(key: AiAnswerKey, value: string) {
-    setAiAnswers((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  }
-
-  function buildAiThought() {
-    const situation = aiAnswers.situation.trim();
-    const block = aiAnswers.block.trim();
-    const desiredOutcome = aiAnswers.desiredOutcome.trim();
-
-    const fullText = `${situation} ${block} ${desiredOutcome}`.trim();
-
-    if (!situation || !block || !desiredOutcome) {
-      alert('Rispondi alle tre domande per generare uno Spunto.');
-      return;
-    }
-
-    const inferredType = inferThoughtType(fullText);
-    const generatedTitle = situation.length > 82 ? `${situation.slice(0, 79).trim()}...` : situation;
-
-    const generatedText = `${generatedTitle}
-
-Nodo principale: ${block}
-
-Aiuto che cerco dalla piazza: ${desiredOutcome}`;
-
-    setText(generatedText);
-    setType(inferredType);
-  }
-
   function openThought() {
-    const title = text.trim().split('\n')[0] || 'Nuovo Spunto The Square';
-
+    const title = text.trim().split("\n")[0] || "Nuovo Spunto The Square";
     const call: NovaCall = {
       title,
       description:
-        text.trim() || 'Spunto aperto dalla piazza. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+        text.trim() || "Spunto aperto dalla piazza. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.",
       type,
-      accessType: 'public',
+      accessType: "public",
       slug: makeSlug(title),
       pulse: 12,
       participants: 1,
       createdAt: new Date().toISOString(),
     };
-
     saveLocalThought(call);
     window.location.href = `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
   }
 
   const featured = liveThoughts[0] || null;
-  const currentQuestion = aiQuestions[aiStep];
 
   return (
     <div className="square-preview">
@@ -508,136 +1761,79 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
         <Sidebar notificationCount={notificationCount} />
 
         <section className="square-center">
-          <section className="hero-refresh">
+          <motion.section
+            className="hero-refresh"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
             <div>
-              <p className="square-eyebrow">THE SQUARE</p>
-              <h1>
+              <motion.p className="square-eyebrow" variants={fadeUp}>
+                THE SQUARE
+              </motion.p>
+              <motion.h1 variants={fadeUp}>
                 Entra nella <span className="gradient-text">piazza</span>
-              </h1>
-              <p className="subtitle">
-                Una piazza digitale viva: Spunti, persone, eventi, notizie e conversazioni intorno a te.
-              </p>
+              </motion.h1>
+              <motion.p className="subtitle" variants={fadeUp}>
+                Una piazza digitale viva: Spunti, persone, eventi, notizie e
+                conversazioni intorno a te.
+              </motion.p>
             </div>
 
-            <div className="hero-mini-stats">
-              <div>
-                <b>{liveThoughts.length || demoCalls.length}</b>
+            <motion.div
+              className="hero-mini-stats"
+              variants={fadeUp}
+              custom={0.3}
+            >
+              <motion.div whileHover={{ y: -3, transition: { duration: 0.2 } }}>
+                <b><AnimatedCounter value={liveThoughts.length || demoCalls.length} /></b>
                 <span>Spunti attivi</span>
-              </div>
-              <div>
-                <b>{avgPulse}</b>
+              </motion.div>
+              <motion.div whileHover={{ y: -3, transition: { duration: 0.2 } }}>
+                <b><AnimatedCounter value={avgPulse} /></b>
                 <span>Pulse medio</span>
-              </div>
-              <div>
-                <b>{worldNews.length || 3}</b>
+              </motion.div>
+              <motion.div whileHover={{ y: -3, transition: { duration: 0.2 } }}>
+                <b><AnimatedCounter value={worldNews.length || 3} /></b>
                 <span>News utili</span>
-              </div>
-            </div>
-          </section>
+              </motion.div>
+            </motion.div>
+          </motion.section>
 
           <SquareMap />
-
           <NeedSomeoneSection />
 
-          <div className="composer ai-composer">
-            <div className="composer-content">
-              <div className="ai-builder-head">
-                <div>
-                  <p className="square-eyebrow">AI Spunto Builder</p>
-                  <h2>Ti aiuto a trasformare un pensiero in uno Spunto</h2>
-                </div>
+          <AIComposer
+            text={text}
+            setText={setText}
+            type={type}
+            setType={setType}
+            attachmentName={attachmentName}
+            setAttachmentName={setAttachmentName}
+            openThought={openThought}
+          />
 
-                <span className="ai-step-pill">
-                  {aiStep + 1}/{aiQuestions.length}
-                </span>
-              </div>
-
-              <div className="ai-question-box">
-                <label className="ai-question-label">{currentQuestion.label}</label>
-
-                <textarea
-                  value={aiAnswers[currentQuestion.key]}
-                  onChange={(event) => updateAiAnswer(currentQuestion.key, event.target.value)}
-                  placeholder={currentQuestion.placeholder}
-                  rows={3}
-                  className="composer-input ai-input"
-                />
-              </div>
-
-              <div className="composer-actions ai-actions">
-                <button
-                  type="button"
-                  onClick={() => setAiStep((value) => Math.max(0, value - 1))}
-                  className="mini-pill"
-                  disabled={aiStep === 0}
-                >
-                  ← Indietro
-                </button>
-
-                {aiStep < aiQuestions.length - 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setAiStep((value) => Math.min(aiQuestions.length - 1, value + 1))}
-                    className="mini-pill ai-primary-pill"
-                  >
-                    Continua →
-                  </button>
-                ) : (
-                  <button type="button" onClick={buildAiThought} className="mini-pill ai-primary-pill">
-                    Genera Spunto
-                  </button>
-                )}
-
-                <label className="mini-pill attachment-pill">
-                  ⌘ {attachmentName || 'Allega'}
-                  <input
-                    type="file"
-                    className="hidden-file"
-                    onChange={(event) => setAttachmentName(event.target.files?.[0]?.name || '')}
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => setType(type === 'Anonima' ? 'Decidere' : 'Anonima')}
-                  className="mini-pill anon-pill"
-                >
-                  ◒ Anonima
-                </button>
-              </div>
-            </div>
-
-            <button type="button" onClick={openThought} className="mic ai-open-button">
-              ✦
-            </button>
-          </div>
-
-          {text && (
-            <div className="ai-preview glass">
-              <div>
-                <p className="square-eyebrow">Spunto generato</p>
-                <h3>{text.split('\n')[0]}</h3>
-                <p>{text}</p>
-              </div>
-
-              <button type="button" onClick={openThought} className="ai-open-cta">
-                Apri lo Spunto →
-              </button>
-            </div>
-          )}
-
-          <div className="chips">
+          <motion.div
+            className="chips"
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
             {thoughtTypes.map((item) => (
-              <button
+              <motion.button
                 type="button"
                 key={item}
                 onClick={() => setType(item)}
-                className={`chip ${type === item ? 'active' : ''}`}
+                className={`chip ${type === item ? "active" : ""}`}
+                variants={fadeUp}
+                whileHover={{ scale: 1.06, y: -2 }}
+                whileTap={{ scale: 0.95 }}
               >
                 {getThoughtTypeIcon(item)} {item}
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
 
           {featured && (
             <FeaturedThought
@@ -870,6 +2066,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-size: 16px;
           font-weight: 850;
           text-decoration: none;
+          transition: all .22s ease;
         }
 
         .nav-item:hover,
@@ -916,6 +2113,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           text-decoration: none;
           background: linear-gradient(135deg, #facc15, #67e8f9 72%);
           box-shadow: 0 18px 34px rgba(6,182,212,.18);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .open-call:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 22px 42px rgba(6,182,212,.24);
         }
 
         .online {
@@ -1005,6 +2208,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           text-align: center;
           background: rgba(255,255,255,.62);
           border: 1px solid rgba(24,33,47,.06);
+          transition: transform .2s ease;
+        }
+
+        .hero-mini-stats div:hover {
+          transform: translateY(-3px);
         }
 
         .hero-mini-stats b {
@@ -1095,14 +2303,6 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           background:
             radial-gradient(circle at 50% 50%, rgba(14,165,233,.12), transparent 26%),
             linear-gradient(115deg, transparent 0 44%, rgba(255,255,255,.08) 45%, transparent 46% 100%);
-          animation: squareGlow 8s ease-in-out infinite;
-        }
-
-        @keyframes squareGlow {
-          50% {
-            opacity: .62;
-            filter: saturate(1.25);
-          }
         }
 
         .square-zone {
@@ -1162,43 +2362,17 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             radial-gradient(circle at 65% 65%, rgba(59,130,246,.92), transparent 38%),
             rgba(2,6,23,.62);
           box-shadow: 0 0 70px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.18);
-          animation: fountainPulse 3.4s ease-in-out infinite;
         }
 
         .square-fountain:hover {
           transform: translate(-50%, calc(-50% - 8px)) scale(1.03);
         }
 
-        @keyframes fountainPulse {
-          50% {
-            box-shadow: 0 0 100px rgba(34,211,238,.48), inset 0 1px 0 rgba(255,255,255,.18);
-          }
-        }
-
-        .square-cafe {
-          left: 6%;
-          top: 14%;
-        }
-
-        .square-stage {
-          right: 7%;
-          top: 12%;
-        }
-
-        .square-board {
-          left: 8%;
-          bottom: 14%;
-        }
-
-        .square-people {
-          right: 9%;
-          bottom: 16%;
-        }
-
-        .square-terrace {
-          left: 39%;
-          top: 7%;
-        }
+        .square-cafe { left: 6%; top: 14%; }
+        .square-stage { right: 7%; top: 12%; }
+        .square-board { left: 8%; bottom: 14%; }
+        .square-people { right: 9%; bottom: 16%; }
+        .square-terrace { left: 39%; top: 7%; }
 
         .square-center-cta {
           position: absolute;
@@ -1217,6 +2391,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           text-decoration: none;
           background: linear-gradient(135deg, #bef264, #67e8f9);
           box-shadow: 0 20px 50px rgba(34,211,238,.24);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .square-center-cta:hover {
+          transform: translateX(-50%) translateY(-3px);
+          box-shadow: 0 28px 60px rgba(34,211,238,.32);
         }
 
         .square-center-cta strong {
@@ -1270,6 +2450,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           align-items: center;
           justify-content: center;
           text-decoration: none;
+          transition: all .2s ease;
+        }
+
+        .square-cta:hover {
+          background: rgba(255,255,255,.16);
+          transform: translateY(-2px);
         }
 
         .square-cta.primary {
@@ -1277,6 +2463,10 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           color: #06111f;
           border: 0;
           box-shadow: 0 18px 42px rgba(34,211,238,.18);
+        }
+
+        .square-cta.primary:hover {
+          box-shadow: 0 24px 54px rgba(34,211,238,.28);
         }
 
         .need-section {
@@ -1511,11 +2701,17 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           cursor: pointer;
           font-family: inherit;
           box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+          transition: all .2s ease;
         }
 
         .mini-pill:disabled {
           cursor: not-allowed;
           opacity: .45;
+        }
+
+        .mini-pill:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(92,64,42,.08);
         }
 
         .ai-primary-pill,
@@ -1543,6 +2739,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           border: 1px solid rgba(24,33,47,.08);
           box-shadow: 0 16px 36px rgba(6,182,212,.14);
           cursor: pointer;
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .mic:hover {
+          transform: scale(1.08) rotate(10deg);
+          box-shadow: 0 20px 44px rgba(6,182,212,.22);
         }
 
         .ai-preview {
@@ -1582,6 +2784,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-weight: 950;
           box-shadow: 0 16px 34px rgba(6,182,212,.16);
           cursor: pointer;
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .ai-open-cta:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 22px 44px rgba(6,182,212,.24);
         }
 
         .chips {
@@ -1606,6 +2814,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
           cursor: pointer;
           font-family: inherit;
+          transition: all .2s ease;
         }
 
         .chip.active {
@@ -1613,6 +2822,10 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           background: linear-gradient(135deg, rgba(251,146,60,.18), rgba(6,182,212,.12));
           color: #92400e;
           box-shadow: 0 14px 28px rgba(92,64,42,.10);
+        }
+
+        .chip:hover {
+          transform: translateY(-2px);
         }
 
         .featured {
@@ -1740,6 +2953,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           text-decoration: none;
           padding: 0 18px;
           cursor: pointer;
+          transition: all .2s ease;
+        }
+
+        .call-action:hover {
+          background: rgba(255,255,255,.16);
+          transform: translateY(-2px);
         }
 
         .primary-cta {
@@ -1757,6 +2976,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           align-items: center;
           justify-content: center;
           text-decoration: none;
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .primary-cta:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 26px 50px rgba(6,182,212,.28);
         }
 
         .home-preview {
@@ -1815,6 +3040,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             radial-gradient(circle at 12% 0%, rgba(255,255,255,.72), transparent 38%),
             linear-gradient(180deg, rgba(255,255,255,.76), rgba(255,247,237,.60));
           box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 16px 38px rgba(92,64,42,.08);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .preview-card:hover {
+          transform: translateY(-4px);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 22px 50px rgba(92,64,42,.14);
         }
 
         .preview-card::before {
@@ -1868,6 +3099,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           background: rgba(255,255,255,.78);
           box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 12px 28px rgba(92,64,42,.08);
           font-size: 21px;
+          transition: transform .2s ease;
         }
 
         .preview-card h3 {
@@ -1884,6 +3116,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-size: 12px;
           font-weight: 950;
           text-decoration: none;
+          transition: opacity .2s ease;
+        }
+
+        .preview-card a:hover {
+          opacity: .7;
         }
 
         .preview-card-body {
@@ -1896,6 +3133,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           padding: 11px 12px;
           background: rgba(255,255,255,.64);
           border: 1px solid rgba(24,33,47,.06);
+          transition: transform .2s ease;
+        }
+
+        .mini-preview-line:hover {
+          transform: translateX(3px);
         }
 
         .mini-preview-line strong {
@@ -1939,6 +3181,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           padding: 16px;
           border: 1px solid rgba(24,33,47,.08);
           background: rgba(255,255,255,.58);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .trend-item:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 12px 28px rgba(92,64,42,.08);
         }
 
         .trend-title {
@@ -1990,6 +3238,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-size: 13px;
           font-weight: 950;
           text-decoration: none;
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .world-news-main-cta:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 30px rgba(6,182,212,.18);
         }
 
         .world-news-grid {
@@ -2007,6 +3261,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,247,237,.62));
           padding: 16px;
           box-shadow: inset 0 1px 0 rgba(255,255,255,.88);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .world-news-item:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 16px 38px rgba(92,64,42,.10);
         }
 
         .world-news-meta {
@@ -2056,6 +3316,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-weight: 950;
           text-decoration: none;
           border: 1px solid rgba(251,146,60,.16);
+          transition: all .2s ease;
+        }
+
+        .world-news-actions a:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 18px rgba(92,64,42,.08);
         }
 
         .world-news-actions a:last-child {
@@ -2090,6 +3356,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-weight: 950;
           background: radial-gradient(circle at 34% 25%, #facc15, #8f7cff 32%, #67e8f9 54%, #15314f 78%);
           box-shadow: 0 0 34px rgba(6,182,212,.18), inset 0 0 16px rgba(255,255,255,.16);
+          transition: transform .3s ease;
+        }
+
+        .host-orb:hover {
+          transform: scale(1.06) rotate(5deg);
         }
 
         .host-orb img {
@@ -2181,6 +3452,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           font-size: 13px;
           font-weight: 900;
           text-decoration: none;
+          transition: color .2s ease;
+        }
+
+        .see-all:hover {
+          color: #18212f;
         }
 
         .call-grid {
@@ -2202,6 +3478,12 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           line-height: 1.15;
           color: #18212f;
           text-decoration: none;
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .mini-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 12px 28px rgba(92,64,42,.10);
         }
 
         .mini-status {
@@ -2294,6 +3576,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           background: rgba(251,146,60,.12);
           color: #92400e;
           border: 1px solid rgba(251,146,60,.18);
+          transition: transform .3s ease;
         }
 
         .mood-wrap {
@@ -2315,7 +3598,6 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             radial-gradient(circle at 60% 70%, rgba(6,182,212,.78), transparent 42%);
           filter: drop-shadow(0 0 18px rgba(219,39,119,.20));
           border-radius: 45% 55% 52% 48% / 46% 38% 62% 54%;
-          animation: morph 7s ease-in-out infinite;
         }
 
         .mood-blob b {
@@ -2327,13 +3609,6 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           margin-top: 9px;
           font-size: 13px;
           color: rgba(255,255,255,.82);
-        }
-
-        @keyframes morph {
-          50% {
-            border-radius: 56% 44% 44% 56% / 35% 57% 43% 65%;
-            transform: rotate(2deg) scale(1.04);
-          }
         }
 
         .legend {
@@ -2369,11 +3644,26 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           height: calc(100% - 42px);
         }
 
+        .radial-wrap {
+          position: relative;
+          width: 230px;
+          height: 230px;
+          margin: auto;
+          display: grid;
+          place-items: center;
+        }
+
+        .radial-ring {
+          position: absolute;
+          inset: -8px;
+          border-radius: 999px;
+          border: 2px solid rgba(251,146,60,.25);
+        }
+
         .radial {
           width: 230px;
           height: 230px;
           border-radius: 999px;
-          margin: auto;
           display: grid;
           place-items: center;
           position: relative;
@@ -2471,6 +3761,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             height: auto;
           }
 
+          .radial-wrap,
           .radial {
             width: 170px;
             height: 170px;
@@ -2773,31 +4064,11 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             height: 130px;
           }
 
-          .square-cafe {
-            left: 4%;
-            top: 9%;
-          }
-
-          .square-stage {
-            right: 4%;
-            top: 9%;
-          }
-
-          .square-board {
-            left: 4%;
-            bottom: 23%;
-          }
-
-          .square-people {
-            right: 4%;
-            bottom: 23%;
-          }
-
-          .square-terrace {
-            left: 50%;
-            top: 34%;
-            transform: translateX(-50%);
-          }
+          .square-cafe { left: 4%; top: 9%; }
+          .square-stage { right: 4%; top: 9%; }
+          .square-board { left: 4%; bottom: 23%; }
+          .square-people { right: 4%; bottom: 23%; }
+          .square-terrace { left: 50%; top: 34%; transform: translateX(-50%); }
 
           .square-center-cta {
             min-width: 230px;
@@ -3079,6 +4350,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             height: 122px;
           }
 
+          .radial-wrap,
           .radial {
             width: 210px;
             height: 210px;
@@ -3118,677 +4390,9 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
     </div>
   );
 }
+'''
 
-function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
-  return (
-    <>
-      <Link href="/" className="brand" aria-label="The Square home">
-        <span className="brand-logo-box">
-          <span className="square-logo-mark">□</span>
-        </span>
-        <span className="brand-word">THE SQUARE</span>
-      </Link>
+with open('/mnt/agents/output/nova-shell-improved.tsx', 'w', encoding='utf-8') as f:
+    f.write(code)
 
-      <div className="top-actions">
-        <Link href="/search" className="icon-btn" aria-label="Cerca">
-          🔎
-        </Link>
-
-        <Link href="/events" className="icon-btn" aria-label="Eventi">
-          📍
-        </Link>
-
-        <Link href="/people" className="icon-btn" aria-label="Persone">
-          👥
-        </Link>
-
-        {isLoggedIn ? (
-          <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
-            <ProfileOrb className="h-full w-full" />
-          </Link>
-        ) : (
-          <div className="auth-actions">
-            <Link href="/login" className="auth-btn auth-login">
-              Login
-            </Link>
-            <Link href="/login?mode=register" className="auth-btn auth-register">
-              Entra in piazza
-            </Link>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-function Sidebar({ notificationCount }: { notificationCount: number }) {
-  return (
-    <aside className="sidebar glass">
-      <nav className="nav">
-        {navItems
-          .filter((item): item is [string, string, string] => Array.isArray(item) && item.length >= 3)
-          .map(([icon, label, href], index) => (
-            <Link key={label} href={href} className={`nav-item ${index === 0 ? 'active' : ''}`}>
-              <span className="nav-icon">{icon}</span>
-              <span className="nav-label">{label}</span>
-              {label === 'Notifiche' && notificationCount > 0 && <span className="nav-badge">{notificationCount}</span>}
-            </Link>
-          ))}
-      </nav>
-
-      <Link href="/calls/new" className="open-call">
-        <span>
-          Apri
-          <br />
-          uno Spunto
-        </span>
-        <span>✦</span>
-      </Link>
-
-      <div className="online">
-        <span className="dot" />
-        The Square aperta
-      </div>
-    </aside>
-  );
-}
-
-function FeaturedThought({
-  thought,
-  currentUserId,
-  onCloseEarly,
-  closingSlug,
-}: {
-  thought: LiveThought;
-  currentUserId: string | null;
-  onCloseEarly: (slug: string) => void;
-  closingSlug: string | null;
-}) {
-  const canClose = Boolean(currentUserId && thought.host_id === currentUserId);
-
-  return (
-    <article className="featured">
-      <div className="featured-content">
-        <span className="badge">★ Spunto in piazza</span>
-        <span className="badge status">
-          <span className="dot" /> In corso
-        </span>
-
-        <h2>{thought.title}</h2>
-        <p>{thought.description || 'Spunto aperto su The Square.'}</p>
-
-        <div className="call-meta">
-          <div className="avatars">
-            <span className="plus-count">↯ Pulse {thought.pulse_score || 0}</span>
-          </div>
-
-          <div className="active-count">
-            <span className="dot" style={{ display: 'inline-block', marginRight: 8 }} />
-            <b>{thought.participants || 0}</b> partecipanti attivi
-            <span className="speaking">Host: {thought.host_name || 'Utente Square'}</span>
-          </div>
-        </div>
-
-        <div className="call-actions">
-          <Link href={`/c/${thought.slug}?mode=chat`} className="call-action">
-            ▱ Chat
-          </Link>
-
-          <Link href={`/c/${thought.slug}`} className="primary-cta">
-            Entra nello Spunto →
-          </Link>
-
-          {canClose && (
-            <button type="button" onClick={() => onCloseEarly(thought.slug)} className="call-action">
-              {closingSlug === thought.slug ? 'Chiusura…' : 'Chiudi → Outcome'}
-            </button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function SquareMap() {
-  return (
-    <section className="square-section">
-      <div className="square-head">
-        <div>
-          <p className="square-eyebrow">Piazza live</p>
-          <h2>La piazza si muove intorno a te</h2>
-        </div>
-
-        <p>
-          Ogni area è un punto vivo della community: entra in una conversazione, trova persone,
-          scopri eventi o trasforma una notizia in uno Spunto.
-        </p>
-      </div>
-
-      <div className="square-map">
-        <div className="square-floor" />
-
-        <Link href="/spaces" className="square-zone square-fountain">
-          <span>⛲</span>
-          <b>Fontana</b>
-          <small>Spunti caldi</small>
-        </Link>
-
-        <Link href="/messages" className="square-zone square-cafe">
-          <span>☕</span>
-          <b>Caffè</b>
-          <small>Chat e messaggi</small>
-        </Link>
-
-        <Link href="/events" className="square-zone square-stage">
-          <span>🎤</span>
-          <b>Palco</b>
-          <small>Eventi live</small>
-        </Link>
-
-        <Link href="/world-news" className="square-zone square-board">
-          <span>📰</span>
-          <b>Bacheca</b>
-          <small>News dal mondo</small>
-        </Link>
-
-        <Link href="/people" className="square-zone square-people">
-          <span>👥</span>
-          <b>Panchine</b>
-          <small>Persone affini</small>
-        </Link>
-
-        <Link href="/echo" className="square-zone square-terrace">
-          <span>🧠</span>
-          <b>Terrazza</b>
-          <small>Echo e trend</small>
-        </Link>
-
-        <Link href="/calls/new" className="square-center-cta">
-          <strong>Apri uno Spunto</strong>
-          <span>Porta qualcosa in piazza →</span>
-        </Link>
-      </div>
-
-      <div className="square-bottom">
-        <p>
-          <strong>La piazza è aperta</strong> · conversazioni, eventi e segnali aggiornati in tempo reale
-        </p>
-
-        <div className="square-actions">
-          <Link href="/spaces" className="square-cta primary">
-            Esplora la piazza →
-          </Link>
-
-          <Link href="/calls/new" className="square-cta">
-            Crea uno Spunto
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function NeedSomeoneSection() {
-  return (
-    <section className="need-section">
-      <div className="need-head">
-        <div>
-          <p className="square-eyebrow">Cosa vuoi fare in piazza?</p>
-          <h2>Scegli un punto di partenza</h2>
-        </div>
-
-        <p>
-          The Square non ti chiede di pubblicare per forza. Ti aiuta a partire da un bisogno reale.
-        </p>
-      </div>
-
-      <div className="need-grid">
-        <Link href="/calls/new?title=Ho%20bisogno%20di%20un%20consiglio&type=Capire" className="need-card">
-          <div className="need-icon">🧭</div>
-          <b>Chiedi consiglio</b>
-          <span>Porta un dubbio in piazza e ricevi punti di vista utili.</span>
-        </Link>
-
-        <Link
-          href="/calls/new?title=Voglio%20confrontarmi%20con%20esperienze%20simili&type=Feedback"
-          className="need-card"
-        >
-          <div className="need-icon">🪞</div>
-          <b>Trova esperienze simili</b>
-          <span>Incontra chi ha vissuto qualcosa di vicino al tuo momento.</span>
-        </Link>
-
-        <Link href="/events" className="need-card">
-          <div className="need-icon">📍</div>
-          <b>Scopri eventi</b>
-          <span>Dal Centro Italia alla tua community: eventi che diventano conversazioni.</span>
-        </Link>
-
-        <Link href="/world-news" className="need-card">
-          <div className="need-icon">📰</div>
-          <b>Parti da una notizia</b>
-          <span>Trasforma una news in uno Spunto da discutere con gli altri.</span>
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function HomeSectionsPreview({
-  thoughts,
-  trendEchoes,
-  worldNews,
-  notificationCount,
-  currentUserId,
-}: {
-  thoughts: LiveThought[];
-  trendEchoes: TrendEcho[];
-  worldNews: WorldNewsItem[];
-  notificationCount: number;
-  currentUserId: string | null;
-}) {
-  const firstThought = thoughts[0];
-  const secondThought = thoughts[1];
-  const firstNews = worldNews[0];
-  const secondNews = worldNews[1];
-
-  return (
-    <section className="home-preview">
-      <div className="home-preview-head">
-        <div>
-          <p className="square-eyebrow">Esplora The Square</p>
-          <h2>La tua piazza viva</h2>
-        </div>
-
-        <p>Tutte le aree principali in anteprima: entra, scopri cosa sta succedendo e apri nuovi Spunti.</p>
-      </div>
-
-      <div className="home-preview-grid">
-        <PreviewCard icon="⛲" title="Fontana" href="/spaces" cta="Vedi Spunti" accent="cyan">
-          {firstThought ? (
-            <>
-              <MiniPreviewLine
-                title={firstThought.title}
-                text={`Pulse ${firstThought.pulse_score || 0} · ${firstThought.participants || 0} partecipanti`}
-              />
-              {secondThought && (
-                <MiniPreviewLine title={secondThought.title} text={`Host: ${secondThought.host_name || 'Utente Square'}`} />
-              )}
-            </>
-          ) : (
-            <MiniPreviewLine title="Nessuno Spunto attivo" text="Apri il primo Spunto e avvia la conversazione." />
-          )}
-        </PreviewCard>
-
-        <PreviewCard icon="🧠" title="Terrazza Echo" href="/echo" cta="Apri Echo" accent="violet">
-          {trendEchoes.slice(0, 2).map((echo) => (
-            <MiniPreviewLine key={echo.title} title={echo.title} text={echo.text} />
-          ))}
-        </PreviewCard>
-
-        <PreviewCard icon="🏁" title="Outcome" href="/outcome" cta="Vedi Outcome" accent="green">
-          <MiniPreviewLine title="Decisioni finali" text="Qui trovi sintesi, direzioni e risultati generati dagli Spunti." />
-          <MiniPreviewLine title="Azioni concrete" text="Trasforma le conversazioni in prossimi passi." />
-        </PreviewCard>
-
-        <PreviewCard icon="📰" title="Bacheca News" href="/world-news" cta="Apri News" accent="pink">
-          {firstNews ? (
-            <>
-              <MiniPreviewLine title={firstNews.title} text={firstNews.source || 'Fonte news'} />
-              {secondNews && <MiniPreviewLine title={secondNews.title} text={secondNews.source || 'Fonte news'} />}
-            </>
-          ) : (
-            <MiniPreviewLine title="News in arrivo" text="Le notizie diventano Spunti per la community." />
-          )}
-        </PreviewCard>
-
-        <PreviewCard icon="🎤" title="Palco Eventi" href="/events" cta="Scopri Eventi" accent="blue">
-          <MiniPreviewLine title="Centro Italia" text="Roma, Firenze, Perugia, Ancona, Pescara e altre città." />
-          <MiniPreviewLine title="Organizziamoci" text="Ogni evento può diventare uno Spunto condiviso." />
-        </PreviewCard>
-
-        <PreviewCard icon="👥" title="Panchine" href="/people" cta="Vedi Persone" accent="cyan">
-          <MiniPreviewLine title="Interazioni reali" text="Scopri le persone con cui hai condiviso Spunti." />
-          <MiniPreviewLine title="Nessun follow" text="Profili visibili, ma niente logiche da social classico." />
-        </PreviewCard>
-
-        <PreviewCard icon="🌐" title="Spazi" href="/spaces" cta="Apri Spazi" accent="violet">
-          <MiniPreviewLine title="Stanze attive" text="Trova Spunti collegati ai tuoi interessi." />
-          <MiniPreviewLine title="Community locali" text="Luoghi digitali dove organizzarsi e confrontarsi." />
-        </PreviewCard>
-
-        <PreviewCard icon="☕" title="Caffè" href="/messages" cta="Apri Messaggi" accent="blue">
-          <MiniPreviewLine title="Conversazioni private" text="Rimani in contatto con chi hai incontrato negli Spunti." />
-          <MiniPreviewLine title="Chat dirette" text="Messaggi più leggibili, ordinati e personali." />
-        </PreviewCard>
-
-        <PreviewCard icon="🔔" title="Notifiche" href="/notifications" cta="Vedi Notifiche" accent="pink">
-          <MiniPreviewLine
-            title={notificationCount > 0 ? `${notificationCount} notifiche attive` : 'Tutto tranquillo'}
-            text={notificationCount > 0 ? 'Hai nuove attività da controllare.' : 'Qui appariranno inviti, risposte e aggiornamenti.'}
-          />
-        </PreviewCard>
-
-        <PreviewCard icon="👤" title="Profilo" href={currentUserId ? '/profile' : '/login'} cta={currentUserId ? 'Vai al Profilo' : 'Accedi'} accent="green">
-          <MiniPreviewLine title="Identità Square" text="Bio, passioni, contributi e punteggio personale." />
-          <MiniPreviewLine title="Livello personale" text="Il livello resta solo nella tua pagina personale." />
-        </PreviewCard>
-      </div>
-    </section>
-  );
-}
-
-function PreviewCard({
-  icon,
-  title,
-  href,
-  cta,
-  accent,
-  children,
-}: {
-  icon: string;
-  title: string;
-  href: string;
-  cta: string;
-  accent: 'cyan' | 'violet' | 'pink' | 'blue' | 'green';
-  children: ReactNode;
-}) {
-  return (
-    <article className={`preview-card preview-${accent}`}>
-      <div className="preview-card-top">
-        <div className="preview-icon">{icon}</div>
-
-        <div>
-          <h3>{title}</h3>
-          <Link href={href}>{cta} →</Link>
-        </div>
-      </div>
-
-      <div className="preview-card-body">{children}</div>
-    </article>
-  );
-}
-
-function MiniPreviewLine({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="mini-preview-line">
-      <strong>{title}</strong>
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function TrendEchoSection({ echoes }: { echoes: TrendEcho[] }) {
-  return (
-    <section className="host-card glass">
-      <div className="trend-grid">
-        {echoes.map((echo) => (
-          <div className="trend-item" key={echo.title}>
-            <div className="trend-title">✦ {echo.title}</div>
-            <div className="trend-text">{echo.text}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function WorldNewsSection({ items, loading }: { items: WorldNewsItem[]; loading: boolean }) {
-  const fallbackItems: WorldNewsItem[] = [
-    {
-      title: 'Tecnologia, lavoro e relazioni stanno cambiando più velocemente delle abitudini sociali.',
-      source: 'The Square Echo',
-      url: '/calls/new',
-      description: 'Uno spunto utile per aprire conversazioni su futuro, scelte personali e nuove priorità.',
-      category: 'Società',
-    },
-    {
-      title: 'Sempre più persone cercano comunità piccole, fidate e orientate a decisioni concrete.',
-      source: 'The Square Echo',
-      url: '/calls/new',
-      description: 'Può diventare uno Spunto su amicizie, lavoro, fiducia o appartenenza.',
-      category: 'Community',
-    },
-    {
-      title: 'Il tema del cambiamento personale resta centrale: città, lavoro, coppia, famiglia, denaro.',
-      source: 'The Square Echo',
-      url: '/calls/new',
-      description: 'Perfetto per generare Spunti dove la rete può portare esperienze reali.',
-      category: 'Vita',
-    },
-  ];
-
-  const visibleItems = items.length ? items : fallbackItems;
-
-  return (
-    <section className="world-news-card glass">
-      <div className="world-news-head">
-        <div>
-          <p className="square-eyebrow">Bacheca News</p>
-          <h2>Notizie dal mondo per dare spunto… a un nuovo Spunto</h2>
-        </div>
-
-        <Link href="/world-news" className="world-news-main-cta">
-          Apri News →
-        </Link>
-      </div>
-
-      <div className="world-news-grid">
-        {loading ? (
-          <div className="world-news-empty">Carico notizie e segnali dal mondo…</div>
-        ) : (
-          visibleItems.slice(0, 6).map((item) => (
-            <article className="world-news-item" key={`${item.title}-${item.source}`}>
-              <div className="world-news-meta">
-                <span>{item.category || 'Mondo'}</span>
-                <span>{item.source}</span>
-              </div>
-
-              <h3>{item.title}</h3>
-
-              {item.description && <p>{item.description}</p>}
-
-              <div className="world-news-actions">
-                <a href={item.url} target="_blank" rel="noreferrer">
-                  Leggi
-                </a>
-
-                <Link href={`/calls/new?title=${encodeURIComponent(item.title)}&type=${encodeURIComponent('Capire')}`}>
-                  Usa come Spunto
-                </Link>
-              </div>
-            </article>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function HostOfMomentSection({ host }: { host: HostMoment | null }) {
-  if (!host) {
-    return (
-      <section className="host-card glass">
-        <div className="host-left">
-          <div className="host-orb">S</div>
-          <div>
-            <div className="badge" style={{ marginBottom: 10, color: '#18212f' }}>
-              ✦ Host del momento
-            </div>
-            <div className="host-name">In raccolta dati</div>
-            <div className="host-title">Servono più Spunti reali per calcolare il miglior Host.</div>
-            <div className="host-bio">
-              The Square userà partecipazione, Pulse medio e numero di Spunti aperti per aggiornare questa sezione.
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="host-card glass">
-      <div className="host-left">
-        <div className="host-orb">
-          {host.hostAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={host.hostAvatar} alt="" />
-          ) : (
-            host.hostName.slice(0, 1).toUpperCase()
-          )}
-        </div>
-
-        <div>
-          <div className="badge" style={{ marginBottom: 10, color: '#18212f' }}>
-            ✦ Host del momento
-          </div>
-
-          <div className="host-name">{host.hostName}</div>
-          <div className="host-title">Riconosciuto automaticamente dai dati della community</div>
-          <div className="host-bio">Selezionato in base a partecipazione, Pulse medio e numero di Spunti aperti.</div>
-        </div>
-      </div>
-
-      <div className="metrics">
-        <div className="metric">
-          <span>Spunti aperti</span>
-          <b>{host.hostedCount}</b>
-        </div>
-        <div className="metric">
-          <span>Partecipanti totali</span>
-          <b>{host.totalParticipants}</b>
-        </div>
-        <div className="metric">
-          <span>Pulse medio</span>
-          <b>{host.avgPulse}</b>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveStrip({ thoughts }: { thoughts: LiveThought[] }) {
-  return (
-    <section className="live-strip">
-      <div className="strip-head">
-        <div className="strip-title">⌁ Spunti attivi in piazza</div>
-        <Link href="/spaces" className="see-all">
-          Vedi tutti →
-        </Link>
-      </div>
-
-      <div className="call-grid">
-        {thoughts.slice(0, 6).map((thought, index) => (
-          <Link href={`/c/${thought.slug}`} key={`${thought.slug}-${index}`} className="mini-card">
-            <span className="mini-status">● In corso</span>
-            {thought.title}
-            <span className="mini-score">↯ {thought.pulse_score}</span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes: TrendEcho[] }) {
-  return (
-    <aside className="right">
-      <section className="panel glass">
-        <div className="panel-title">
-          ✣ Echo <small>Voci dalla piazza</small>
-        </div>
-
-        <div className="echo-body">
-          <div className="inner">
-            <h4>Insight del momento</h4>
-
-            {trendEchoes.map((item, index) => (
-              <div className="insight" key={item.title}>
-                <span className="insight-icon">{index === 0 ? '◎' : index === 1 ? '♙' : '◉'}</span>
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="inner">
-            <h4>Clima della piazza</h4>
-            <div className="mood-wrap">
-              <div className="mood-blob">
-                <div>
-                  <b>Viva</b>
-                  <span>
-                    Conversazioni attive e
-                    <br />
-                    segnali in crescita.
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="legend">
-              <span>
-                <i />
-                Ascolto
-              </span>
-              <span>
-                <i />
-                Curiosità
-              </span>
-              <span>
-                Decisione
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel glass">
-        <div className="panel-title">
-          〽 Pulse <small>Energia della piazza</small>
-        </div>
-
-        <div className="pulse">
-          <div className="radial">
-            <div className="pulse-score">
-              {avgPulse}
-              <span>{avgPulse >= 75 ? 'Alta' : avgPulse >= 45 ? 'Media' : 'In crescita'}</span>
-            </div>
-          </div>
-
-          <div className="momentum">
-            <h4>Media Pulse attuale</h4>
-            <p>Dato calcolato sugli Spunti pubblici attivi.</p>
-
-            <div className="chart">
-              <svg viewBox="0 0 280 100" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="line" x1="0" x2="1">
-                    <stop stopColor="#facc15" />
-                    <stop offset=".55" stopColor="#58c4ff" />
-                    <stop offset="1" stopColor="#c8f36b" />
-                  </linearGradient>
-                  <linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
-                    <stop stopColor="#facc15" stopOpacity=".22" />
-                    <stop offset="1" stopColor="#58c4ff" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                <path
-                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24 L280 100 L0 100 Z"
-                  fill="url(#area)"
-                />
-                <path
-                  d="M0 74 L34 66 L66 60 L96 58 L130 48 L162 42 L195 38 L225 28 L280 24"
-                  fill="none"
-                  stroke="url(#line)"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </section>
-    </aside>
-  );
-}
+print("File salvato con successo. Righe:", len(code.splitlines()))
