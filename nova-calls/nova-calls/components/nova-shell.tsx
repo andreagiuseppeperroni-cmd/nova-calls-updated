@@ -1,7 +1,7 @@
-'use client';
+use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { demoCalls, makeSlug, type NovaCall } from '@/lib/local-call';
 import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
@@ -12,8 +12,8 @@ const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare
 
 const navItems: Array<[string, string, string]> = [
   ['🏛️', 'Piazza', '/'],
-  ['🚶', 'Passeggiata', '#passeggiata'],
   ['💡', 'Spunti', '/calls/new'],
+  ['🚶', 'Passeggiata', '#walk'],
   ['🧠', 'Echo', '/echo'],
   ['🏁', 'Outcome', '/outcome'],
   ['👥', 'Persone', '/people'],
@@ -65,7 +65,6 @@ type WorldNewsItem = {
 };
 
 type AiAnswerKey = 'situation' | 'block' | 'desiredOutcome';
-type WalkMode = 'piazza' | 'people' | 'understand' | 'do';
 
 const aiQuestions: Array<{
   key: AiAnswerKey;
@@ -141,21 +140,12 @@ function extractKeywords(thoughts: LiveThought[]) {
     'cosa',
     'come',
     'con',
-    'da',
-    'dei',
-    'del',
     'della',
     'delle',
     'dopo',
     'dove',
     'essere',
     'fare',
-    'fra',
-    'gli',
-    'hai',
-    'ho',
-    'per',
-    'piu',
     'prima',
     'quando',
     'sono',
@@ -238,7 +228,6 @@ function computeHostOfMoment(thoughts: LiveThought[]): HostMoment | null {
   const hosts = [...grouped.values()].map((host) => {
     const avgPulse = host.hostedCount ? Math.round(host.avgPulse / host.hostedCount) : 0;
     const popularityScore = host.hostedCount * 12 + host.totalParticipants * 2 + avgPulse * 3;
-
     return { ...host, avgPulse, popularityScore };
   });
 
@@ -311,130 +300,6 @@ function inferThoughtType(value: string) {
   return 'Capire';
 }
 
-function buildSpuntoHref(title: string, type = 'Capire') {
-  return `/calls/new?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}`;
-}
-
-function buildWalkItems(thoughts: LiveThought[], news: WorldNewsItem[], mode: WalkMode) {
-  const safeThoughts = thoughts.length ? thoughts : demoCalls.map(localCallToThought);
-  const safeNews = news.length
-    ? news
-    : [
-        {
-          title: 'Roma, lavoro e relazioni stanno diventando i temi più caldi della piazza.',
-          source: 'The Square Echo',
-          url: '/world-news',
-          description: 'Un segnale da trasformare in discussione.',
-          category: 'Piazza',
-        },
-        {
-          title: 'Le persone cercano gruppi piccoli prima degli eventi.',
-          source: 'The Square Echo',
-          url: '/world-news',
-          description: 'The Square può far nascere incontri più naturali.',
-          category: 'Eventi',
-        },
-      ];
-
-  const peopleFirst = mode === 'people';
-  const understandFirst = mode === 'understand';
-  const doFirst = mode === 'do';
-
-  return [
-    {
-      type: 'moment',
-      title: safeThoughts[0]?.title || 'Sto cercando un confronto sincero',
-      text: safeThoughts[0]?.description || 'Uno Spunto aperto nella piazza per ricevere esperienze, idee e punti di vista.',
-      href: `/c/${safeThoughts[0]?.slug || 'demo'}`,
-      meta: `Pulse ${safeThoughts[0]?.pulse_score || 42} · ${safeThoughts[0]?.participants || 8} persone`,
-      badge: 'Momento caldo',
-    },
-    peopleFirst
-      ? {
-          type: 'person',
-          title: 'Giulia può aiutarti',
-          text: 'Ha risposto a Momenti simili e vive conversazioni su lavoro, città e cambiamento.',
-          href: '/people',
-          meta: 'Match 91%',
-          badge: 'Persona affine',
-        }
-      : {
-          type: 'event',
-          title: 'Roma: gruppo in formazione',
-          text: 'Persone che vogliono organizzarsi prima di un evento. Chat temporanea consigliata.',
-          href: '/events',
-          meta: '18 interessati',
-          badge: 'Evento vicino',
-        },
-    {
-      type: 'news',
-      title: safeNews[0]?.title || 'Una notizia può diventare uno Spunto',
-      text: safeNews[0]?.description || 'Porta questa notizia in piazza e chiedi cosa ne pensa la community.',
-      href: safeNews[0]?.url || '/world-news',
-      meta: safeNews[0]?.source || 'The Square',
-      badge: safeNews[0]?.category || 'News',
-    },
-    {
-      type: 'bivio',
-      title: 'Dove vuoi andare ora?',
-      text: 'Scegli una direzione: la Passeggiata cambia ritmo e ti mostra contenuti più utili.',
-      href: '#passeggiata',
-      meta: 'Bivio intelligente',
-      badge: 'Social 5.0',
-    },
-    understandFirst
-      ? {
-          type: 'echo',
-          title: 'Eco: il tema nascosto',
-          text: 'La piazza sta collegando lavoro, paura di sbagliare e bisogno di esperienze reali.',
-          href: '/echo',
-          meta: 'Insight generato',
-          badge: 'Echo',
-        }
-      : {
-          type: 'bench',
-          title: 'Panchina: fermati un secondo',
-          text: 'Hai attraversato contenuti simili. Vuoi trasformare questo interesse in uno Spunto?',
-          href: buildSpuntoHref('Voglio trasformare questo interesse in uno Spunto', 'Capire'),
-          meta: 'Pausa utile',
-          badge: 'Panchina',
-        },
-    doFirst
-      ? {
-          type: 'event',
-          title: 'Fai qualcosa: evento consigliato',
-          text: 'Un gruppo locale può nascere da qui. Entra, guarda chi c’è e proponi un momento.',
-          href: '/events',
-          meta: 'Centro Italia',
-          badge: 'Azione',
-        }
-      : {
-          type: 'person',
-          title: 'Marco cerca persone per un’idea',
-          text: 'Compatibile con chi vuole creare, discutere e trasformare un’intuizione in progetto.',
-          href: '/people',
-          meta: '5 compatibili',
-          badge: 'Persone',
-        },
-    {
-      type: 'mission',
-      title: 'Missione di piazza',
-      text: 'Aiuta una persona, accendi un Patto o porta uno Spunto verso un Outcome.',
-      href: '/spaces',
-      meta: '1 azione utile',
-      badge: 'Missione',
-    },
-    {
-      type: 'change_square',
-      title: 'Cambio Piazza',
-      text: 'Continua verso Roma, Firenze, Perugia o nella Piazza Anonima.',
-      href: '/events',
-      meta: 'Nuovo scenario',
-      badge: 'Cambio scenario',
-    },
-  ];
-}
-
 export function NovaHome() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
@@ -457,7 +322,6 @@ export function NovaHome() {
   const [hostMoment, setHostMoment] = useState<HostMoment | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [closingSlug, setClosingSlug] = useState<string | null>(null);
-  const [walkMode, setWalkMode] = useState<WalkMode>('piazza');
 
   useEffect(() => {
     loadDashboardData();
@@ -639,10 +503,10 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             <div>
               <p className="square-eyebrow">THE SQUARE</p>
               <h1>
-                Entra nella <span className="gradient-text">piazza</span>
+                La piazza si muove <span className="gradient-text">intorno a te</span>
               </h1>
               <p className="subtitle">
-                Una piazza digitale viva: non un feed infinito, ma una Passeggiata che ti porta da qualche parte.
+                Una piazza digitale viva: Spunti, persone, eventi, notizie e conversazioni utili, senza scroll vuoto.
               </p>
             </div>
 
@@ -663,7 +527,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           </section>
 
           <SquareMap />
-          <InfiniteWalkSection thoughts={liveThoughts} worldNews={worldNews} walkMode={walkMode} setWalkMode={setWalkMode} />
+          <InfiniteWalkSection thoughts={liveThoughts} />
           <NeedSomeoneSection />
 
           <div className="composer ai-composer">
@@ -796,10 +660,7 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
         :root {
           --sand: #f7efe3;
           --stone: #d9c7ae;
-          --stone-dark: #4b3727;
           --night: #0b1120;
-          --panel: rgba(255, 255, 255, 0.76);
-          --line: rgba(120, 53, 15, 0.16);
           --text: #18212f;
           --muted: #5b6472;
           --cyan: #06b6d4;
@@ -828,20 +689,6 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             linear-gradient(180deg, #f7efe3 0%, #f6ead8 36%, #e8d5bc 72%, #d8c4aa 100%);
           overflow-x: hidden;
           isolation: isolate;
-        }
-
-        .square-preview::before {
-          content: "";
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
-          opacity: .12;
-          background-image:
-            linear-gradient(rgba(75,55,39,.18) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(75,55,39,.18) 1px, transparent 1px);
-          background-size: 44px 44px;
-          mask-image: linear-gradient(to bottom, black, transparent 86%);
         }
 
         .glass {
@@ -1420,170 +1267,82 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           box-shadow: 0 18px 42px rgba(34,211,238,.18);
         }
 
-        .walk-section {
+        .infinite-section {
           position: relative;
-          margin-top: 18px;
           overflow: hidden;
-          border-radius: 38px;
-          padding: 26px;
-          color: #f8fafc;
-          border: 1px solid rgba(255,255,255,.16);
-          background:
-            radial-gradient(circle at 12% 0%, rgba(250,204,21,.26), transparent 28%),
-            radial-gradient(circle at 92% 18%, rgba(6,182,212,.24), transparent 30%),
-            radial-gradient(circle at 68% 92%, rgba(219,39,119,.17), transparent 30%),
-            linear-gradient(135deg, #17110d, #292524 48%, #0f172a);
-          box-shadow: 0 32px 100px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14);
-        }
-
-        .walk-head {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 20px;
-          margin-bottom: 20px;
-        }
-
-        .walk-head h2 {
-          margin: 0;
-          max-width: 720px;
+          margin-top: 18px;
+          border-radius: 40px;
+          padding: 28px;
           color: white;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(250,204,21,.22), transparent 28%),
+            radial-gradient(circle at 92% 16%, rgba(34,211,238,.20), transparent 28%),
+            linear-gradient(135deg, #15110d, #2b1b16 48%, #07111f);
+          box-shadow: 0 32px 100px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
+        }
+
+        .infinite-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: flex-end;
+          margin-bottom: 18px;
+        }
+
+        .infinite-head h2 {
+          margin: 0;
+          max-width: 760px;
           font-size: clamp(38px, 4vw, 72px);
           line-height: .86;
-          letter-spacing: -.075em;
+          letter-spacing: -.08em;
           font-weight: 950;
         }
 
-        .walk-head p {
-          max-width: 420px;
+        .infinite-head p {
+          max-width: 390px;
           margin: 0;
           color: #cbd5e1;
           line-height: 1.55;
-          font-weight: 720;
+          font-weight: 700;
         }
 
-        .walk-modebar {
-          position: sticky;
-          top: 90px;
-          z-index: 6;
-          display: flex;
-          gap: 10px;
-          overflow-x: auto;
-          padding: 10px;
-          border-radius: 24px;
-          background: rgba(2,6,23,.34);
-          border: 1px solid rgba(255,255,255,.12);
-          backdrop-filter: blur(18px);
-          scrollbar-width: none;
-        }
-
-        .walk-modebar::-webkit-scrollbar {
-          display: none;
-        }
-
-        .walk-mode {
-          flex: 0 0 auto;
-          min-height: 42px;
-          border: 1px solid rgba(255,255,255,.13);
-          border-radius: 999px;
-          padding: 0 15px;
-          background: rgba(255,255,255,.08);
-          color: rgba(255,255,255,.82);
-          font-size: 13px;
-          font-weight: 950;
-          cursor: pointer;
-        }
-
-        .walk-mode.active {
-          background: linear-gradient(135deg, #bef264, #67e8f9);
-          color: #08111f;
-          border-color: transparent;
-          box-shadow: 0 16px 34px rgba(34,211,238,.14);
-        }
-
-        .walk-path {
-          position: relative;
+        .walk-grid {
           display: grid;
-          gap: 14px;
-          margin-top: 18px;
-          padding-left: 28px;
-        }
-
-        .walk-path::before {
-          content: "";
-          position: absolute;
-          left: 12px;
-          top: 12px;
-          bottom: 12px;
-          width: 2px;
-          background: linear-gradient(180deg, #bef264, #67e8f9, #db2777, transparent);
-          opacity: .55;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .walk-card {
-          position: relative;
-          display: grid;
-          grid-template-columns: 74px minmax(0, 1fr) auto;
-          gap: 16px;
-          align-items: center;
-          min-height: 138px;
-          border-radius: 30px;
+          min-height: 210px;
+          border-radius: 28px;
           padding: 18px;
           color: white;
           text-decoration: none;
+          background: rgba(255,255,255,.09);
           border: 1px solid rgba(255,255,255,.13);
-          background:
-            radial-gradient(circle at 98% 12%, rgba(255,255,255,.12), transparent 28%),
-            rgba(255,255,255,.08);
-          backdrop-filter: blur(16px);
-          transition: transform .22s ease, background .22s ease, border-color .22s ease;
-        }
-
-        .walk-card::before {
-          content: "";
-          position: absolute;
-          left: -23px;
-          top: 50%;
-          width: 13px;
-          height: 13px;
-          border-radius: 999px;
-          background: #bef264;
-          box-shadow: 0 0 18px rgba(190,242,100,.72);
-          transform: translateY(-50%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+          transition: transform .2s ease, background .2s ease;
         }
 
         .walk-card:hover {
-          transform: translateY(-5px) scale(1.008);
-          background: rgba(255,255,255,.13);
-          border-color: rgba(103,232,249,.32);
+          transform: translateY(-6px);
+          background: rgba(255,255,255,.14);
         }
 
-        .walk-icon {
-          width: 74px;
-          height: 74px;
-          display: grid;
-          place-items: center;
-          border-radius: 25px;
-          background: rgba(255,255,255,.12);
-          font-size: 31px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
-        }
-
-        .walk-badge {
+        .walk-card small {
           display: inline-flex;
-          width: fit-content;
           min-height: 28px;
           align-items: center;
-          border-radius: 999px;
           padding: 0 10px;
-          color: #17110d;
-          background: rgba(250,204,21,.92);
+          border-radius: 999px;
+          color: #07111f;
+          background: linear-gradient(135deg, #bef264, #67e8f9);
           font-size: 11px;
           font-weight: 950;
         }
 
         .walk-card h3 {
-          margin: 10px 0 6px;
+          margin: 20px 0 8px;
           font-size: 26px;
           line-height: 1;
           letter-spacing: -.045em;
@@ -1592,65 +1351,57 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
 
         .walk-card p {
           margin: 0;
-          color: rgba(255,255,255,.76);
-          font-size: 14px;
+          color: #cbd5e1;
           line-height: 1.45;
-          font-weight: 680;
+          font-size: 13px;
+          font-weight: 700;
         }
 
-        .walk-meta {
-          color: rgba(255,255,255,.70);
+        .walk-card span {
+          display: block;
+          margin-top: 18px;
+          color: #bef264;
           font-size: 12px;
           font-weight: 950;
-          text-align: right;
-          white-space: nowrap;
         }
 
-        .walk-enter {
+        .bench-note {
+          margin-top: 14px;
+          border-radius: 28px;
+          padding: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          background: rgba(255,255,255,.10);
+          border: 1px solid rgba(255,255,255,.13);
+        }
+
+        .bench-note b {
+          display: block;
+          font-size: 20px;
+          line-height: 1.05;
+        }
+
+        .bench-note p {
+          margin: 6px 0 0;
+          color: #cbd5e1;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .bench-note a {
+          min-height: 46px;
           display: inline-flex;
-          margin-top: 8px;
-          min-height: 34px;
           align-items: center;
           border-radius: 999px;
-          padding: 0 12px;
-          color: #08111f;
-          background: linear-gradient(135deg, #bef264, #67e8f9);
-          font-size: 12px;
-          font-weight: 950;
-        }
-
-        .walk-bivio,
-        .walk-bench,
-        .walk-mission,
-        .walk-change_square {
-          background:
-            radial-gradient(circle at 16% 0%, rgba(250,204,21,.18), transparent 32%),
-            radial-gradient(circle at 88% 20%, rgba(6,182,212,.18), transparent 34%),
-            rgba(255,255,255,.10);
-        }
-
-        .walk-actions {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          margin-top: 14px;
-        }
-
-        .walk-action {
-          min-height: 58px;
-          border: 1px solid rgba(255,255,255,.13);
-          border-radius: 18px;
-          background: rgba(255,255,255,.08);
-          color: white;
+          padding: 0 16px;
+          color: #07111f;
+          background: linear-gradient(135deg, #facc15, #67e8f9);
           font-size: 13px;
           font-weight: 950;
-          cursor: pointer;
-        }
-
-        .walk-action:hover,
-        .walk-action.active {
-          background: rgba(255,255,255,.16);
-          border-color: rgba(190,242,100,.42);
+          text-decoration: none;
+          white-space: nowrap;
         }
 
         .need-section {
@@ -1666,18 +1417,6 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             linear-gradient(135deg, rgba(30,41,59,.96), rgba(15,23,42,.92));
           box-shadow: 0 22px 74px rgba(92,64,42,.14), inset 0 1px 0 rgba(255,255,255,.16);
           color: #f8fafc;
-        }
-
-        .need-section::after {
-          content: "";
-          position: absolute;
-          width: 240px;
-          height: 240px;
-          right: -60px;
-          bottom: -80px;
-          border-radius: 999px;
-          background: radial-gradient(circle, rgba(190,242,100,.22), transparent 70%);
-          filter: blur(8px);
         }
 
         .need-head {
@@ -2887,17 +2626,22 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .walk-card {
-            grid-template-columns: 60px minmax(0, 1fr);
-          }
-
-          .walk-meta {
-            grid-column: 2;
-            text-align: left;
+          .walk-grid {
+            grid-template-columns: 1fr;
           }
         }
 
         @media (max-width: 860px) {
+          html,
+          body {
+            width: 100%;
+            overflow-x: hidden;
+          }
+
+          .square-preview {
+            overflow-x: hidden;
+          }
+
           .brand {
             position: relative;
             left: auto;
@@ -2959,301 +2703,220 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             gap: 16px;
           }
 
-          .sidebar {
-            order: 3;
-            position: fixed;
-            left: 12px;
-            right: 12px;
-            bottom: 12px;
-            top: auto;
-            z-index: 50;
-            margin: 0;
-            min-height: 0;
-            height: auto;
-            max-width: calc(100vw - 24px);
-            border-radius: 24px;
-            padding: 9px;
-            background: rgba(255,255,255,.90);
-            backdrop-filter: blur(26px) saturate(1.4);
-            box-shadow: 0 18px 60px rgba(92,64,42,.18), inset 0 1px 0 rgba(255,255,255,.9);
-            overflow: hidden;
-          }
-
-          .sidebar::before,
-          .online {
-            display: none;
-          }
-
-          .nav {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            grid-template-columns: none;
-            gap: 8px;
-            overflow-x: auto;
-            overflow-y: hidden;
-            padding: 0 2px 2px;
-            scroll-snap-type: x mandatory;
-            scrollbar-width: none;
-            -webkit-overflow-scrolling: touch;
-          }
-
-          .nav::-webkit-scrollbar {
-            display: none;
-          }
-
-          .nav-item,
-          .nav-item:nth-child(n+6) {
-            position: relative;
-            display: flex !important;
-            flex: 0 0 76px;
-            width: 76px;
-            height: 58px;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            padding: 6px 4px;
-            border-radius: 18px;
-            font-size: 10px;
-            line-height: 1;
-            gap: 5px;
-            text-align: center;
-            scroll-snap-align: start;
-          }
-
-          .nav-icon {
-            width: auto;
-            font-size: 21px;
-            line-height: 1;
-            filter: none;
-          }
-
-          .nav-label {
-            display: block;
-            max-width: 68px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: rgba(24,33,47,.72);
-            font-size: 10px;
-            font-weight: 900;
-          }
-
-          .nav-item.active .nav-label,
-          .nav-item:hover .nav-label {
-            color: #92400e;
-          }
-
-          .nav-badge {
-            position: absolute;
-            right: 7px;
-            top: 5px;
-            width: 18px;
-            height: 18px;
-            min-width: 18px;
-            font-size: 10px;
-            margin-left: 0;
-          }
-
-          .open-call {
-            position: fixed;
-            right: 18px;
-            bottom: 84px;
-            width: 64px;
-            min-height: 64px;
-            height: 64px;
-            border-radius: 24px;
-            padding: 0;
-            justify-content: center;
-            text-align: center;
-            font-size: 0;
-          }
-
-          .open-call::before {
-            content: "+";
-            font-size: 36px;
-            line-height: 1;
-          }
-
-          .open-call span {
-            display: none;
-          }
-
           .square-center {
             order: 1;
-            padding-top: 4px;
+            width: 100%;
+            padding-top: 8px;
           }
 
           .hero-refresh {
-            grid-template-columns: 1fr;
-            text-align: center;
+            display: block;
+            text-align: left;
+            margin: 6px 0 18px;
+          }
+
+          .square-center h1 {
+            max-width: 100%;
+            margin: 0;
+            text-align: left;
+            font-size: clamp(48px, 15vw, 72px);
+            line-height: .82;
+            letter-spacing: -.08em;
+          }
+
+          .subtitle {
+            max-width: 100%;
+            margin: 18px 0 0;
+            text-align: left;
+            font-size: 16px;
+            line-height: 1.55;
           }
 
           .hero-mini-stats {
             grid-template-columns: repeat(3, 1fr);
-          }
-
-          .square-center h1 {
-            max-width: 360px;
-            margin: 0 auto;
-            text-align: center;
-            font-size: clamp(42px, 13.6vw, 58px);
-            line-height: .92;
-            letter-spacing: -.07em;
-          }
-
-          .subtitle {
-            max-width: 320px;
-            margin: 12px auto 18px;
-            text-align: center;
-            font-size: 14px;
-            line-height: 1.45;
+            margin-top: 18px;
           }
 
           .square-section {
-            min-height: 720px;
+            min-height: auto;
             padding: 22px;
-            border-radius: 30px;
+            border-radius: 32px;
           }
 
           .square-head {
-            flex-direction: column;
+            display: block;
+            position: relative;
+            z-index: 10;
           }
 
           .square-head h2 {
-            font-size: 42px;
+            max-width: 100%;
+            font-size: clamp(42px, 13vw, 62px);
+            line-height: .86;
+            letter-spacing: -.075em;
+          }
+
+          .square-head p {
+            max-width: 100%;
+            margin-top: 20px;
+            font-size: 15px;
+            line-height: 1.6;
           }
 
           .square-map {
-            top: 230px;
-            left: 18px;
-            right: 18px;
-            bottom: 110px;
-            border-radius: 26px;
+            position: relative;
+            left: auto;
+            right: auto;
+            top: auto;
+            bottom: auto;
+            height: auto;
+            min-height: 620px;
+            margin-top: 26px;
+            border-radius: 28px;
           }
 
           .square-zone {
-            min-width: 116px;
-            min-height: 92px;
-            padding: 12px;
-            border-radius: 20px;
+            min-width: 0;
+            width: calc(50% - 12px);
+            min-height: 132px;
+            padding: 16px;
+            border-radius: 24px;
           }
 
           .square-zone span {
-            font-size: 23px;
+            font-size: 30px;
           }
 
           .square-zone b {
-            font-size: 15px;
+            font-size: 24px;
+            line-height: 1;
           }
 
           .square-zone small {
-            font-size: 10px;
-          }
-
-          .square-fountain {
-            width: 130px;
-            height: 130px;
+            font-size: 13px;
           }
 
           .square-cafe {
-            left: 4%;
-            top: 9%;
+            left: 18px;
+            top: 28px;
           }
 
           .square-stage {
-            right: 4%;
-            top: 9%;
-          }
-
-          .square-board {
-            left: 4%;
-            bottom: 23%;
-          }
-
-          .square-people {
-            right: 4%;
-            bottom: 23%;
+            right: 18px;
+            top: 28px;
           }
 
           .square-terrace {
             left: 50%;
-            top: 34%;
+            top: 210px;
+            width: 220px;
+            min-height: 132px;
             transform: translateX(-50%);
           }
 
+          .square-board {
+            left: 18px;
+            top: 390px;
+            bottom: auto;
+          }
+
+          .square-people {
+            right: 18px;
+            top: 390px;
+            bottom: auto;
+          }
+
+          .square-fountain {
+            display: none;
+          }
+
           .square-center-cta {
-            min-width: 230px;
-            bottom: 16px;
+            position: relative;
+            left: auto;
+            bottom: auto;
+            transform: none;
+            width: 100%;
+            min-width: 0;
+            min-height: 62px;
+            margin-top: 20px;
+            border-radius: 999px;
+            z-index: 20;
           }
 
           .square-bottom {
-            left: 22px;
-            right: 22px;
-            bottom: 18px;
-            flex-direction: column;
-            align-items: flex-start;
+            position: relative;
+            left: auto;
+            right: auto;
+            bottom: auto;
+            display: block;
+            padding-top: 22px;
+            margin-top: 20px;
           }
 
-          .walk-section {
-            border-radius: 30px;
-            padding: 20px;
+          .square-bottom p {
+            font-size: 15px;
+            line-height: 1.5;
           }
 
-          .walk-head {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-          .walk-head h2 {
-            font-size: 42px;
-          }
-
-          .walk-modebar {
-            top: 12px;
-          }
-
-          .walk-path {
-            padding-left: 20px;
-          }
-
-          .walk-path::before {
-            left: 7px;
-          }
-
-          .walk-card {
+          .square-actions {
+            margin-top: 18px;
+            display: grid;
             grid-template-columns: 1fr;
-            min-height: 0;
-            padding: 16px;
+            gap: 10px;
           }
 
-          .walk-card::before {
-            left: -19px;
+          .square-cta {
+            width: 100%;
+            min-height: 54px;
           }
 
-          .walk-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 19px;
-            font-size: 25px;
+          .infinite-section {
+            border-radius: 32px;
+            padding: 22px;
           }
 
-          .walk-meta {
-            grid-column: auto;
-            text-align: left;
+          .infinite-head {
+            display: block;
           }
 
-          .walk-actions {
+          .infinite-head h2 {
+            font-size: clamp(42px, 14vw, 66px);
+            line-height: .86;
+            letter-spacing: -.08em;
+          }
+
+          .infinite-head p {
+            max-width: 100%;
+            margin-top: 16px;
+            font-size: 15px;
+            line-height: 1.55;
+          }
+
+          .walk-grid {
             grid-template-columns: 1fr;
+          }
+
+          .bench-note {
+            display: block;
+          }
+
+          .bench-note a {
+            margin-top: 16px;
+            width: 100%;
+            justify-content: center;
           }
 
           .need-head {
-            flex-direction: column;
-            align-items: flex-start;
+            display: block;
           }
 
           .need-head h2 {
-            font-size: 42px;
+            font-size: clamp(34px, 10vw, 48px);
+          }
+
+          .need-head p {
+            max-width: 100%;
+            margin-top: 14px;
           }
 
           .need-grid {
@@ -3261,50 +2924,49 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
           }
 
           .ai-composer {
-            min-height: 260px;
+            margin-top: 18px;
             padding: 18px;
+            min-height: auto;
+            border-radius: 28px;
           }
 
-          .ai-builder-head,
-          .world-news-head {
-            flex-direction: column;
+          .ai-builder-head {
+            display: block;
           }
 
-          .ai-preview {
-            flex-direction: column;
-            align-items: stretch;
+          .ai-builder-head h2 {
+            font-size: 30px;
+            line-height: .96;
           }
 
-          .ai-open-cta,
-          .world-news-main-cta {
-            width: 100%;
+          .ai-step-pill {
+            margin-top: 14px;
           }
 
           .ai-actions {
+            padding-right: 62px;
             gap: 8px;
-            padding-right: 58px;
           }
 
           .mini-pill {
-            height: 36px;
+            height: 38px;
             padding: 0 12px;
             font-size: 12px;
           }
 
           .mic {
-            width: 54px;
-            height: 54px;
-            right: 15px;
-            bottom: 17px;
-            font-size: 21px;
+            width: 56px;
+            height: 56px;
+            right: 14px;
+            bottom: 14px;
           }
 
           .chips {
             flex-wrap: nowrap;
             overflow-x: auto;
             gap: 9px;
-            margin: 17px -14px 16px;
-            padding: 0 14px 6px;
+            margin: 18px -14px 16px;
+            padding: 0 14px 8px;
             scrollbar-width: none;
           }
 
@@ -3314,123 +2976,104 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
 
           .chip {
             flex: 0 0 auto;
-            height: 37px;
-            padding: 0 15px;
-            font-size: 12px;
             white-space: nowrap;
           }
 
-          .featured {
-            min-height: 360px;
+          .home-preview-grid,
+          .world-news-grid,
+          .trend-grid,
+          .call-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .home-preview,
+          .world-news-card,
+          .host-card,
+          .live-strip,
+          .panel {
             border-radius: 28px;
           }
 
-          .featured-content {
-            min-height: 360px;
-            padding: 20px;
+          .home-preview-head,
+          .world-news-head {
+            display: block;
           }
 
-          .status {
-            right: 16px;
-            top: 16px;
+          .home-preview-head h2,
+          .world-news-head h2 {
+            font-size: clamp(34px, 10vw, 48px);
+            line-height: .95;
+          }
+
+          .home-preview-head p:last-child,
+          .world-news-head p {
+            max-width: 100%;
+            margin-top: 14px;
+          }
+
+          .featured {
+            min-height: auto;
+            border-radius: 30px;
+          }
+
+          .featured-content {
+            min-height: auto;
+            padding: 22px;
           }
 
           .featured h2 {
-            margin-top: 48px;
-            max-width: 270px;
+            max-width: 100%;
+            margin-top: 54px;
             font-size: 34px;
             line-height: .98;
           }
 
           .featured p {
-            max-width: 280px;
+            max-width: 100%;
             font-size: 14px;
             line-height: 1.5;
           }
 
-          .call-meta {
-            align-items: flex-start;
-            flex-direction: column;
-            gap: 13px;
-            margin-top: 20px;
-          }
-
-          .active-count {
-            border-left: 0;
-            padding-left: 0;
-            font-size: 13px;
-          }
-
-          .active-count b {
-            font-size: 18px;
-          }
-
           .call-actions {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            width: 100%;
-          }
-
-          .call-action {
-            min-width: 0;
-            height: 44px;
-            font-size: 12px;
-          }
-
-          .primary-cta {
-            grid-column: 1 / -1;
-            width: 100%;
-            height: 54px;
-            margin-left: 0;
-            font-size: 19px;
-          }
-
-          .home-preview {
-            border-radius: 25px;
-            padding: 18px;
-          }
-
-          .home-preview-head {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-          .home-preview-head p:last-child {
-            max-width: none;
-          }
-
-          .home-preview-grid {
             grid-template-columns: 1fr;
+            gap: 10px;
+            width: 100%;
+            margin-top: 24px;
           }
 
-          .preview-card {
-            min-height: auto;
+          .call-action,
+          .primary-cta {
+            width: 100%;
+            min-width: 0;
+            margin-left: 0;
+          }
+
+          .right {
+            order: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-top: 0;
+          }
+
+          .echo-body,
+          .pulse {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .radial {
+            width: 210px;
+            height: 210px;
+          }
+
+          .radial::before {
+            inset: 36px;
           }
 
           .host-card {
             grid-template-columns: 1fr;
-            gap: 17px;
-            border-radius: 25px;
-            padding: 18px;
-          }
-
-          .host-left {
-            gap: 15px;
-          }
-
-          .host-orb {
-            width: 74px;
-            height: 74px;
-            flex: 0 0 auto;
-          }
-
-          .host-name {
-            font-size: 22px;
-          }
-
-          .host-bio {
-            max-width: none;
           }
 
           .metrics {
@@ -3454,99 +3097,164 @@ Aiuto che cerco dalla piazza: ${desiredOutcome}`;
             font-size: 20px;
           }
 
-          .live-strip {
-            border-radius: 25px;
-            padding: 14px;
+          .sidebar {
+            order: 3;
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            top: auto;
+            z-index: 100;
+            height: auto;
+            min-height: 0;
+            max-width: calc(100vw - 24px);
+            margin: 0;
+            padding: 9px;
+            border-radius: 26px;
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(26px) saturate(1.35);
+            box-shadow: 0 18px 60px rgba(92,64,42,.20), inset 0 1px 0 rgba(255,255,255,.92);
           }
 
-          .call-grid {
-            display: flex;
-            overflow-x: auto;
-            gap: 10px;
-            padding-bottom: 4px;
-            scrollbar-width: none;
-          }
-
-          .call-grid::-webkit-scrollbar {
+          .sidebar::before,
+          .online {
             display: none;
           }
 
-          .mini-card {
-            flex: 0 0 148px;
-          }
-
-          .right {
-            order: 2;
+          .nav {
             display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0 2px 2px;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+          }
+
+          .nav::-webkit-scrollbar {
+            display: none;
+          }
+
+          .nav-item,
+          .nav-item:nth-child(n+6) {
+            display: flex !important;
+            flex: 0 0 78px;
+            width: 78px;
+            height: 62px;
+            min-height: 62px;
+            justify-content: center;
+            align-items: center;
             flex-direction: column;
-            gap: 16px;
-            padding-top: 0;
+            padding: 6px 4px;
+            border-radius: 20px;
+            font-size: 10px;
+            line-height: 1;
+            gap: 5px;
+            text-align: center;
+            scroll-snap-align: start;
           }
 
-          .panel {
-            border-radius: 25px;
-            padding: 18px;
+          .nav-icon {
+            width: auto;
+            font-size: 21px;
+            line-height: 1;
           }
 
-          .panel-title {
-            font-size: 24px;
-            margin-bottom: 14px;
+          .nav-label {
+            display: block;
+            max-width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 10px;
+            font-weight: 900;
           }
 
-          .panel-title small {
-            font-size: 12px;
+          .nav-badge {
+            position: absolute;
+            right: 7px;
+            top: 5px;
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            font-size: 10px;
+            margin-left: 0;
           }
 
-          .echo-body,
-          .pulse {
-            display: flex;
-            flex-direction: column;
-            height: auto;
+          .open-call {
+            position: fixed;
+            right: 18px;
+            bottom: 92px;
+            z-index: 101;
+            width: 64px;
+            min-height: 64px;
+            height: 64px;
+            border-radius: 24px;
+            padding: 0;
+            justify-content: center;
+            text-align: center;
+            font-size: 0;
           }
 
-          .mood-wrap {
-            height: auto;
-            padding: 12px 0 16px;
+          .open-call::before {
+            content: "+";
+            font-size: 36px;
+            line-height: 1;
           }
 
-          .mood-blob {
-            width: 142px;
-            height: 122px;
-          }
-
-          .radial {
-            width: 210px;
-            height: 210px;
-          }
-
-          .momentum {
-            width: 100%;
-          }
-
-          .chart {
-            height: 82px;
+          .open-call span {
+            display: none;
           }
         }
 
         @media (max-width: 420px) {
-          .anon-pill {
-            display: none;
+          .square-app {
+            padding-left: 12px;
+            padding-right: 12px;
+          }
+
+          .square-center h1 {
+            font-size: clamp(46px, 16vw, 62px);
+          }
+
+          .square-head h2 {
+            font-size: clamp(40px, 13vw, 56px);
+          }
+
+          .square-map {
+            min-height: 590px;
+          }
+
+          .square-zone {
+            width: calc(50% - 10px);
+            min-height: 120px;
+            padding: 14px;
+          }
+
+          .square-zone b {
+            font-size: 20px;
+          }
+
+          .square-zone small {
+            font-size: 12px;
+          }
+
+          .square-terrace {
+            width: 205px;
+            top: 198px;
+          }
+
+          .square-board,
+          .square-people {
+            top: 365px;
           }
 
           .hero-mini-stats {
             grid-template-columns: 1fr;
           }
 
-          .featured h2 {
-            font-size: 31px;
-          }
-
-          .call-action {
-            font-size: 11px;
-          }
-
-          .metric span {
-            font-size: 9px;
+          .anon-pill {
+            display: none;
           }
         }
       `}</style>
@@ -3690,12 +3398,11 @@ function SquareMap() {
       <div className="square-head">
         <div>
           <p className="square-eyebrow">Piazza live</p>
-          <h2>La piazza si muove intorno a te</h2>
+          <h2>Ogni area è un punto vivo</h2>
         </div>
 
         <p>
-          Ogni area è un punto vivo della community: entra in una conversazione, trova persone,
-          scopri eventi o trasforma una notizia in uno Spunto.
+          Entra in una conversazione, trova persone, scopri eventi o trasforma una notizia in uno Spunto.
         </p>
       </div>
 
@@ -3763,88 +3470,58 @@ function SquareMap() {
   );
 }
 
-function InfiniteWalkSection({
-  thoughts,
-  worldNews,
-  walkMode,
-  setWalkMode,
-}: {
-  thoughts: LiveThought[];
-  worldNews: WorldNewsItem[];
-  walkMode: WalkMode;
-  setWalkMode: (mode: WalkMode) => void;
-}) {
-  const items = buildWalkItems(thoughts, worldNews, walkMode);
-
-  const iconMap: Record<string, string> = {
-    moment: '⚡',
-    person: '👥',
-    event: '📍',
-    news: '📰',
-    bivio: '🧭',
-    echo: '🧠',
-    bench: '🪑',
-    mission: '🏁',
-    change_square: '🏛️',
-  };
+function InfiniteWalkSection({ thoughts }: { thoughts: LiveThought[] }) {
+  const cards = [
+    {
+      tag: 'Momento caldo',
+      title: thoughts[0]?.title || 'Cambiare città senza sentirsi soli',
+      text: thoughts[0]?.description || 'Una conversazione viva con esperienze, consigli e persone che ci sono già passate.',
+      href: thoughts[0]?.slug ? `/c/${thoughts[0].slug}` : '/calls/new',
+    },
+    {
+      tag: 'Bivio',
+      title: 'Scegli dove andare ora',
+      text: 'Lo scroll non continua a caso: ti propone una direzione, persone, eventi o una pausa intelligente.',
+      href: '#walk',
+    },
+    {
+      tag: 'Panchina',
+      title: 'Fermati, scegli, riparti',
+      text: 'Dopo alcuni contenuti The Square ti invita a fare qualcosa: chiedere, incontrare, decidere.',
+      href: '/calls/new',
+    },
+  ];
 
   return (
-    <section className="walk-section" id="passeggiata">
-      <div className="walk-head">
+    <section className="infinite-section" id="walk">
+      <div className="infinite-head">
         <div>
           <p className="square-eyebrow">Passeggiata infinita</p>
           <h2>Non scrollare. Passeggia.</h2>
         </div>
         <p>
-          Il feed non è una lista casuale: è un percorso con Momenti, persone, eventi, Bivi,
-          Panchine e Missioni. Ogni scroll deve portarti da qualche parte.
+          Il feed diventa una passeggiata guidata: Momenti, persone, eventi e pause intelligenti si alternano
+          per non trasformare tutto in scroll passivo.
         </p>
       </div>
 
-      <div className="walk-modebar" aria-label="Scegli la direzione della Passeggiata">
-        <button type="button" onClick={() => setWalkMode('piazza')} className={`walk-mode ${walkMode === 'piazza' ? 'active' : ''}`}>
-          🏛️ Piazza
-        </button>
-        <button type="button" onClick={() => setWalkMode('people')} className={`walk-mode ${walkMode === 'people' ? 'active' : ''}`}>
-          👥 Persone
-        </button>
-        <button type="button" onClick={() => setWalkMode('understand')} className={`walk-mode ${walkMode === 'understand' ? 'active' : ''}`}>
-          🧠 Capire
-        </button>
-        <button type="button" onClick={() => setWalkMode('do')} className={`walk-mode ${walkMode === 'do' ? 'active' : ''}`}>
-          📍 Fare
-        </button>
-      </div>
-
-      <div className="walk-path">
-        {items.map((item, index) => (
-          <Link href={item.href} key={`${item.type}-${item.title}-${index}`} className={`walk-card walk-${item.type}`}>
-            <div className="walk-icon">{iconMap[item.type] || '□'}</div>
-            <div>
-              <span className="walk-badge">{item.badge}</span>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
-
-              {item.type === 'bivio' && (
-                <div className="walk-actions" onClick={(event) => event.preventDefault()}>
-                  <button type="button" className={`walk-action ${walkMode === 'people' ? 'active' : ''}`} onClick={() => setWalkMode('people')}>
-                    👥 Persone
-                  </button>
-                  <button type="button" className={`walk-action ${walkMode === 'understand' ? 'active' : ''}`} onClick={() => setWalkMode('understand')}>
-                    🧠 Capire
-                  </button>
-                  <button type="button" className={`walk-action ${walkMode === 'do' ? 'active' : ''}`} onClick={() => setWalkMode('do')}>
-                    📍 Fare
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="walk-meta">
-              <span>{item.meta}</span>
-              <span className="walk-enter">Entra →</span>
-            </div>
+      <div className="walk-grid">
+        {cards.map((card) => (
+          <Link href={card.href} className="walk-card" key={card.tag}>
+            <small>{card.tag}</small>
+            <h3>{card.title}</h3>
+            <p>{card.text}</p>
+            <span>Continua →</span>
           </Link>
         ))}
+      </div>
+
+      <div className="bench-note">
+        <div>
+          <b>La Panchina appare quando serve.</b>
+          <p>Se l’utente resta troppo tempo su un tema, la piattaforma propone un’azione utile invece di altro rumore.</p>
+        </div>
+        <Link href="/calls/new">Apri un momento</Link>
       </div>
     </section>
   );
@@ -3865,13 +3542,16 @@ function NeedSomeoneSection() {
       </div>
 
       <div className="need-grid">
-        <Link href={buildSpuntoHref('Ho bisogno di un consiglio', 'Capire')} className="need-card">
+        <Link href="/calls/new?title=Ho%20bisogno%20di%20un%20consiglio&type=Capire" className="need-card">
           <div className="need-icon">🧭</div>
           <b>Chiedi consiglio</b>
           <span>Porta un dubbio in piazza e ricevi punti di vista utili.</span>
         </Link>
 
-        <Link href={buildSpuntoHref('Voglio confrontarmi con esperienze simili', 'Feedback')} className="need-card">
+        <Link
+          href="/calls/new?title=Voglio%20confrontarmi%20con%20esperienze%20simili&type=Feedback"
+          className="need-card"
+        >
           <div className="need-icon">🪞</div>
           <b>Trova esperienze simili</b>
           <span>Incontra chi ha vissuto qualcosa di vicino al tuo momento.</span>
@@ -4010,7 +3690,7 @@ function PreviewCard({
   href: string;
   cta: string;
   accent: 'cyan' | 'violet' | 'pink' | 'blue' | 'green';
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <article className={`preview-card preview-${accent}`}>
@@ -4312,3 +3992,5 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
     </aside>
   );
 }
+
+export default NovaHome;
