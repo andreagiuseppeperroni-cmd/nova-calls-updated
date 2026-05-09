@@ -533,6 +533,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             </div>
           </section>
 
+          <NovaRadar />
+
+          <NeedSomeoneSection />
+
           <div className="composer ai-composer">
             <div className="composer-content">
               <div className="ai-builder-head">
@@ -1012,6 +1016,379 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           letter-spacing: .08em;
         }
 
+        .nova-radar-section {
+          position: relative;
+          min-height: 520px;
+          margin-top: 18px;
+          overflow: hidden;
+          border-radius: 38px;
+          padding: 28px;
+          border: 1px solid rgba(34, 211, 238, .22);
+          background:
+            radial-gradient(circle at 50% 52%, rgba(34, 211, 238, .22), transparent 18%),
+            radial-gradient(circle at 62% 35%, rgba(139, 92, 246, .18), transparent 26%),
+            radial-gradient(circle at 32% 72%, rgba(236, 72, 153, .14), transparent 24%),
+            linear-gradient(135deg, rgba(3, 7, 18, .96), rgba(15, 23, 42, .88));
+          box-shadow: 0 32px 100px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255,255,255,.12);
+          color: #f8fafc;
+        }
+
+        .nova-radar-head {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          justify-content: space-between;
+          gap: 18px;
+          align-items: flex-start;
+        }
+
+        .nova-radar-head h2 {
+          margin: 0;
+          max-width: 620px;
+          color: #ffffff;
+          font-size: clamp(38px, 4vw, 68px);
+          line-height: .9;
+          letter-spacing: -.07em;
+          font-weight: 950;
+        }
+
+        .nova-radar-head p {
+          max-width: 350px;
+          margin: 0;
+          color: #cbd5e1;
+          font-weight: 650;
+          line-height: 1.55;
+        }
+
+        .nova-radar {
+          position: absolute;
+          left: 50%;
+          top: 55%;
+          width: min(620px, 84vw);
+          height: min(620px, 84vw);
+          transform: translate(-50%, -50%);
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+        }
+
+        .nova-radar-ring {
+          position: absolute;
+          border-radius: 999px;
+          border: 1px solid rgba(34,211,238,.14);
+          box-shadow: inset 0 0 30px rgba(34,211,238,.04);
+        }
+
+        .ring-1 {
+          inset: 4%;
+        }
+
+        .ring-2 {
+          inset: 18%;
+        }
+
+        .ring-3 {
+          inset: 32%;
+        }
+
+        .nova-radar-sweep {
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          background: conic-gradient(from 0deg, rgba(34,211,238,0), rgba(34,211,238,.22), rgba(34,211,238,0) 70deg);
+          animation: novaSweep 8s linear infinite;
+          mask: radial-gradient(circle, transparent 0 11%, black 12% 100%);
+        }
+
+        @keyframes novaSweep {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .nova-radar-core {
+          position: relative;
+          z-index: 2;
+          width: 144px;
+          height: 144px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          text-align: center;
+          background:
+            radial-gradient(circle at 35% 28%, rgba(103,232,249,.98), transparent 31%),
+            radial-gradient(circle at 70% 66%, rgba(236,72,153,.82), transparent 36%),
+            radial-gradient(circle at 48% 55%, rgba(139,92,246,.92), transparent 44%),
+            #020617;
+          box-shadow:
+            0 0 55px rgba(34,211,238,.34),
+            0 0 100px rgba(139,92,246,.22);
+          animation: pulseCore 3.5s ease-in-out infinite;
+        }
+
+        @keyframes pulseCore {
+          50% {
+            transform: scale(1.05);
+            filter: saturate(1.25);
+          }
+        }
+
+        .nova-radar-core strong {
+          display: block;
+          color: #ffffff;
+          font-size: 20px;
+          font-weight: 950;
+          letter-spacing: .12em;
+        }
+
+        .nova-radar-core span {
+          display: block;
+          margin-top: 5px;
+          color: rgba(255,255,255,.78);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .radar-signal {
+          position: absolute;
+          z-index: 4;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-height: 38px;
+          padding: 0 13px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(2,6,23,.58);
+          backdrop-filter: blur(16px);
+          color: white;
+          font-size: 13px;
+          font-weight: 900;
+          text-decoration: none;
+          box-shadow: 0 18px 38px rgba(0,0,0,.25);
+          animation: floatSignal 5s ease-in-out infinite;
+        }
+
+        .radar-signal i {
+          width: 9px;
+          height: 9px;
+          border-radius: 99px;
+          background: var(--cyan);
+          box-shadow: 0 0 16px var(--cyan);
+        }
+
+        .signal-pink i {
+          background: var(--pink);
+          box-shadow: 0 0 16px var(--pink);
+        }
+
+        .signal-violet i {
+          background: var(--violet);
+          box-shadow: 0 0 16px var(--violet);
+        }
+
+        .signal-lime i {
+          background: var(--lime);
+          box-shadow: 0 0 16px var(--lime);
+        }
+
+        @keyframes floatSignal {
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        .signal-1 {
+          left: 10%;
+          top: 44%;
+          animation-delay: .1s;
+        }
+
+        .signal-2 {
+          right: 12%;
+          top: 36%;
+          animation-delay: .5s;
+        }
+
+        .signal-3 {
+          left: 25%;
+          bottom: 18%;
+          animation-delay: .9s;
+        }
+
+        .signal-4 {
+          right: 20%;
+          bottom: 22%;
+          animation-delay: 1.3s;
+        }
+
+        .signal-5 {
+          left: 42%;
+          top: 28%;
+          animation-delay: 1.7s;
+        }
+
+        .signal-6 {
+          right: 8%;
+          top: 62%;
+          animation-delay: 2.1s;
+        }
+
+        .nova-radar-bottom {
+          position: absolute;
+          z-index: 5;
+          left: 28px;
+          right: 28px;
+          bottom: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255,255,255,.12);
+        }
+
+        .nova-radar-bottom p {
+          margin: 0;
+          color: #cbd5e1;
+          font-weight: 650;
+        }
+
+        .nova-radar-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .radar-cta {
+          min-height: 42px;
+          padding: 0 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          color: white;
+          font-size: 13px;
+          font-weight: 950;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+        }
+
+        .radar-cta.primary {
+          background: linear-gradient(135deg, var(--lime), var(--cyan));
+          color: #06111f;
+          border: 0;
+          box-shadow: 0 18px 42px rgba(34,211,238,.18);
+        }
+
+        .need-section {
+          position: relative;
+          overflow: hidden;
+          margin-top: 18px;
+          border-radius: 34px;
+          padding: 26px;
+          border: 1px solid rgba(190,242,100,.22);
+          background:
+            radial-gradient(circle at 6% 10%, rgba(190,242,100,.18), transparent 26%),
+            radial-gradient(circle at 92% 22%, rgba(34,211,238,.18), transparent 28%),
+            linear-gradient(135deg, rgba(15,23,42,.96), rgba(30,41,59,.88));
+          box-shadow: 0 22px 74px rgba(37,99,235,.14), inset 0 1px 0 rgba(255,255,255,.16);
+          color: #f8fafc;
+        }
+
+        .need-section::after {
+          content: "";
+          position: absolute;
+          width: 240px;
+          height: 240px;
+          right: -60px;
+          bottom: -80px;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(190,242,100,.22), transparent 70%);
+          filter: blur(8px);
+        }
+
+        .need-head {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+          align-items: flex-end;
+          margin-bottom: 18px;
+        }
+
+        .need-head h2 {
+          margin: 0;
+          max-width: 620px;
+          color: #ffffff;
+          font-size: clamp(34px, 3.2vw, 56px);
+          line-height: .94;
+          letter-spacing: -.06em;
+          font-weight: 950;
+        }
+
+        .need-head p {
+          max-width: 390px;
+          margin: 0;
+          color: #cbd5e1;
+          line-height: 1.55;
+          font-weight: 650;
+        }
+
+        .need-grid {
+          position: relative;
+          z-index: 2;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .need-card {
+          min-height: 154px;
+          border-radius: 24px;
+          padding: 18px;
+          border: 1px solid rgba(255,255,255,.13);
+          background: rgba(2,6,23,.42);
+          color: #ffffff;
+          text-decoration: none;
+          transition: transform .2s ease, background .2s ease, border-color .2s ease;
+        }
+
+        .need-card:hover {
+          transform: translateY(-5px);
+          background: rgba(255,255,255,.10);
+          border-color: rgba(34,211,238,.30);
+        }
+
+        .need-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          background: rgba(255,255,255,.10);
+          font-size: 22px;
+        }
+
+        .need-card b {
+          display: block;
+          margin: 12px 0 8px;
+          color: #ffffff;
+          font-size: 18px;
+          line-height: 1.05;
+          letter-spacing: -.02em;
+        }
+
+        .need-card span {
+          display: block;
+          color: #cbd5e1;
+          font-size: 13px;
+          line-height: 1.45;
+          font-weight: 650;
+        }
+
         .composer {
           position: relative;
           border-radius: 30px;
@@ -1028,6 +1405,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .ai-composer {
           min-height: 238px;
           padding: 24px;
+          margin-top: 18px;
           background:
             radial-gradient(circle at 18% 8%, rgba(56,214,255,.26), transparent 28%),
             radial-gradient(circle at 78% 38%, rgba(219,39,119,.12), transparent 32%),
@@ -2147,6 +2525,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           .home-preview-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
+
+          .need-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
 
         @media (max-width: 860px) {
@@ -2365,6 +2747,66 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             text-align: center;
             font-size: 14px;
             line-height: 1.45;
+          }
+
+          .nova-radar-section {
+            min-height: 620px;
+            padding: 22px;
+          }
+
+          .nova-radar-head,
+          .need-head {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .nova-radar-head h2,
+          .need-head h2 {
+            font-size: 42px;
+          }
+
+          .radar-signal {
+            font-size: 11px;
+            padding: 0 10px;
+          }
+
+          .signal-1 {
+            left: 5%;
+            top: 46%;
+          }
+
+          .signal-2 {
+            right: 4%;
+            top: 38%;
+          }
+
+          .signal-3 {
+            left: 9%;
+            bottom: 24%;
+          }
+
+          .signal-4 {
+            right: 6%;
+            bottom: 29%;
+          }
+
+          .signal-5 {
+            left: 31%;
+            top: 30%;
+          }
+
+          .signal-6 {
+            right: 5%;
+            top: 62%;
+          }
+
+          .nova-radar-bottom {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .need-grid {
+            grid-template-columns: 1fr;
           }
 
           .ai-composer {
@@ -2789,6 +3231,124 @@ function FeaturedThought({
         </div>
       </div>
     </article>
+  );
+}
+
+function NovaRadar() {
+  return (
+    <section className="nova-radar-section">
+      <div className="nova-radar-head">
+        <div>
+          <p className="ai-eyebrow">Radar NOVA</p>
+          <h2>Cosa sta vibrando nella rete</h2>
+        </div>
+
+        <p>Ogni segnale è un bisogno reale che sta emergendo nella community. Entra dove senti qualcosa.</p>
+      </div>
+
+      <div className="nova-radar">
+        <div className="nova-radar-ring ring-1" />
+        <div className="nova-radar-ring ring-2" />
+        <div className="nova-radar-ring ring-3" />
+        <div className="nova-radar-sweep" />
+
+        <div className="nova-radar-core">
+          <div>
+            <strong>NOVA</strong>
+            <span>LIVE</span>
+          </div>
+        </div>
+      </div>
+
+      <Link href="/spaces" className="radar-signal signal-1">
+        <i /> cambiare città
+      </Link>
+
+      <Link href="/spaces" className="radar-signal signal-2 signal-pink">
+        <i /> relazioni
+      </Link>
+
+      <Link href="/spaces" className="radar-signal signal-3 signal-violet">
+        <i /> lavoro
+      </Link>
+
+      <Link href="/events" className="radar-signal signal-4 signal-lime">
+        <i /> eventi a Roma
+      </Link>
+
+      <Link href="/people" className="radar-signal signal-5">
+        <i /> nuove amicizie
+      </Link>
+
+      <Link href="/calls/new" className="radar-signal signal-6 signal-pink">
+        <i /> decisioni difficili
+      </Link>
+
+      <div className="nova-radar-bottom">
+        <p>
+          <strong>18 momenti attivi</strong> · 42 persone stanno contribuendo · 3 eventi stanno creando gruppi
+        </p>
+
+        <div className="nova-radar-actions">
+          <Link href="/spaces" className="radar-cta primary">
+            Entra nel Radar →
+          </Link>
+
+          <Link href="/calls/new" className="radar-cta">
+            Apri un Momento
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NeedSomeoneSection() {
+  return (
+    <section className="need-section">
+      <div className="need-head">
+        <div>
+          <p className="ai-eyebrow">Azione immediata</p>
+          <h2>Ti serve qualcuno adesso?</h2>
+        </div>
+
+        <p>
+          Non devi scrivere un post perfetto. Scegli cosa ti serve e NOVA ti aiuta ad aprire il momento giusto.
+        </p>
+      </div>
+
+      <div className="need-grid">
+        <Link href="/calls/new?title=Ho%20bisogno%20di%20un%20consiglio&type=Capire" className="need-card">
+          <div className="need-icon">🧭</div>
+          <b>Ho bisogno di un consiglio</b>
+          <span>Apri uno Spunto per ricevere pareri concreti.</span>
+        </Link>
+
+        <Link
+          href="/calls/new?title=Voglio%20confrontarmi%20con%20esperienze%20simili&type=Feedback"
+          className="need-card"
+        >
+          <div className="need-icon">🪞</div>
+          <b>Voglio esperienze simili</b>
+          <span>Trova chi ha vissuto qualcosa di vicino al tuo momento.</span>
+        </Link>
+
+        <Link
+          href="/calls/new?title=Voglio%20organizzarmi%20con%20qualcuno&type=Trovare%20persone"
+          className="need-card"
+        >
+          <div className="need-icon">📍</div>
+          <b>Voglio organizzarmi</b>
+          <span>Crea un gruppo intorno a un evento, città o interesse.</span>
+        </Link>
+
+        <Link href="/calls/new?title=Voglio%20parlarne%20in%20anonimo&type=Anonima" className="need-card">
+          <div className="need-icon">🌙</div>
+          <b>Voglio parlarne in anonimo</b>
+          <span>Apri uno spazio sicuro senza esporti subito.</span>
+        </Link>
+      </div>
+    </section>
   );
 }
 
