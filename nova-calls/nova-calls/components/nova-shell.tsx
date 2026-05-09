@@ -11,7 +11,7 @@ const STORAGE_KEY = 'nova:calls';
 const thoughtTypes = ['Decidere', 'Capire', 'Feedback', 'Trovare persone', 'Fare ora', 'Creare insieme'];
 
 const navItems: Array<[string, string, string]> = [
-  ['🏠', 'Home', '/'],
+  ['🏛️', 'Piazza', '/'],
   ['💡', 'Spunti', '/calls/new'],
   ['🧠', 'Echo', '/echo'],
   ['🏁', 'Outcome', '/outcome'],
@@ -72,17 +72,17 @@ const aiQuestions: Array<{
 }> = [
   {
     key: 'situation',
-    label: 'Che cosa sta succedendo?',
+    label: 'Che cosa vuoi portare in piazza?',
     placeholder: 'Esempio: sto valutando se cambiare lavoro, città o progetto...',
   },
   {
     key: 'block',
-    label: 'Qual è il nodo che ti blocca di più?',
+    label: 'Qual è il nodo che vuoi sciogliere?',
     placeholder: 'Esempio: paura di sbagliare, soldi, tempo, relazione, scelta difficile...',
   },
   {
     key: 'desiredOutcome',
-    label: 'Che tipo di aiuto vorresti ricevere dalla rete?',
+    label: 'Che tipo di risposta cerchi dagli altri?',
     placeholder: 'Esempio: opinioni sincere, esperienze simili, idee pratiche, una decisione...',
   },
 ];
@@ -113,7 +113,7 @@ function localCallToThought(call: NovaCall): LiveThought {
     pulse_score: call.pulse || 12,
     participants: call.participants || 1,
     host_id: null,
-    host_name: 'NOVA',
+    host_name: 'The Square',
     host_avatar: null,
     created_at: call.createdAt || new Date().toISOString(),
   };
@@ -192,20 +192,20 @@ function buildTrendEchoes(thoughts: LiveThought[]): TrendEcho[] {
 
   return [
     {
-      title: 'Tema dominante',
+      title: 'Tema della piazza',
       text: keywords.length
-        ? `Negli Spunti recenti emergono soprattutto: ${keywords.slice(0, 3).join(', ')}.`
-        : 'Stanno emergendo nuovi temi, ma servono più Spunti reali per leggere la tendenza.',
+        ? `In piazza si parla soprattutto di: ${keywords.slice(0, 3).join(', ')}.`
+        : 'La piazza si sta accendendo: apri il primo Spunto per dare direzione alla conversazione.',
     },
     {
-      title: 'Energia della rete',
-      text: `La categoria più attiva ora è “${topType}”: la community sta cercando confronto immediato.`,
+      title: 'Energia collettiva',
+      text: `La zona più attiva ora è “${topType}”: le persone cercano confronto immediato.`,
     },
     {
-      title: 'Nuovo Spunto suggerito',
+      title: 'Spunto suggerito',
       text: keywords[0]
-        ? `Apri uno Spunto su “${keywords[0]}” per intercettare un bisogno già presente nella rete.`
-        : 'Apri uno Spunto su una decisione concreta: è il formato che genera più partecipazione.',
+        ? `Porta “${keywords[0]}” al centro della piazza: è un segnale già presente nella community.`
+        : 'Porta una decisione concreta in piazza: è il formato che genera più partecipazione.',
     },
   ];
 }
@@ -472,19 +472,19 @@ export function NovaHome() {
 
 Nodo principale: ${block}
 
-Aiuto che cerco dalla rete: ${desiredOutcome}`;
+Aiuto che cerco dalla piazza: ${desiredOutcome}`;
 
     setText(generatedText);
     setType(inferredType);
   }
 
   function openThought() {
-    const title = text.trim().split('\n')[0] || 'Nuovo Spunto Nova';
+    const title = text.trim().split('\n')[0] || 'Nuovo Spunto The Square';
 
     const call: NovaCall = {
       title,
       description:
-        text.trim() || 'Spunto aperto dalla homepage. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
+        text.trim() || 'Spunto aperto dalla piazza. Aggiungi contesto, messaggi e genera Echo, Pulse e Outcome.',
       type,
       accessType: 'public',
       slug: makeSlug(title),
@@ -501,20 +501,22 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
   const currentQuestion = aiQuestions[aiStep];
 
   return (
-    <div className="nova-preview">
+    <div className="square-preview">
       <TopChrome isLoggedIn={Boolean(currentUserId)} />
 
-      <main className="nova-app">
+      <main className="square-app">
         <Sidebar notificationCount={notificationCount} />
 
-        <section className="nova-center">
+        <section className="square-center">
           <section className="hero-refresh">
             <div>
-              <p className="ai-eyebrow">NOVA Home</p>
+              <p className="square-eyebrow">THE SQUARE</p>
               <h1>
-                Di cosa hai bisogno <span className="gradient-text">adesso?</span>
+                Entra nella <span className="gradient-text">piazza</span>
               </h1>
-              <p className="subtitle">Apri uno Spunto. La risposta è già nella tua rete.</p>
+              <p className="subtitle">
+                Una piazza digitale viva: Spunti, persone, eventi, notizie e conversazioni intorno a te.
+              </p>
             </div>
 
             <div className="hero-mini-stats">
@@ -533,7 +535,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             </div>
           </section>
 
-          <NovaRadar />
+          <SquareMap />
 
           <NeedSomeoneSection />
 
@@ -541,7 +543,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             <div className="composer-content">
               <div className="ai-builder-head">
                 <div>
-                  <p className="ai-eyebrow">AI Spunto Builder</p>
+                  <p className="square-eyebrow">AI Spunto Builder</p>
                   <h2>Ti aiuto a trasformare un pensiero in uno Spunto</h2>
                 </div>
 
@@ -613,7 +615,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           {text && (
             <div className="ai-preview glass">
               <div>
-                <p className="ai-eyebrow">Spunto generato</p>
+                <p className="square-eyebrow">Spunto generato</p>
                 <h3>{text.split('\n')[0]}</h3>
                 <p>{text}</p>
               </div>
@@ -665,14 +667,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
       <style jsx global>{`
         :root {
-          --bg: #e7f8ff;
-          --panel: rgba(255, 255, 255, 0.74);
-          --panel-2: rgba(217, 242, 255, 0.72);
-          --deep-panel: rgba(27, 68, 105, 0.9);
-          --line: rgba(148, 163, 184, 0.2);
-          --text: #0f172a;
-          --muted: #475569;
-          --soft: #64748b;
+          --sand: #f7efe3;
+          --stone: #d9c7ae;
+          --stone-dark: #4b3727;
+          --night: #0b1120;
+          --panel: rgba(255, 255, 255, 0.76);
+          --line: rgba(120, 53, 15, 0.16);
+          --text: #18212f;
+          --muted: #5b6472;
           --cyan: #06b6d4;
           --blue: #2563eb;
           --violet: #7c3aed;
@@ -680,24 +682,23 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           --coral: #fb7185;
           --lime: #a3e635;
           --green: #10b981;
-          --radius-xl: 30px;
         }
 
-        .nova-preview,
-        .nova-preview * {
+        .square-preview,
+        .square-preview * {
           box-sizing: border-box;
         }
 
-        .nova-preview {
+        .square-preview {
           position: relative;
           min-height: 100vh;
           width: 100%;
           color: var(--text);
           background:
-            radial-gradient(circle at 12% 8%, rgba(6, 182, 212, .24), transparent 22%),
-            radial-gradient(circle at 84% 10%, rgba(124, 58, 237, .16), transparent 24%),
-            radial-gradient(circle at 72% 76%, rgba(219, 39, 119, .10), transparent 28%),
-            linear-gradient(180deg, #e7f8ff 0%, #f3fbff 30%, #d9f2ff 62%, #c6eaff 84%, #b8e4ff 100%);
+            radial-gradient(circle at 12% 8%, rgba(251,146,60,.20), transparent 24%),
+            radial-gradient(circle at 82% 12%, rgba(6,182,212,.20), transparent 24%),
+            radial-gradient(circle at 72% 78%, rgba(219,39,119,.12), transparent 30%),
+            linear-gradient(180deg, #f7efe3 0%, #f6ead8 36%, #e8d5bc 72%, #d8c4aa 100%);
           overflow-x: hidden;
           isolation: isolate;
         }
@@ -705,14 +706,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .glass {
           border: 1px solid rgba(255,255,255,.68);
           background:
-            radial-gradient(circle at 82% 0%, rgba(6,182,212,.08), transparent 32%),
-            linear-gradient(180deg, rgba(255,255,255,.82), rgba(223,246,255,.68));
-          box-shadow: 0 22px 74px rgba(37,99,235,.11), inset 0 1px 0 rgba(255,255,255,.96);
-          backdrop-filter: blur(24px) saturate(1.22);
-          color: #0f172a;
+            radial-gradient(circle at 82% 0%, rgba(251,146,60,.08), transparent 32%),
+            linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,247,237,.72));
+          box-shadow: 0 22px 74px rgba(92,64,42,.11), inset 0 1px 0 rgba(255,255,255,.96);
+          backdrop-filter: blur(24px) saturate(1.18);
+          color: #18212f;
         }
 
-        .nova-app {
+        .square-app {
           position: relative;
           z-index: 1;
           display: grid;
@@ -731,7 +732,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: flex;
           align-items: center;
           gap: 12px;
-          color: #0f172a;
+          color: #18212f;
           text-decoration: none;
         }
 
@@ -743,24 +744,28 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           justify-content: center;
           overflow: hidden;
           border-radius: 18px;
-          border: 1px solid rgba(6,182,212,.22);
-          background: rgba(255,255,255,.72);
-          box-shadow: 0 0 24px rgba(6,182,212,.15), inset 0 1px 0 rgba(255,255,255,.9);
+          border: 1px solid rgba(255,255,255,.38);
+          background:
+            radial-gradient(circle at 30% 20%, rgba(255,255,255,.9), transparent 34%),
+            linear-gradient(135deg, #111827, #a16207 48%, #06b6d4);
+          box-shadow: 0 0 24px rgba(161,98,7,.18), inset 0 1px 0 rgba(255,255,255,.28);
           flex-shrink: 0;
         }
 
-        .brand-logo-image {
-          width: 44px;
-          height: 44px;
-          object-fit: contain;
-          display: block;
+        .square-logo-mark {
+          color: white;
+          font-size: 30px;
+          font-weight: 950;
+          line-height: 1;
+          transform: rotate(45deg);
+          text-shadow: 0 0 18px rgba(255,255,255,.45);
         }
 
         .brand-word {
-          font-size: 20px;
-          font-weight: 900;
-          letter-spacing: .28em;
-          color: #0f172a;
+          font-size: 18px;
+          font-weight: 950;
+          letter-spacing: .16em;
+          color: #18212f;
         }
 
         .top-actions {
@@ -778,9 +783,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           width: 49px;
           height: 49px;
           border-radius: 18px;
-          border: 1px solid rgba(15,23,42,.1);
-          background: rgba(255,255,255,.68);
-          color: #0f172a;
+          border: 1px solid rgba(24,33,47,.1);
+          background: rgba(255,255,255,.70);
+          color: #18212f;
           display: grid;
           place-items: center;
           font-size: 19px;
@@ -791,7 +796,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .profile-orb-wrap {
           border-radius: 999px;
           overflow: hidden;
-          background: radial-gradient(circle at 30% 20%, #fbcfe8, #8f7cff 38%, #58c4ff 70%);
+          background: radial-gradient(circle at 30% 20%, #fde68a, #8f7cff 38%, #58c4ff 70%);
           box-shadow: 0 0 28px rgba(124,58,237,.22);
         }
 
@@ -815,15 +820,15 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .auth-login {
-          border: 1px solid rgba(15, 23, 42, .1);
-          background: rgba(255, 255, 255, .72);
-          color: #0f172a;
+          border: 1px solid rgba(24,33,47,.1);
+          background: rgba(255,255,255,.72);
+          color: #18212f;
         }
 
         .auth-register {
-          background: linear-gradient(135deg, #a3e635, #7de3ff);
-          color: #0f172a;
-          box-shadow: 0 16px 32px rgba(6, 182, 212, .16);
+          background: linear-gradient(135deg, #facc15, #67e8f9);
+          color: #18212f;
+          box-shadow: 0 16px 32px rgba(6,182,212,.16);
         }
 
         .sidebar {
@@ -843,7 +848,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(130deg, rgba(6,182,212,.10), transparent 36%, rgba(124,58,237,.08));
+          background: linear-gradient(130deg, rgba(251,146,60,.12), transparent 36%, rgba(6,182,212,.08));
           pointer-events: none;
         }
 
@@ -861,28 +866,23 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           height: 52px;
           padding: 0 14px;
           border-radius: 16px;
-          color: rgba(15,23,42,.72);
+          color: rgba(24,33,47,.72);
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 850;
           text-decoration: none;
         }
 
         .nav-item:hover,
         .nav-item.active {
           color: #075985;
-          background: linear-gradient(90deg, rgba(6,182,212,.16), rgba(124,58,237,.08));
-          box-shadow: inset 0 0 0 1px rgba(6,182,212,.16), 0 12px 28px rgba(37,99,235,.08);
+          background: linear-gradient(90deg, rgba(251,146,60,.17), rgba(6,182,212,.11));
+          box-shadow: inset 0 0 0 1px rgba(251,146,60,.16), 0 12px 28px rgba(92,64,42,.08);
         }
 
         .nav-icon {
           width: 23px;
           text-align: center;
           font-size: 18px;
-          filter: drop-shadow(0 0 8px rgba(6,182,212,.24));
-        }
-
-        .nav-label {
-          display: inline;
         }
 
         .nav-badge {
@@ -892,8 +892,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-width: 30px;
           height: 30px;
           border-radius: 999px;
-          background: #a3e635;
-          color: #10220a;
+          background: #facc15;
+          color: #422006;
           font-size: 12px;
           font-weight: 900;
         }
@@ -908,13 +908,13 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           justify-content: space-between;
           padding: 0 17px;
           border-radius: 18px;
-          color: #0f172a;
+          color: #18212f;
           font-size: 21px;
           line-height: 1.15;
-          font-weight: 900;
+          font-weight: 950;
           text-align: left;
           text-decoration: none;
-          background: linear-gradient(135deg, #a3e635, #7de3ff 72%);
+          background: linear-gradient(135deg, #facc15, #67e8f9 72%);
           box-shadow: 0 18px 34px rgba(6,182,212,.18);
         }
 
@@ -924,14 +924,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-top: 20px;
           border-radius: 999px;
           padding: 10px 13px;
-          color: #475569;
+          color: #5b6472;
           background: rgba(255,255,255,.52);
           display: flex;
           gap: 10px;
           align-items: center;
           font-size: 12px;
           letter-spacing: .08em;
-          font-weight: 800;
+          font-weight: 850;
         }
 
         .dot {
@@ -942,7 +942,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           box-shadow: 0 0 12px rgba(16,185,129,.45);
         }
 
-        .nova-center {
+        .square-center {
           min-width: 0;
           padding-top: 78px;
         }
@@ -955,26 +955,36 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-bottom: 18px;
         }
 
-        .nova-center h1 {
+        .square-center h1 {
           margin: 0;
-          font-size: clamp(52px, 5.2vw, 83px);
-          line-height: .98;
-          letter-spacing: -.065em;
-          font-weight: 900;
+          font-size: clamp(52px, 5.2vw, 86px);
+          line-height: .94;
+          letter-spacing: -.075em;
+          font-weight: 950;
         }
 
         .gradient-text {
-          background: linear-gradient(92deg, var(--cyan), var(--blue) 26%, var(--violet) 64%, var(--pink));
+          background: linear-gradient(92deg, #0891b2, #2563eb 28%, #7c3aed 64%, #db2777);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
         }
 
         .subtitle {
-          margin: 8px 0 0;
+          margin: 10px 0 0;
           color: var(--muted);
-          font-size: 16px;
-          font-weight: 750;
+          font-size: 17px;
+          line-height: 1.45;
+          font-weight: 780;
+        }
+
+        .square-eyebrow {
+          margin: 0 0 6px;
+          color: #a16207;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: .18em;
+          text-transform: uppercase;
         }
 
         .hero-mini-stats {
@@ -985,7 +995,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           padding: 12px;
           border: 1px solid rgba(255,255,255,.66);
           background: rgba(255,255,255,.58);
-          box-shadow: 0 16px 45px rgba(37,99,235,.08), inset 0 1px 0 rgba(255,255,255,.9);
+          box-shadow: 0 16px 45px rgba(92,64,42,.08), inset 0 1px 0 rgba(255,255,255,.9);
           backdrop-filter: blur(22px);
         }
 
@@ -994,12 +1004,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           padding: 12px 10px;
           text-align: center;
           background: rgba(255,255,255,.62);
-          border: 1px solid rgba(15,23,42,.06);
+          border: 1px solid rgba(24,33,47,.06);
         }
 
         .hero-mini-stats b {
           display: block;
-          color: #0f172a;
+          color: #18212f;
           font-size: 22px;
           line-height: 1;
           font-weight: 950;
@@ -1016,251 +1026,238 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           letter-spacing: .08em;
         }
 
-        .nova-radar-section {
+        .square-section {
           position: relative;
-          min-height: 520px;
+          min-height: 640px;
           margin-top: 18px;
           overflow: hidden;
-          border-radius: 38px;
-          padding: 28px;
-          border: 1px solid rgba(34, 211, 238, .22);
-          background:
-            radial-gradient(circle at 50% 52%, rgba(34, 211, 238, .22), transparent 18%),
-            radial-gradient(circle at 62% 35%, rgba(139, 92, 246, .18), transparent 26%),
-            radial-gradient(circle at 32% 72%, rgba(236, 72, 153, .14), transparent 24%),
-            linear-gradient(135deg, rgba(3, 7, 18, .96), rgba(15, 23, 42, .88));
-          box-shadow: 0 32px 100px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255,255,255,.12);
+          border-radius: 40px;
+          padding: 30px;
           color: #f8fafc;
+          border: 1px solid rgba(255,255,255,.16);
+          background:
+            radial-gradient(circle at 18% 20%, rgba(14,165,233,.22), transparent 28%),
+            radial-gradient(circle at 84% 18%, rgba(236,72,153,.18), transparent 28%),
+            radial-gradient(circle at 50% 88%, rgba(251,146,60,.20), transparent 30%),
+            linear-gradient(135deg, #15110d 0%, #1e293b 42%, #020617 100%);
+          box-shadow: 0 32px 100px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255,255,255,.12);
         }
 
-        .nova-radar-head {
+        .square-head {
           position: relative;
-          z-index: 3;
+          z-index: 4;
           display: flex;
-          justify-content: space-between;
-          gap: 18px;
           align-items: flex-start;
+          justify-content: space-between;
+          gap: 20px;
         }
 
-        .nova-radar-head h2 {
+        .square-head h2 {
           margin: 0;
-          max-width: 620px;
-          color: #ffffff;
-          font-size: clamp(38px, 4vw, 68px);
-          line-height: .9;
-          letter-spacing: -.07em;
+          max-width: 680px;
+          color: white;
+          font-size: clamp(38px, 4.3vw, 76px);
+          line-height: .88;
+          letter-spacing: -.075em;
           font-weight: 950;
         }
 
-        .nova-radar-head p {
-          max-width: 350px;
+        .square-head p {
+          max-width: 390px;
           margin: 0;
           color: #cbd5e1;
-          font-weight: 650;
-          line-height: 1.55;
+          font-size: 15px;
+          line-height: 1.6;
+          font-weight: 700;
         }
 
-        .nova-radar {
+        .square-map {
           position: absolute;
-          left: 50%;
-          top: 55%;
-          width: min(620px, 84vw);
-          height: min(620px, 84vw);
-          transform: translate(-50%, -50%);
-          border-radius: 999px;
-          display: grid;
-          place-items: center;
+          left: 30px;
+          right: 30px;
+          top: 150px;
+          bottom: 92px;
+          border-radius: 34px;
+          overflow: hidden;
+          background:
+            linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+            linear-gradient(0deg, rgba(255,255,255,.05) 1px, transparent 1px),
+            radial-gradient(circle at 50% 50%, rgba(255,255,255,.10), transparent 34%),
+            linear-gradient(135deg, rgba(120,53,15,.32), rgba(15,23,42,.48));
+          background-size: 54px 54px, 54px 54px, auto, auto;
+          border: 1px solid rgba(255,255,255,.10);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
         }
 
-        .nova-radar-ring {
-          position: absolute;
-          border-radius: 999px;
-          border: 1px solid rgba(34,211,238,.14);
-          box-shadow: inset 0 0 30px rgba(34,211,238,.04);
-        }
-
-        .ring-1 {
-          inset: 4%;
-        }
-
-        .ring-2 {
-          inset: 18%;
-        }
-
-        .ring-3 {
-          inset: 32%;
-        }
-
-        .nova-radar-sweep {
+        .square-floor {
           position: absolute;
           inset: 0;
-          border-radius: 999px;
-          background: conic-gradient(from 0deg, rgba(34,211,238,0), rgba(34,211,238,.22), rgba(34,211,238,0) 70deg);
-          animation: novaSweep 8s linear infinite;
-          mask: radial-gradient(circle, transparent 0 11%, black 12% 100%);
-        }
-
-        @keyframes novaSweep {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .nova-radar-core {
-          position: relative;
-          z-index: 2;
-          width: 144px;
-          height: 144px;
-          border-radius: 999px;
-          display: grid;
-          place-items: center;
-          text-align: center;
           background:
-            radial-gradient(circle at 35% 28%, rgba(103,232,249,.98), transparent 31%),
-            radial-gradient(circle at 70% 66%, rgba(236,72,153,.82), transparent 36%),
-            radial-gradient(circle at 48% 55%, rgba(139,92,246,.92), transparent 44%),
-            #020617;
-          box-shadow:
-            0 0 55px rgba(34,211,238,.34),
-            0 0 100px rgba(139,92,246,.22);
-          animation: pulseCore 3.5s ease-in-out infinite;
+            radial-gradient(circle at 50% 50%, rgba(14,165,233,.12), transparent 26%),
+            linear-gradient(115deg, transparent 0 44%, rgba(255,255,255,.08) 45%, transparent 46% 100%);
+          animation: squareGlow 8s ease-in-out infinite;
         }
 
-        @keyframes pulseCore {
+        @keyframes squareGlow {
           50% {
-            transform: scale(1.05);
+            opacity: .62;
             filter: saturate(1.25);
           }
         }
 
-        .nova-radar-core strong {
-          display: block;
-          color: #ffffff;
-          font-size: 20px;
-          font-weight: 950;
-          letter-spacing: .12em;
+        .square-zone {
+          position: absolute;
+          z-index: 3;
+          min-width: 148px;
+          min-height: 116px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 5px;
+          padding: 16px;
+          border-radius: 26px;
+          text-decoration: none;
+          color: white;
+          border: 1px solid rgba(255,255,255,.16);
+          background: rgba(2,6,23,.52);
+          backdrop-filter: blur(18px);
+          box-shadow: 0 20px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
+          transition: transform .22s ease, background .22s ease, border-color .22s ease;
         }
 
-        .nova-radar-core span {
-          display: block;
-          margin-top: 5px;
-          color: rgba(255,255,255,.78);
-          font-size: 11px;
+        .square-zone:hover {
+          transform: translateY(-8px) scale(1.02);
+          background: rgba(255,255,255,.12);
+          border-color: rgba(125,227,255,.44);
+        }
+
+        .square-zone span {
+          font-size: 30px;
+        }
+
+        .square-zone b {
+          font-size: 20px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -.03em;
+        }
+
+        .square-zone small {
+          color: #cbd5e1;
+          font-size: 12px;
           font-weight: 800;
         }
 
-        .radar-signal {
-          position: absolute;
-          z-index: 4;
-          display: flex;
+        .square-fountain {
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
           align-items: center;
-          gap: 9px;
-          min-height: 38px;
-          padding: 0 13px;
+          text-align: center;
+          width: 170px;
+          height: 170px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.14);
-          background: rgba(2,6,23,.58);
-          backdrop-filter: blur(16px);
-          color: white;
-          font-size: 13px;
-          font-weight: 900;
-          text-decoration: none;
-          box-shadow: 0 18px 38px rgba(0,0,0,.25);
-          animation: floatSignal 5s ease-in-out infinite;
+          background:
+            radial-gradient(circle at 30% 25%, rgba(103,232,249,.96), transparent 28%),
+            radial-gradient(circle at 65% 65%, rgba(59,130,246,.92), transparent 38%),
+            rgba(2,6,23,.62);
+          box-shadow: 0 0 70px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.18);
+          animation: fountainPulse 3.4s ease-in-out infinite;
         }
 
-        .radar-signal i {
-          width: 9px;
-          height: 9px;
-          border-radius: 99px;
-          background: var(--cyan);
-          box-shadow: 0 0 16px var(--cyan);
+        .square-fountain:hover {
+          transform: translate(-50%, calc(-50% - 8px)) scale(1.03);
         }
 
-        .signal-pink i {
-          background: var(--pink);
-          box-shadow: 0 0 16px var(--pink);
-        }
-
-        .signal-violet i {
-          background: var(--violet);
-          box-shadow: 0 0 16px var(--violet);
-        }
-
-        .signal-lime i {
-          background: var(--lime);
-          box-shadow: 0 0 16px var(--lime);
-        }
-
-        @keyframes floatSignal {
+        @keyframes fountainPulse {
           50% {
-            transform: translateY(-10px);
+            box-shadow: 0 0 100px rgba(34,211,238,.48), inset 0 1px 0 rgba(255,255,255,.18);
           }
         }
 
-        .signal-1 {
-          left: 10%;
-          top: 44%;
-          animation-delay: .1s;
+        .square-cafe {
+          left: 6%;
+          top: 14%;
         }
 
-        .signal-2 {
-          right: 12%;
-          top: 36%;
-          animation-delay: .5s;
+        .square-stage {
+          right: 7%;
+          top: 12%;
         }
 
-        .signal-3 {
-          left: 25%;
-          bottom: 18%;
-          animation-delay: .9s;
+        .square-board {
+          left: 8%;
+          bottom: 14%;
         }
 
-        .signal-4 {
-          right: 20%;
-          bottom: 22%;
-          animation-delay: 1.3s;
+        .square-people {
+          right: 9%;
+          bottom: 16%;
         }
 
-        .signal-5 {
-          left: 42%;
-          top: 28%;
-          animation-delay: 1.7s;
+        .square-terrace {
+          left: 39%;
+          top: 7%;
         }
 
-        .signal-6 {
-          right: 8%;
-          top: 62%;
-          animation-delay: 2.1s;
-        }
-
-        .nova-radar-bottom {
+        .square-center-cta {
           position: absolute;
           z-index: 5;
-          left: 28px;
-          right: 28px;
+          left: 50%;
+          bottom: 20px;
+          transform: translateX(-50%);
+          min-width: 280px;
+          min-height: 62px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          border-radius: 999px;
+          color: #08111f;
+          text-decoration: none;
+          background: linear-gradient(135deg, #bef264, #67e8f9);
+          box-shadow: 0 20px 50px rgba(34,211,238,.24);
+        }
+
+        .square-center-cta strong {
+          font-size: 17px;
+          font-weight: 950;
+        }
+
+        .square-center-cta span {
+          margin-top: 2px;
+          font-size: 12px;
+          font-weight: 850;
+          opacity: .78;
+        }
+
+        .square-bottom {
+          position: absolute;
+          z-index: 5;
+          left: 30px;
+          right: 30px;
           bottom: 24px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 16px;
-          padding-top: 20px;
+          padding-top: 18px;
           border-top: 1px solid rgba(255,255,255,.12);
         }
 
-        .nova-radar-bottom p {
+        .square-bottom p {
           margin: 0;
           color: #cbd5e1;
-          font-weight: 650;
+          font-weight: 700;
         }
 
-        .nova-radar-actions {
+        .square-actions {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
         }
 
-        .radar-cta {
+        .square-cta {
           min-height: 42px;
           padding: 0 16px;
           border-radius: 999px;
@@ -1275,7 +1272,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-decoration: none;
         }
 
-        .radar-cta.primary {
+        .square-cta.primary {
           background: linear-gradient(135deg, var(--lime), var(--cyan));
           color: #06111f;
           border: 0;
@@ -1288,12 +1285,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           margin-top: 18px;
           border-radius: 34px;
           padding: 26px;
-          border: 1px solid rgba(190,242,100,.22);
+          border: 1px solid rgba(255,255,255,.16);
           background:
-            radial-gradient(circle at 6% 10%, rgba(190,242,100,.18), transparent 26%),
+            radial-gradient(circle at 8% 10%, rgba(251,146,60,.18), transparent 28%),
             radial-gradient(circle at 92% 22%, rgba(34,211,238,.18), transparent 28%),
-            linear-gradient(135deg, rgba(15,23,42,.96), rgba(30,41,59,.88));
-          box-shadow: 0 22px 74px rgba(37,99,235,.14), inset 0 1px 0 rgba(255,255,255,.16);
+            linear-gradient(135deg, rgba(30,41,59,.96), rgba(15,23,42,.92));
+          box-shadow: 0 22px 74px rgba(92,64,42,.14), inset 0 1px 0 rgba(255,255,255,.16);
           color: #f8fafc;
         }
 
@@ -1394,22 +1391,18 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 30px;
           padding: 22px;
           overflow: hidden;
-          border: 1px solid rgba(6,182,212,.26);
+          border: 1px solid rgba(251,146,60,.26);
           background:
-            radial-gradient(ellipse at 38% 6%, rgba(6,182,212,.22), transparent 28%),
-            radial-gradient(ellipse at 74% 54%, rgba(219,39,119,.14), transparent 32%),
-            rgba(255,255,255,.84);
-          box-shadow: 0 0 28px rgba(6,182,212,.10), 0 18px 45px rgba(37,99,235,.08);
+            radial-gradient(ellipse at 38% 6%, rgba(251,146,60,.20), transparent 28%),
+            radial-gradient(ellipse at 74% 54%, rgba(6,182,212,.14), transparent 32%),
+            rgba(255,255,255,.86);
+          box-shadow: 0 0 28px rgba(251,146,60,.10), 0 18px 45px rgba(92,64,42,.08);
         }
 
         .ai-composer {
           min-height: 238px;
           padding: 24px;
           margin-top: 18px;
-          background:
-            radial-gradient(circle at 18% 8%, rgba(56,214,255,.26), transparent 28%),
-            radial-gradient(circle at 78% 38%, rgba(219,39,119,.12), transparent 32%),
-            linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,249,255,.84));
         }
 
         .composer-content {
@@ -1428,19 +1421,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 18px;
         }
 
-        .ai-eyebrow {
-          margin: 0 0 6px;
-          color: #0284c7;
-          font-size: 11px;
-          font-weight: 950;
-          letter-spacing: .18em;
-          text-transform: uppercase;
-        }
-
         .ai-builder-head h2 {
           margin: 0;
           max-width: 680px;
-          color: #10213a;
+          color: #18212f;
           font-size: clamp(24px, 2.2vw, 38px);
           line-height: 1;
           letter-spacing: -.045em;
@@ -1453,17 +1437,17 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-width: 56px;
           height: 38px;
           border-radius: 999px;
-          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(124,58,237,.12));
-          color: #075985;
+          background: linear-gradient(135deg, rgba(251,146,60,.16), rgba(6,182,212,.12));
+          color: #92400e;
           font-size: 13px;
           font-weight: 950;
-          border: 1px solid rgba(6,182,212,.22);
+          border: 1px solid rgba(251,146,60,.22);
         }
 
         .ai-question-box {
           margin-top: 22px;
           border-radius: 22px;
-          border: 1px solid rgba(90,132,185,.18);
+          border: 1px solid rgba(120,53,15,.14);
           background: rgba(255,255,255,.72);
           padding: 16px;
           box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
@@ -1472,7 +1456,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .ai-question-label {
           display: block;
           margin-bottom: 10px;
-          color: #10213a;
+          color: #18212f;
           font-size: 15px;
           font-weight: 950;
         }
@@ -1484,7 +1468,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border: 0;
           outline: none;
           background: transparent;
-          color: #0f172a;
+          color: #18212f;
           font-size: 16px;
           font-weight: 700;
           font-family: inherit;
@@ -1492,12 +1476,11 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .ai-input {
           min-height: 82px;
-          color: #10213a;
           font-weight: 750;
         }
 
         .composer-input::placeholder {
-          color: rgba(100,116,139,.82);
+          color: rgba(91,100,114,.78);
         }
 
         .composer-actions {
@@ -1519,10 +1502,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 9px;
           height: 38px;
           border-radius: 999px;
-          border: 1px solid rgba(15,23,42,.08);
+          border: 1px solid rgba(24,33,47,.08);
           background: rgba(248,250,252,.82);
           padding: 0 16px;
-          color: #475569;
+          color: #5b6472;
           font-size: 14px;
           font-weight: 850;
           cursor: pointer;
@@ -1538,9 +1521,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .ai-primary-pill,
         .ai-open-button,
         .ai-open-cta {
-          background: linear-gradient(135deg, #a3e635, #7de3ff) !important;
-          color: #10213a !important;
-          border-color: rgba(6,182,212,.18) !important;
+          background: linear-gradient(135deg, #facc15, #67e8f9) !important;
+          color: #18212f !important;
+          border-color: rgba(251,146,60,.18) !important;
         }
 
         .hidden-file {
@@ -1557,8 +1540,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: grid;
           place-items: center;
           font-size: 26px;
-          border: 1px solid rgba(15,23,42,.08);
-          box-shadow: 0 16px 36px rgba(124,58,237,.14);
+          border: 1px solid rgba(24,33,47,.08);
+          box-shadow: 0 16px 36px rgba(6,182,212,.14);
           cursor: pointer;
         }
 
@@ -1574,7 +1557,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .ai-preview h3 {
           margin: 0;
-          color: #10213a;
+          color: #18212f;
           font-size: 24px;
           font-weight: 950;
           letter-spacing: -.035em;
@@ -1582,7 +1565,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .ai-preview p {
           margin: 8px 0 0;
-          color: #475569;
+          color: #5b6472;
           font-size: 14px;
           line-height: 1.55;
           font-weight: 700;
@@ -1614,9 +1597,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           align-items: center;
           gap: 10px;
           border-radius: 999px;
-          border: 1px solid rgba(15,23,42,.08);
+          border: 1px solid rgba(24,33,47,.08);
           background: rgba(255,255,255,.64);
-          color: #475569;
+          color: #5b6472;
           padding: 0 19px;
           font-size: 14px;
           font-weight: 850;
@@ -1626,22 +1609,22 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .chip.active {
-          border-color: rgba(6,182,212,.24);
-          background: linear-gradient(135deg, rgba(6,182,212,.18), rgba(124,58,237,.12));
-          color: #075985;
-          box-shadow: 0 14px 28px rgba(37,99,235,.10);
+          border-color: rgba(251,146,60,.24);
+          background: linear-gradient(135deg, rgba(251,146,60,.18), rgba(6,182,212,.12));
+          color: #92400e;
+          box-shadow: 0 14px 28px rgba(92,64,42,.10);
         }
 
         .featured {
           position: relative;
           min-height: 310px;
-          border-radius: var(--radius-xl);
+          border-radius: 30px;
           overflow: hidden;
           border: 1px solid rgba(255,255,255,.18);
           background:
-            radial-gradient(circle at 80% 0%, rgba(6,182,212,.20), transparent 30%),
-            linear-gradient(180deg, rgba(27,68,105,.90), rgba(21,49,79,.88));
-          box-shadow: 0 24px 90px rgba(37,99,235,.12), inset 0 1px 0 rgba(255,255,255,.12);
+            radial-gradient(circle at 80% 0%, rgba(251,146,60,.20), transparent 30%),
+            linear-gradient(180deg, rgba(31,41,55,.94), rgba(15,23,42,.88));
+          box-shadow: 0 24px 90px rgba(92,64,42,.12), inset 0 1px 0 rgba(255,255,255,.12);
           color: #eff6ff;
         }
 
@@ -1650,9 +1633,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse at 78% 36%, rgba(219,39,119,.34), transparent 14%),
-            radial-gradient(ellipse at 82% 26%, rgba(6,182,212,.34), transparent 26%),
-            linear-gradient(165deg, transparent 0 42%, rgba(125,227,255,.14), transparent 57%);
+            radial-gradient(ellipse at 78% 36%, rgba(219,39,119,.26), transparent 14%),
+            radial-gradient(ellipse at 82% 26%, rgba(6,182,212,.28), transparent 26%),
+            linear-gradient(165deg, transparent 0 42%, rgba(250,204,21,.14), transparent 57%);
           opacity: .88;
         }
 
@@ -1765,10 +1748,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           height: 58px;
           border-radius: 999px;
           border: 0;
-          color: #0f172a;
+          color: #18212f;
           font-size: 21px;
           font-weight: 950;
-          background: linear-gradient(100deg, #a3e635, #7de3ff);
+          background: linear-gradient(100deg, #facc15, #67e8f9);
           box-shadow: 0 18px 34px rgba(6,182,212,.18);
           display: inline-flex;
           align-items: center;
@@ -1782,10 +1765,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           padding: 22px;
           border: 1px solid rgba(255,255,255,.64);
           background:
-            radial-gradient(circle at 8% 0%, rgba(6,182,212,.14), transparent 28%),
-            radial-gradient(circle at 92% 20%, rgba(124,58,237,.12), transparent 30%),
-            linear-gradient(180deg, rgba(255,255,255,.78), rgba(224,246,255,.62));
-          box-shadow: 0 22px 74px rgba(37,99,235,.10), inset 0 1px 0 rgba(255,255,255,.92);
+            radial-gradient(circle at 8% 0%, rgba(251,146,60,.14), transparent 28%),
+            radial-gradient(circle at 92% 20%, rgba(6,182,212,.12), transparent 30%),
+            linear-gradient(180deg, rgba(255,255,255,.82), rgba(255,247,237,.66));
+          box-shadow: 0 22px 74px rgba(92,64,42,.10), inset 0 1px 0 rgba(255,255,255,.92);
           backdrop-filter: blur(24px) saturate(1.2);
         }
 
@@ -1799,7 +1782,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .home-preview-head h2 {
           margin: 0;
-          color: #10213a;
+          color: #18212f;
           font-size: clamp(28px, 2.8vw, 46px);
           line-height: .95;
           letter-spacing: -.05em;
@@ -1809,7 +1792,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .home-preview-head p:last-child {
           max-width: 430px;
           margin: 0;
-          color: #475569;
+          color: #5b6472;
           font-size: 14px;
           line-height: 1.55;
           font-weight: 750;
@@ -1827,11 +1810,11 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           overflow: hidden;
           border-radius: 22px;
           padding: 16px;
-          border: 1px solid rgba(15,23,42,.08);
+          border: 1px solid rgba(24,33,47,.08);
           background:
             radial-gradient(circle at 12% 0%, rgba(255,255,255,.72), transparent 38%),
-            linear-gradient(180deg, rgba(255,255,255,.74), rgba(238,249,255,.58));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 16px 38px rgba(37,99,235,.08);
+            linear-gradient(180deg, rgba(255,255,255,.76), rgba(255,247,237,.60));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 16px 38px rgba(92,64,42,.08);
         }
 
         .preview-card::before {
@@ -1883,13 +1866,13 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           flex: 0 0 auto;
           border-radius: 16px;
           background: rgba(255,255,255,.78);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 12px 28px rgba(37,99,235,.08);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 12px 28px rgba(92,64,42,.08);
           font-size: 21px;
         }
 
         .preview-card h3 {
           margin: 0 0 6px;
-          color: #0f172a;
+          color: #18212f;
           font-size: 18px;
           line-height: 1;
           letter-spacing: -.025em;
@@ -1897,7 +1880,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .preview-card a {
-          color: #075985;
+          color: #92400e;
           font-size: 12px;
           font-weight: 950;
           text-decoration: none;
@@ -1911,13 +1894,13 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .mini-preview-line {
           border-radius: 15px;
           padding: 11px 12px;
-          background: rgba(255,255,255,.62);
-          border: 1px solid rgba(15,23,42,.06);
+          background: rgba(255,255,255,.64);
+          border: 1px solid rgba(24,33,47,.06);
         }
 
         .mini-preview-line strong {
           display: block;
-          color: #10213a;
+          color: #18212f;
           font-size: 13px;
           line-height: 1.25;
           font-weight: 950;
@@ -1926,7 +1909,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .mini-preview-line span {
           display: block;
           margin-top: 4px;
-          color: #475569;
+          color: #5b6472;
           font-size: 12px;
           line-height: 1.4;
           font-weight: 700;
@@ -1954,7 +1937,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .trend-item {
           border-radius: 18px;
           padding: 16px;
-          border: 1px solid rgba(15,23,42,.08);
+          border: 1px solid rgba(24,33,47,.08);
           background: rgba(255,255,255,.58);
         }
 
@@ -1964,7 +1947,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .trend-text {
-          color: #475569;
+          color: #5b6472;
           line-height: 1.5;
           font-weight: 700;
           font-size: 13px;
@@ -1987,7 +1970,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .world-news-head h2 {
           margin: 0;
           max-width: 720px;
-          color: #10213a;
+          color: #18212f;
           font-size: clamp(25px, 2.3vw, 40px);
           line-height: 1;
           letter-spacing: -.045em;
@@ -2002,8 +1985,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-height: 44px;
           border-radius: 999px;
           padding: 0 18px;
-          background: linear-gradient(135deg, #a3e635, #7de3ff);
-          color: #10213a;
+          background: linear-gradient(135deg, #facc15, #67e8f9);
+          color: #18212f;
           font-size: 13px;
           font-weight: 950;
           text-decoration: none;
@@ -2018,10 +2001,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         .world-news-item {
           min-height: 190px;
           border-radius: 20px;
-          border: 1px solid rgba(15, 23, 42, .08);
+          border: 1px solid rgba(24,33,47,.08);
           background:
-            radial-gradient(circle at 20% 0%, rgba(6, 182, 212, .13), transparent 34%),
-            linear-gradient(180deg, rgba(255,255,255,.78), rgba(239,249,255,.62));
+            radial-gradient(circle at 20% 0%, rgba(251,146,60,.13), transparent 34%),
+            linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,247,237,.62));
           padding: 16px;
           box-shadow: inset 0 1px 0 rgba(255,255,255,.88);
         }
@@ -2039,7 +2022,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .world-news-item h3 {
           margin: 13px 0 8px;
-          color: #10213a;
+          color: #18212f;
           font-size: 18px;
           line-height: 1.15;
           letter-spacing: -.025em;
@@ -2048,7 +2031,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .world-news-item p {
           margin: 0;
-          color: #475569;
+          color: #5b6472;
           font-size: 13px;
           line-height: 1.5;
           font-weight: 700;
@@ -2068,16 +2051,16 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 999px;
           padding: 0 12px;
           background: rgba(255,255,255,.72);
-          color: #075985;
+          color: #92400e;
           font-size: 12px;
           font-weight: 950;
           text-decoration: none;
-          border: 1px solid rgba(6,182,212,.16);
+          border: 1px solid rgba(251,146,60,.16);
         }
 
         .world-news-actions a:last-child {
-          background: linear-gradient(135deg, rgba(163,230,53,.88), rgba(125,227,255,.88));
-          color: #10213a;
+          background: linear-gradient(135deg, rgba(250,204,21,.88), rgba(103,232,249,.88));
+          color: #18212f;
         }
 
         .world-news-empty {
@@ -2085,7 +2068,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 20px;
           padding: 18px;
           background: rgba(255,255,255,.58);
-          color: #475569;
+          color: #5b6472;
           font-weight: 850;
         }
 
@@ -2105,7 +2088,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           color: #fff;
           font-size: 26px;
           font-weight: 950;
-          background: radial-gradient(circle at 34% 25%, #7de3ff, #8f7cff 32%, #e77bcf 54%, #15314f 78%);
+          background: radial-gradient(circle at 34% 25%, #facc15, #8f7cff 32%, #67e8f9 54%, #15314f 78%);
           box-shadow: 0 0 34px rgba(6,182,212,.18), inset 0 0 16px rgba(255,255,255,.16);
         }
 
@@ -2123,7 +2106,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .host-title,
         .host-bio {
-          color: #475569;
+          color: #5b6472;
           font-size: 14px;
           font-weight: 700;
         }
@@ -2138,12 +2121,12 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0;
-          border-left: 1px solid rgba(15,23,42,.08);
+          border-left: 1px solid rgba(24,33,47,.08);
         }
 
         .metric {
           padding-left: 22px;
-          border-right: 1px solid rgba(15,23,42,.08);
+          border-right: 1px solid rgba(24,33,47,.08);
         }
 
         .metric:last-child {
@@ -2161,7 +2144,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           display: block;
           margin-top: 8px;
           font-size: 23px;
-          color: var(--cyan);
+          color: #0891b2;
         }
 
         .metric:nth-child(2) b {
@@ -2178,7 +2161,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           padding: 14px 16px;
           background: rgba(255,255,255,.58);
           border: 1px solid rgba(255,255,255,.64);
-          box-shadow: 0 20px 50px rgba(37,99,235,.08);
+          box-shadow: 0 20px 50px rgba(92,64,42,.08);
         }
 
         .strip-head {
@@ -2194,7 +2177,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .see-all {
-          color: #475569;
+          color: #5b6472;
           font-size: 13px;
           font-weight: 900;
           text-decoration: none;
@@ -2210,14 +2193,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           min-height: 84px;
           border-radius: 16px;
           padding: 10px;
-          border: 1px solid rgba(15,23,42,.08);
-          background: linear-gradient(135deg, rgba(6,182,212,.16), rgba(255,255,255,.70));
+          border: 1px solid rgba(24,33,47,.08);
+          background: linear-gradient(135deg, rgba(251,146,60,.16), rgba(255,255,255,.70));
           overflow: hidden;
           position: relative;
           font-weight: 900;
           font-size: 13px;
           line-height: 1.15;
-          color: #0f172a;
+          color: #18212f;
           text-decoration: none;
         }
 
@@ -2232,7 +2215,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           position: absolute;
           left: 11px;
           bottom: 7px;
-          color: #0369a1;
+          color: #92400e;
           font-size: 11px;
         }
 
@@ -2264,7 +2247,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .panel-title small {
           font-size: 14px;
-          color: #475569;
+          color: #5b6472;
           font-weight: 850;
           letter-spacing: 0;
         }
@@ -2277,8 +2260,8 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .inner {
-          border: 1px solid rgba(15,23,42,.08);
-          background: rgba(255,255,255,.48);
+          border: 1px solid rgba(24,33,47,.08);
+          background: rgba(255,255,255,.50);
           border-radius: 18px;
           padding: 16px;
         }
@@ -2296,7 +2279,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           gap: 13px;
           align-items: start;
           margin-bottom: 18px;
-          color: #0f172a;
+          color: #18212f;
           font-size: 15px;
           line-height: 1.45;
           font-weight: 700;
@@ -2308,9 +2291,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: rgba(6,182,212,.12);
-          color: var(--cyan);
-          border: 1px solid rgba(6,182,212,.18);
+          background: rgba(251,146,60,.12);
+          color: #92400e;
+          border: 1px solid rgba(251,146,60,.18);
         }
 
         .mood-wrap {
@@ -2327,10 +2310,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-align: center;
           color: white;
           background:
-            radial-gradient(circle at 28% 30%, rgba(6,182,212,.94), transparent 31%),
+            radial-gradient(circle at 28% 30%, rgba(251,146,60,.94), transparent 31%),
             radial-gradient(circle at 75% 35%, rgba(219,39,119,.76), transparent 32%),
-            radial-gradient(circle at 60% 70%, rgba(124,58,237,.78), transparent 42%);
-          filter: drop-shadow(0 0 18px rgba(219,39,119,.24));
+            radial-gradient(circle at 60% 70%, rgba(6,182,212,.78), transparent 42%);
+          filter: drop-shadow(0 0 18px rgba(219,39,119,.20));
           border-radius: 45% 55% 52% 48% / 46% 38% 62% 54%;
           animation: morph 7s ease-in-out infinite;
         }
@@ -2367,7 +2350,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           height: 7px;
           border-radius: 99px;
           margin-right: 5px;
-          background: var(--cyan);
+          background: #facc15;
         }
 
         .legend span:nth-child(2) i {
@@ -2375,7 +2358,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         .legend span:nth-child(3) i {
-          background: var(--pink);
+          background: var(--cyan);
         }
 
         .pulse {
@@ -2395,10 +2378,10 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           place-items: center;
           position: relative;
           background:
-            repeating-radial-gradient(circle, transparent 0 12px, rgba(6,182,212,.13) 13px 14px),
-            conic-gradient(from -15deg, transparent 0 18deg, var(--cyan) 38deg, var(--lime) 120deg, var(--pink) 240deg, transparent 310deg),
-            radial-gradient(circle, rgba(6,182,212,.16), transparent 52%);
-          box-shadow: 0 0 36px rgba(6,182,212,.18);
+            repeating-radial-gradient(circle, transparent 0 12px, rgba(251,146,60,.13) 13px 14px),
+            conic-gradient(from -15deg, transparent 0 18deg, #facc15 38deg, var(--lime) 120deg, var(--cyan) 240deg, transparent 310deg),
+            radial-gradient(circle, rgba(251,146,60,.16), transparent 52%);
+          box-shadow: 0 0 36px rgba(251,146,60,.18);
         }
 
         .radial::before {
@@ -2407,7 +2390,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           inset: 42px;
           border-radius: inherit;
           background: rgba(255,255,255,.88);
-          box-shadow: inset 0 0 20px rgba(15,23,42,.06);
+          box-shadow: inset 0 0 20px rgba(24,33,47,.06);
         }
 
         .radial::after {
@@ -2415,7 +2398,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           position: absolute;
           width: 8px;
           height: 126%;
-          background: linear-gradient(transparent, rgba(6,182,212,.65), rgba(124,58,237,.52), transparent);
+          background: linear-gradient(transparent, rgba(251,146,60,.65), rgba(6,182,212,.52), transparent);
           filter: blur(2px);
         }
 
@@ -2425,7 +2408,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           text-align: center;
           font-size: 35px;
           font-weight: 950;
-          color: #0f172a;
+          color: #18212f;
         }
 
         .pulse-score span {
@@ -2443,7 +2426,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 
         .momentum p {
           margin: 0 0 28px;
-          color: #475569;
+          color: #5b6472;
           font-size: 13px;
           font-weight: 700;
         }
@@ -2465,7 +2448,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         @media (max-width: 1780px) {
-          .nova-app {
+          .square-app {
             grid-template-columns: 232px minmax(0, 1fr);
             gap: 26px;
             padding-right: 26px;
@@ -2508,7 +2491,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
         }
 
         @media (max-width: 1280px) {
-          .nova-app {
+          .square-app {
             grid-template-columns: 210px minmax(0, 1fr);
           }
 
@@ -2549,14 +2532,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             border-radius: 16px;
           }
 
-          .brand-logo-image {
-            width: 36px;
-            height: 36px;
-          }
-
           .brand-word {
-            font-size: 18px;
-            letter-spacing: .22em;
+            font-size: 15px;
+            letter-spacing: .12em;
           }
 
           .top-actions {
@@ -2589,7 +2567,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             display: none;
           }
 
-          .nova-app {
+          .square-app {
             display: flex;
             flex-direction: column;
             width: 100%;
@@ -2612,9 +2590,9 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             max-width: calc(100vw - 24px);
             border-radius: 24px;
             padding: 9px;
-            background: rgba(255,255,255,.88);
+            background: rgba(255,255,255,.90);
             backdrop-filter: blur(26px) saturate(1.4);
-            box-shadow: 0 18px 60px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.9);
+            box-shadow: 0 18px 60px rgba(92,64,42,.18), inset 0 1px 0 rgba(255,255,255,.9);
             overflow: hidden;
           }
 
@@ -2673,14 +2651,14 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: rgba(15, 23, 42, .72);
+            color: rgba(24,33,47,.72);
             font-size: 10px;
             font-weight: 900;
           }
 
           .nav-item.active .nav-label,
           .nav-item:hover .nav-label {
-            color: #075985;
+            color: #92400e;
           }
 
           .nav-badge {
@@ -2718,7 +2696,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             display: none;
           }
 
-          .nova-center {
+          .square-center {
             order: 1;
             padding-top: 4px;
           }
@@ -2732,7 +2710,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
             grid-template-columns: repeat(3, 1fr);
           }
 
-          .nova-center h1 {
+          .square-center h1 {
             max-width: 360px;
             margin: 0 auto;
             text-align: center;
@@ -2742,67 +2720,105 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           }
 
           .subtitle {
-            max-width: 310px;
+            max-width: 320px;
             margin: 12px auto 18px;
             text-align: center;
             font-size: 14px;
             line-height: 1.45;
           }
 
-          .nova-radar-section {
-            min-height: 620px;
+          .square-section {
+            min-height: 720px;
             padding: 22px;
+            border-radius: 30px;
           }
 
-          .nova-radar-head,
+          .square-head {
+            flex-direction: column;
+          }
+
+          .square-head h2 {
+            font-size: 42px;
+          }
+
+          .square-map {
+            top: 230px;
+            left: 18px;
+            right: 18px;
+            bottom: 110px;
+            border-radius: 26px;
+          }
+
+          .square-zone {
+            min-width: 116px;
+            min-height: 92px;
+            padding: 12px;
+            border-radius: 20px;
+          }
+
+          .square-zone span {
+            font-size: 23px;
+          }
+
+          .square-zone b {
+            font-size: 15px;
+          }
+
+          .square-zone small {
+            font-size: 10px;
+          }
+
+          .square-fountain {
+            width: 130px;
+            height: 130px;
+          }
+
+          .square-cafe {
+            left: 4%;
+            top: 9%;
+          }
+
+          .square-stage {
+            right: 4%;
+            top: 9%;
+          }
+
+          .square-board {
+            left: 4%;
+            bottom: 23%;
+          }
+
+          .square-people {
+            right: 4%;
+            bottom: 23%;
+          }
+
+          .square-terrace {
+            left: 50%;
+            top: 34%;
+            transform: translateX(-50%);
+          }
+
+          .square-center-cta {
+            min-width: 230px;
+            bottom: 16px;
+          }
+
+          .square-bottom {
+            left: 22px;
+            right: 22px;
+            bottom: 18px;
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
           .need-head {
             flex-direction: column;
             align-items: flex-start;
           }
 
-          .nova-radar-head h2,
           .need-head h2 {
             font-size: 42px;
-          }
-
-          .radar-signal {
-            font-size: 11px;
-            padding: 0 10px;
-          }
-
-          .signal-1 {
-            left: 5%;
-            top: 46%;
-          }
-
-          .signal-2 {
-            right: 4%;
-            top: 38%;
-          }
-
-          .signal-3 {
-            left: 9%;
-            bottom: 24%;
-          }
-
-          .signal-4 {
-            right: 6%;
-            bottom: 29%;
-          }
-
-          .signal-5 {
-            left: 31%;
-            top: 30%;
-          }
-
-          .signal-6 {
-            right: 5%;
-            top: 62%;
-          }
-
-          .nova-radar-bottom {
-            flex-direction: column;
-            align-items: flex-start;
           }
 
           .need-grid {
@@ -2985,7 +3001,7 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
           .metrics {
             grid-template-columns: repeat(3, 1fr);
             border-left: 0;
-            border-top: 1px solid rgba(15,23,42,.08);
+            border-top: 1px solid rgba(24,33,47,.08);
             padding-top: 14px;
           }
 
@@ -3106,12 +3122,11 @@ Aiuto che cerco dalla rete: ${desiredOutcome}`;
 function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <>
-      <Link href="/" className="brand" aria-label="NOVA home">
+      <Link href="/" className="brand" aria-label="The Square home">
         <span className="brand-logo-box">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/nova-logo.png" alt="" className="brand-logo-image" />
+          <span className="square-logo-mark">□</span>
         </span>
-        <span className="brand-word">NOVA</span>
+        <span className="brand-word">THE SQUARE</span>
       </Link>
 
       <div className="top-actions">
@@ -3119,8 +3134,8 @@ function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
           🔎
         </Link>
 
-        <Link href="/saved" className="icon-btn" aria-label="Salvati">
-          ⭐
+        <Link href="/events" className="icon-btn" aria-label="Eventi">
+          📍
         </Link>
 
         <Link href="/people" className="icon-btn" aria-label="Persone">
@@ -3137,7 +3152,7 @@ function TopChrome({ isLoggedIn }: { isLoggedIn: boolean }) {
               Login
             </Link>
             <Link href="/login?mode=register" className="auth-btn auth-register">
-              Registrati
+              Entra in piazza
             </Link>
           </div>
         )}
@@ -3172,7 +3187,7 @@ function Sidebar({ notificationCount }: { notificationCount: number }) {
 
       <div className="online">
         <span className="dot" />
-        NOVA Online
+        The Square aperta
       </div>
     </aside>
   );
@@ -3194,13 +3209,13 @@ function FeaturedThought({
   return (
     <article className="featured">
       <div className="featured-content">
-        <span className="badge">★ Spunto in evidenza</span>
+        <span className="badge">★ Spunto in piazza</span>
         <span className="badge status">
           <span className="dot" /> In corso
         </span>
 
         <h2>{thought.title}</h2>
-        <p>{thought.description || 'Spunto aperto su NOVA.'}</p>
+        <p>{thought.description || 'Spunto aperto su The Square.'}</p>
 
         <div className="call-meta">
           <div className="avatars">
@@ -3210,7 +3225,7 @@ function FeaturedThought({
           <div className="active-count">
             <span className="dot" style={{ display: 'inline-block', marginRight: 8 }} />
             <b>{thought.participants || 0}</b> partecipanti attivi
-            <span className="speaking">Host: {thought.host_name || 'Utente Nova'}</span>
+            <span className="speaking">Host: {thought.host_name || 'Utente Square'}</span>
           </div>
         </div>
 
@@ -3220,7 +3235,7 @@ function FeaturedThought({
           </Link>
 
           <Link href={`/c/${thought.slug}`} className="primary-cta">
-            Apri lo Spunto →
+            Entra nello Spunto →
           </Link>
 
           {canClose && (
@@ -3234,68 +3249,78 @@ function FeaturedThought({
   );
 }
 
-function NovaRadar() {
+function SquareMap() {
   return (
-    <section className="nova-radar-section">
-      <div className="nova-radar-head">
+    <section className="square-section">
+      <div className="square-head">
         <div>
-          <p className="ai-eyebrow">Radar NOVA</p>
-          <h2>Cosa sta vibrando nella rete</h2>
+          <p className="square-eyebrow">Piazza live</p>
+          <h2>La piazza si muove intorno a te</h2>
         </div>
 
-        <p>Ogni segnale è un bisogno reale che sta emergendo nella community. Entra dove senti qualcosa.</p>
-      </div>
-
-      <div className="nova-radar">
-        <div className="nova-radar-ring ring-1" />
-        <div className="nova-radar-ring ring-2" />
-        <div className="nova-radar-ring ring-3" />
-        <div className="nova-radar-sweep" />
-
-        <div className="nova-radar-core">
-          <div>
-            <strong>NOVA</strong>
-            <span>LIVE</span>
-          </div>
-        </div>
-      </div>
-
-      <Link href="/spaces" className="radar-signal signal-1">
-        <i /> cambiare città
-      </Link>
-
-      <Link href="/spaces" className="radar-signal signal-2 signal-pink">
-        <i /> relazioni
-      </Link>
-
-      <Link href="/spaces" className="radar-signal signal-3 signal-violet">
-        <i /> lavoro
-      </Link>
-
-      <Link href="/events" className="radar-signal signal-4 signal-lime">
-        <i /> eventi a Roma
-      </Link>
-
-      <Link href="/people" className="radar-signal signal-5">
-        <i /> nuove amicizie
-      </Link>
-
-      <Link href="/calls/new" className="radar-signal signal-6 signal-pink">
-        <i /> decisioni difficili
-      </Link>
-
-      <div className="nova-radar-bottom">
         <p>
-          <strong>18 momenti attivi</strong> · 42 persone stanno contribuendo · 3 eventi stanno creando gruppi
+          Ogni area è un punto vivo della community: entra in una conversazione, trova persone,
+          scopri eventi o trasforma una notizia in uno Spunto.
+        </p>
+      </div>
+
+      <div className="square-map">
+        <div className="square-floor" />
+
+        <Link href="/spaces" className="square-zone square-fountain">
+          <span>⛲</span>
+          <b>Fontana</b>
+          <small>Spunti caldi</small>
+        </Link>
+
+        <Link href="/messages" className="square-zone square-cafe">
+          <span>☕</span>
+          <b>Caffè</b>
+          <small>Chat e messaggi</small>
+        </Link>
+
+        <Link href="/events" className="square-zone square-stage">
+          <span>🎤</span>
+          <b>Palco</b>
+          <small>Eventi live</small>
+        </Link>
+
+        <Link href="/world-news" className="square-zone square-board">
+          <span>📰</span>
+          <b>Bacheca</b>
+          <small>News dal mondo</small>
+        </Link>
+
+        <Link href="/people" className="square-zone square-people">
+          <span>👥</span>
+          <b>Panchine</b>
+          <small>Persone affini</small>
+        </Link>
+
+        <Link href="/echo" className="square-zone square-terrace">
+          <span>🧠</span>
+          <b>Terrazza</b>
+          <small>Echo e trend</small>
+        </Link>
+
+        <Link href="/calls/new" className="square-center-cta">
+          <strong>Apri uno Spunto</strong>
+          <span>Porta qualcosa in piazza →</span>
+        </Link>
+      </div>
+
+      <div className="square-bottom">
+        <p>
+          <strong>La piazza è aperta</strong> · conversazioni, eventi e segnali aggiornati in tempo reale
         </p>
 
-        <div className="nova-radar-actions">
-          <Link href="/spaces" className="radar-cta primary">
-            Entra nel Radar →
+        <div className="square-actions">
+          <Link href="/spaces" className="square-cta primary">
+            Esplora la piazza →
           </Link>
 
-          <Link href="/calls/new" className="radar-cta">
-            Apri un Momento
+          <Link href="/calls/new" className="square-cta">
+            Crea uno Spunto
           </Link>
         </div>
       </div>
@@ -3308,20 +3333,20 @@ function NeedSomeoneSection() {
     <section className="need-section">
       <div className="need-head">
         <div>
-          <p className="ai-eyebrow">Azione immediata</p>
-          <h2>Ti serve qualcuno adesso?</h2>
+          <p className="square-eyebrow">Cosa vuoi fare in piazza?</p>
+          <h2>Scegli un punto di partenza</h2>
         </div>
 
         <p>
-          Non devi scrivere un post perfetto. Scegli cosa ti serve e NOVA ti aiuta ad aprire il momento giusto.
+          The Square non ti chiede di pubblicare per forza. Ti aiuta a partire da un bisogno reale.
         </p>
       </div>
 
       <div className="need-grid">
         <Link href="/calls/new?title=Ho%20bisogno%20di%20un%20consiglio&type=Capire" className="need-card">
           <div className="need-icon">🧭</div>
-          <b>Ho bisogno di un consiglio</b>
-          <span>Apri uno Spunto per ricevere pareri concreti.</span>
+          <b>Chiedi consiglio</b>
+          <span>Porta un dubbio in piazza e ricevi punti di vista utili.</span>
         </Link>
 
         <Link
@@ -3329,23 +3354,20 @@ function NeedSomeoneSection() {
           className="need-card"
         >
           <div className="need-icon">🪞</div>
-          <b>Voglio esperienze simili</b>
-          <span>Trova chi ha vissuto qualcosa di vicino al tuo momento.</span>
+          <b>Trova esperienze simili</b>
+          <span>Incontra chi ha vissuto qualcosa di vicino al tuo momento.</span>
         </Link>
 
-        <Link
-          href="/calls/new?title=Voglio%20organizzarmi%20con%20qualcuno&type=Trovare%20persone"
-          className="need-card"
-        >
+        <Link href="/events" className="need-card">
           <div className="need-icon">📍</div>
-          <b>Voglio organizzarmi</b>
-          <span>Crea un gruppo intorno a un evento, città o interesse.</span>
+          <b>Scopri eventi</b>
+          <span>Dal Centro Italia alla tua community: eventi che diventano conversazioni.</span>
         </Link>
 
-        <Link href="/calls/new?title=Voglio%20parlarne%20in%20anonimo&type=Anonima" className="need-card">
-          <div className="need-icon">🌙</div>
-          <b>Voglio parlarne in anonimo</b>
-          <span>Apri uno spazio sicuro senza esporti subito.</span>
+        <Link href="/world-news" className="need-card">
+          <div className="need-icon">📰</div>
+          <b>Parti da una notizia</b>
+          <span>Trasforma una news in uno Spunto da discutere con gli altri.</span>
         </Link>
       </div>
     </section>
@@ -3374,15 +3396,15 @@ function HomeSectionsPreview({
     <section className="home-preview">
       <div className="home-preview-head">
         <div>
-          <p className="ai-eyebrow">Esplora NOVA</p>
-          <h2>La tua dashboard viva</h2>
+          <p className="square-eyebrow">Esplora The Square</p>
+          <h2>La tua piazza viva</h2>
         </div>
 
-        <p>Tutte le sezioni principali in anteprima: entra, scopri cosa sta succedendo e apri nuovi Spunti.</p>
+        <p>Tutte le aree principali in anteprima: entra, scopri cosa sta succedendo e apri nuovi Spunti.</p>
       </div>
 
       <div className="home-preview-grid">
-        <PreviewCard icon="💡" title="Spunti" href="/spaces" cta="Vedi Spunti" accent="cyan">
+        <PreviewCard icon="⛲" title="Fontana" href="/spaces" cta="Vedi Spunti" accent="cyan">
           {firstThought ? (
             <>
               <MiniPreviewLine
@@ -3390,7 +3412,7 @@ function HomeSectionsPreview({
                 text={`Pulse ${firstThought.pulse_score || 0} · ${firstThought.participants || 0} partecipanti`}
               />
               {secondThought && (
-                <MiniPreviewLine title={secondThought.title} text={`Host: ${secondThought.host_name || 'Utente NOVA'}`} />
+                <MiniPreviewLine title={secondThought.title} text={`Host: ${secondThought.host_name || 'Utente Square'}`} />
               )}
             </>
           ) : (
@@ -3398,7 +3420,7 @@ function HomeSectionsPreview({
           )}
         </PreviewCard>
 
-        <PreviewCard icon="🧠" title="Echo" href="/echo" cta="Apri Echo" accent="violet">
+        <PreviewCard icon="🧠" title="Terrazza Echo" href="/echo" cta="Apri Echo" accent="violet">
           {trendEchoes.slice(0, 2).map((echo) => (
             <MiniPreviewLine key={echo.title} title={echo.title} text={echo.text} />
           ))}
@@ -3409,7 +3431,7 @@ function HomeSectionsPreview({
           <MiniPreviewLine title="Azioni concrete" text="Trasforma le conversazioni in prossimi passi." />
         </PreviewCard>
 
-        <PreviewCard icon="📰" title="News dal mondo" href="/world-news" cta="Apri News" accent="pink">
+        <PreviewCard icon="📰" title="Bacheca News" href="/world-news" cta="Apri News" accent="pink">
           {firstNews ? (
             <>
               <MiniPreviewLine title={firstNews.title} text={firstNews.source || 'Fonte news'} />
@@ -3420,12 +3442,12 @@ function HomeSectionsPreview({
           )}
         </PreviewCard>
 
-        <PreviewCard icon="📍" title="Eventi" href="/events" cta="Scopri Eventi" accent="blue">
+        <PreviewCard icon="🎤" title="Palco Eventi" href="/events" cta="Scopri Eventi" accent="blue">
           <MiniPreviewLine title="Centro Italia" text="Roma, Firenze, Perugia, Ancona, Pescara e altre città." />
           <MiniPreviewLine title="Organizziamoci" text="Ogni evento può diventare uno Spunto condiviso." />
         </PreviewCard>
 
-        <PreviewCard icon="👥" title="Persone" href="/people" cta="Vedi Persone" accent="cyan">
+        <PreviewCard icon="👥" title="Panchine" href="/people" cta="Vedi Persone" accent="cyan">
           <MiniPreviewLine title="Interazioni reali" text="Scopri le persone con cui hai condiviso Spunti." />
           <MiniPreviewLine title="Nessun follow" text="Profili visibili, ma niente logiche da social classico." />
         </PreviewCard>
@@ -3435,7 +3457,7 @@ function HomeSectionsPreview({
           <MiniPreviewLine title="Community locali" text="Luoghi digitali dove organizzarsi e confrontarsi." />
         </PreviewCard>
 
-        <PreviewCard icon="💬" title="Messaggi" href="/messages" cta="Apri Messaggi" accent="blue">
+        <PreviewCard icon="☕" title="Caffè" href="/messages" cta="Apri Messaggi" accent="blue">
           <MiniPreviewLine title="Conversazioni private" text="Rimani in contatto con chi hai incontrato negli Spunti." />
           <MiniPreviewLine title="Chat dirette" text="Messaggi più leggibili, ordinati e personali." />
         </PreviewCard>
@@ -3448,8 +3470,8 @@ function HomeSectionsPreview({
         </PreviewCard>
 
         <PreviewCard icon="👤" title="Profilo" href={currentUserId ? '/profile' : '/login'} cta={currentUserId ? 'Vai al Profilo' : 'Accedi'} accent="green">
-          <MiniPreviewLine title="Identità NOVA" text="Bio, passioni, contributi e punteggio personale." />
-          <MiniPreviewLine title="Livello Nova" text="Il livello resta solo nella tua pagina personale." />
+          <MiniPreviewLine title="Identità Square" text="Bio, passioni, contributi e punteggio personale." />
+          <MiniPreviewLine title="Livello personale" text="Il livello resta solo nella tua pagina personale." />
         </PreviewCard>
       </div>
     </section>
@@ -3515,21 +3537,21 @@ function WorldNewsSection({ items, loading }: { items: WorldNewsItem[]; loading:
   const fallbackItems: WorldNewsItem[] = [
     {
       title: 'Tecnologia, lavoro e relazioni stanno cambiando più velocemente delle abitudini sociali.',
-      source: 'NOVA Echo',
+      source: 'The Square Echo',
       url: '/calls/new',
       description: 'Uno spunto utile per aprire conversazioni su futuro, scelte personali e nuove priorità.',
       category: 'Società',
     },
     {
       title: 'Sempre più persone cercano comunità piccole, fidate e orientate a decisioni concrete.',
-      source: 'NOVA Echo',
+      source: 'The Square Echo',
       url: '/calls/new',
       description: 'Può diventare uno Spunto su amicizie, lavoro, fiducia o appartenenza.',
       category: 'Community',
     },
     {
       title: 'Il tema del cambiamento personale resta centrale: città, lavoro, coppia, famiglia, denaro.',
-      source: 'NOVA Echo',
+      source: 'The Square Echo',
       url: '/calls/new',
       description: 'Perfetto per generare Spunti dove la rete può portare esperienze reali.',
       category: 'Vita',
@@ -3542,7 +3564,7 @@ function WorldNewsSection({ items, loading }: { items: WorldNewsItem[]; loading:
     <section className="world-news-card glass">
       <div className="world-news-head">
         <div>
-          <p className="ai-eyebrow">News dal mondo</p>
+          <p className="square-eyebrow">Bacheca News</p>
           <h2>Notizie dal mondo per dare spunto… a un nuovo Spunto</h2>
         </div>
 
@@ -3588,15 +3610,15 @@ function HostOfMomentSection({ host }: { host: HostMoment | null }) {
     return (
       <section className="host-card glass">
         <div className="host-left">
-          <div className="host-orb">N</div>
+          <div className="host-orb">S</div>
           <div>
-            <div className="badge" style={{ marginBottom: 10, color: '#0f172a' }}>
+            <div className="badge" style={{ marginBottom: 10, color: '#18212f' }}>
               ✦ Host del momento
             </div>
             <div className="host-name">In raccolta dati</div>
             <div className="host-title">Servono più Spunti reali per calcolare il miglior Host.</div>
             <div className="host-bio">
-              NOVA userà partecipazione, Pulse medio e numero di Spunti aperti per aggiornare questa sezione.
+              The Square userà partecipazione, Pulse medio e numero di Spunti aperti per aggiornare questa sezione.
             </div>
           </div>
         </div>
@@ -3617,7 +3639,7 @@ function HostOfMomentSection({ host }: { host: HostMoment | null }) {
         </div>
 
         <div>
-          <div className="badge" style={{ marginBottom: 10, color: '#0f172a' }}>
+          <div className="badge" style={{ marginBottom: 10, color: '#18212f' }}>
             ✦ Host del momento
           </div>
 
@@ -3649,7 +3671,7 @@ function LiveStrip({ thoughts }: { thoughts: LiveThought[] }) {
   return (
     <section className="live-strip">
       <div className="strip-head">
-        <div className="strip-title">⌁ Spunti attivi</div>
+        <div className="strip-title">⌁ Spunti attivi in piazza</div>
         <Link href="/spaces" className="see-all">
           Vedi tutti →
         </Link>
@@ -3673,7 +3695,7 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
     <aside className="right">
       <section className="panel glass">
         <div className="panel-title">
-          ✣ Echo <small>In tempo reale</small>
+          ✣ Echo <small>Voci dalla piazza</small>
         </div>
 
         <div className="echo-body">
@@ -3689,13 +3711,13 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
           </div>
 
           <div className="inner">
-            <h4>Clima della rete</h4>
+            <h4>Clima della piazza</h4>
             <div className="mood-wrap">
               <div className="mood-blob">
                 <div>
-                  <b>Attivo</b>
+                  <b>Viva</b>
                   <span>
-                    Conversazioni vive e
+                    Conversazioni attive e
                     <br />
                     segnali in crescita.
                   </span>
@@ -3713,7 +3735,6 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
                 Curiosità
               </span>
               <span>
-                <i />
                 Decisione
               </span>
             </div>
@@ -3723,7 +3744,7 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
 
       <section className="panel glass">
         <div className="panel-title">
-          〽 Pulse <small>Media reale delle stanze</small>
+          〽 Pulse <small>Energia della piazza</small>
         </div>
 
         <div className="pulse">
@@ -3742,12 +3763,12 @@ function RightPanels({ avgPulse, trendEchoes }: { avgPulse: number; trendEchoes:
               <svg viewBox="0 0 280 100" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="line" x1="0" x2="1">
-                    <stop stopColor="#8f7cff" />
+                    <stop stopColor="#facc15" />
                     <stop offset=".55" stopColor="#58c4ff" />
                     <stop offset="1" stopColor="#c8f36b" />
                   </linearGradient>
                   <linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
-                    <stop stopColor="#58c4ff" stopOpacity=".22" />
+                    <stop stopColor="#facc15" stopOpacity=".22" />
                     <stop offset="1" stopColor="#58c4ff" stopOpacity="0" />
                   </linearGradient>
                 </defs>
