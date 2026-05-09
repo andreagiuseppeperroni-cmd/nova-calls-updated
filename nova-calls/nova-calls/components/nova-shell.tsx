@@ -1,8 +1,4 @@
-
-# Scrivo il file migliorato con animazioni, architettura pulita e design premium
-# Nota: richiede 'framer-motion' installato (npm i framer-motion)
-
-code = r'''"use client";
+"use client";
 
 import Link from "next/link";
 import {
@@ -4390,9 +4386,3 @@ export function NovaHome() {
     </div>
   );
 }
-'''
-
-with open('/mnt/agents/output/nova-shell-improved.tsx', 'w', encoding='utf-8') as f:
-    f.write(code)
-
-print("File salvato con successo. Righe:", len(code.splitlines()))
