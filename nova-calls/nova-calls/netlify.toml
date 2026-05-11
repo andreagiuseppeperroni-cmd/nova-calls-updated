@@ -1,7 +1,7 @@
 [build]
   base = "nova-calls/nova-calls"
   command = "npm run build"
-  publish = "nova-calls/nova-calls/.next"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
