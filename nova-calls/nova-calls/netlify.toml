@@ -1,6 +1,7 @@
 [build]
+  base = "nova-calls/nova-calls"
   command = "npm run build"
-  publish = ".next"
+  publish = "nova-calls/nova-calls/.next"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+[build.environment]
+  NODE_VERSION = "20"
