@@ -3,8 +3,8 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'The Square — City Wall Network',
-  description: 'Ogni città ha un Wall. Ogni persona ha una Piazza.',
+  title: 'The Square',
+  description: 'Il social delle piazze, delle stanze e dei momenti locali.',
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
@@ -16,31 +16,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="it">
       <body>
+        {children}
+
         <Script
           src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
           strategy="afterInteractive"
         />
 
-        <Script
-          id="onesignal-init"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.OneSignalDeferred = window.OneSignalDeferred || [];
-              OneSignalDeferred.push(async function(OneSignal) {
-                await OneSignal.init({
-                  appId: "faab59fe-2bcc-4ea1-93e2-6b0c940c7240",
-                  safari_web_id: "web.onesignal.auto.012c2ba4-f65b-47d9-b245-c87f55979016",
-                  notifyButton: {
-                    enable: true,
-                  },
-                });
+        <Script id="onesignal-init" strategy="afterInteractive">
+          {`
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            OneSignalDeferred.push(async function(OneSignal) {
+              await OneSignal.init({
+                appId: "faab59fe-2bcc-4ea1-93e2-6b0c940c7240",
+                safari_web_id: "web.onesignal.auto.012c2ba4-f65b-47d9-b245-c87f55979016",
+                notifyButton: {
+                  enable: true
+                },
+                serviceWorkerPath: "OneSignalSDKWorker.js",
+                serviceWorkerUpdaterPath: "OneSignalSDKUpdaterWorker.js"
               });
-            `,
-          }}
-        />
-
-        {children}
+            });
+          `}
+        </Script>
       </body>
     </html>
   );
