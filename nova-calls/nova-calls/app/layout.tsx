@@ -3,8 +3,8 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'The Square — Il social che risolve momenti',
-  description: 'Apri uno Spunto, entra nella piazza, genera un Outcome.',
+  title: 'The Square — City Wall Network',
+  description: 'Ogni città ha un Wall. Ogni persona ha una Piazza.',
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
