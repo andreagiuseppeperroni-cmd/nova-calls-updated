@@ -61,6 +61,17 @@ type UserLinkRow = {
   updated_at?: string | null;
 };
 
+type RpcLinkRow = {
+  link_id: string;
+  other_user_id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  nova_points: number | null;
+  updated_at: string | null;
+};
+
 type ChatPreview = {
   otherUserId: string;
   name: string;
@@ -702,6 +713,10 @@ export function NovaHome() {
     ]);
 
     const messages = (messageRows || []) as PrivateMessageRow[];
+
+    const { data: rpcRows } = await supabase.rpc('get_my_active_links');
+    const rpcLinks = (rpcRows || []) as RpcLinkRow[];
+
     const allowedLinkStatuses = new Set(['accepted', 'active', 'connected']);
     const links = ((linkRows || []) as UserLinkRow[]).filter((link) =>
       !link.status || allowedLinkStatuses.has(String(link.status).toLowerCase())
@@ -715,7 +730,9 @@ export function NovaHome() {
       link.requester_id === user.id ? link.receiver_id : link.requester_id
     );
 
-    const otherIds = Array.from(new Set([...messageOtherIds, ...linkOtherIds]));
+    const rpcOtherIds = rpcLinks.map((link) => link.other_user_id);
+
+    const otherIds = Array.from(new Set([...messageOtherIds, ...linkOtherIds, ...rpcOtherIds]));
 
     let profiles: ChatProfile[] = [];
 
@@ -729,6 +746,7 @@ export function NovaHome() {
     }
 
     const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const rpcProfileMap = new Map(rpcLinks.map((link) => [link.other_user_id, link]));
     const linkMap = new Map<string, UserLinkRow>();
 
     for (const link of links) {
@@ -748,15 +766,16 @@ export function NovaHome() {
 
       if (!grouped.has(otherUserId)) {
         const profile = profileMap.get(otherUserId);
+        const rpcProfile = rpcProfileMap.get(otherUserId);
         const link = linkMap.get(otherUserId);
-        const name = getProfileName(profile) || 'Utente The Square';
+        const name = getProfileName(profile) || rpcProfile?.full_name || rpcProfile?.username || 'Utente The Square';
 
         grouped.set(otherUserId, {
           otherUserId,
           name,
           initials: getInitials(name),
-          avatarUrl: profile?.avatar_url || null,
-          linkId: message.link_id || link?.id || null,
+          avatarUrl: profile?.avatar_url || rpcProfile?.avatar_url || null,
+          linkId: message.link_id || link?.id || rpcProfile?.link_id || null,
           body: message.body || 'Messaggio',
           time: timeLabel(message.created_at),
           unread: 0,
@@ -780,6 +799,29 @@ export function NovaHome() {
           initials: getInitials(name),
           avatarUrl: profile?.avatar_url || null,
           linkId: link.id,
+          body: `${city}${points} · Legame attivo`,
+          time: link.updated_at ? timeLabel(link.updated_at) : '',
+          unread: 0,
+          accent: ['cyan', 'pink', 'green', 'blue', 'yellow'][grouped.size % 5] as ChatPreview['accent'],
+        });
+      }
+    }
+
+    for (const link of rpcLinks) {
+      const otherUserId = link.other_user_id;
+
+      if (!grouped.has(otherUserId)) {
+        const profile = profileMap.get(otherUserId);
+        const name = getProfileName(profile) || link.full_name || link.username || 'Utente The Square';
+        const city = profile?.city || link.city || 'Italia';
+        const points = typeof link.nova_points === 'number' ? ` · ${link.nova_points} punti` : '';
+
+        grouped.set(otherUserId, {
+          otherUserId,
+          name,
+          initials: getInitials(name),
+          avatarUrl: profile?.avatar_url || link.avatar_url || null,
+          linkId: link.link_id,
           body: `${city}${points} · Legame attivo`,
           time: link.updated_at ? timeLabel(link.updated_at) : '',
           unread: 0,
@@ -3352,4 +3394,515 @@ const styles = `
     min-height: 560px;
   }
 }
+
+/* === THE SQUARE MOBILE REDESIGN — exact bottom/nav fix === */
+@media (max-width: 980px) {
+  .feed-shell {
+    background:
+      radial-gradient(circle at 16% 0%, rgba(255,210,31,.10), transparent 30%),
+      radial-gradient(circle at 92% 14%, rgba(36,224,210,.08), transparent 28%),
+      linear-gradient(180deg, #080c12 0%, #0b1017 56%, #070a0f 100%);
+  }
+
+  .app {
+    width: min(100%, 940px);
+    padding: 22px 24px 118px;
+  }
+
+  .topbar {
+    position: relative;
+    top: auto;
+    z-index: 35;
+    margin: 0;
+    padding: 0 0 18px;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .home-brand-row {
+    display: block;
+    margin-bottom: 22px;
+  }
+
+  .home-brand {
+    width: 100%;
+    min-height: 108px;
+    display: grid;
+    grid-template-columns: 86px 1fr 60px;
+    gap: 18px;
+    align-items: center;
+    padding: 18px 0;
+    border: 0;
+    background: transparent;
+    clip-path: none;
+  }
+
+  .home-brand::after {
+    content: "🔔";
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    justify-self: end;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(10,15,22,.88);
+    border-radius: 18px;
+    font-size: 25px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.25);
+  }
+
+  .home-brand::before {
+    content: "3";
+    position: absolute;
+    right: 4px;
+    top: 10px;
+    z-index: 2;
+    min-width: 23px;
+    height: 23px;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--yellow);
+    color: #07110f;
+    font-size: 12px;
+    font-weight: 1000;
+    box-shadow: 0 0 0 3px rgba(8,12,18,.9);
+  }
+
+  .home-brand img {
+    width: 82px;
+    height: 82px;
+    border-radius: 21px;
+    border: 2px solid rgba(255,210,31,.44);
+    box-shadow: 0 16px 34px rgba(255,210,31,.14);
+  }
+
+  .home-brand b {
+    font-size: clamp(42px, 9vw, 56px);
+    letter-spacing: -.075em;
+    line-height: .86;
+  }
+
+  .home-brand small {
+    margin-top: 10px;
+    font-size: 15px;
+    letter-spacing: .34em;
+    color: #9aa6b8;
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    min-height: auto;
+    margin-bottom: 18px;
+  }
+
+  .search-row > .icon-btn {
+    display: none;
+  }
+
+  .search {
+    height: 82px;
+    border-radius: 20px;
+    clip-path: none;
+    border: 1px solid rgba(255,255,255,.13);
+    background: rgba(8,12,18,.88);
+    padding: 0 26px;
+    color: #8f99aa;
+    font-size: clamp(22px, 3.4vw, 27px);
+    letter-spacing: -.04em;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.025), 0 16px 40px rgba(0,0,0,.18);
+  }
+
+  .search::first-letter {
+    color: var(--yellow);
+  }
+
+  .wall-tabs {
+    gap: 14px;
+    margin-top: 0;
+    padding-bottom: 14px;
+  }
+
+  .wall-tab {
+    min-height: 66px;
+    border-radius: 22px;
+    padding: 0 30px;
+    background: rgba(12,17,25,.82);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #d6dce6;
+    font-size: clamp(22px, 3.1vw, 27px);
+    font-weight: 1000;
+    box-shadow: 0 14px 34px rgba(0,0,0,.18);
+  }
+
+  .wall-tab.active {
+    color: #07110f;
+    background: linear-gradient(135deg, #ffd21f, #ffb326);
+    border-color: rgba(255,210,31,.42);
+  }
+
+  .topic-tabs {
+    gap: 14px;
+    margin-top: 2px;
+    padding-bottom: 18px;
+  }
+
+  .topic {
+    min-height: 64px;
+    border-radius: 13px;
+    padding: 0 24px;
+    background: rgba(12,17,25,.86);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #d6dce6;
+    font-size: clamp(20px, 2.8vw, 25px);
+    font-weight: 1000;
+  }
+
+  .topic.active {
+    color: var(--cyan);
+    border-color: rgba(36,224,210,.46);
+    background: rgba(36,224,210,.08);
+  }
+
+  .composer {
+    margin: 10px 0 24px;
+    padding: 26px;
+    border-radius: 23px;
+    clip-path: none;
+    border: 1px solid rgba(255,255,255,.13);
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255,210,31,.08), transparent 28%),
+      rgba(15,20,27,.86);
+    box-shadow: 0 24px 58px rgba(0,0,0,.28);
+  }
+
+  .composer-top {
+    grid-template-columns: 88px 1fr;
+    gap: 22px;
+  }
+
+  .avatar {
+    width: 78px;
+    height: 78px;
+    border-radius: 18px;
+    font-size: 28px;
+  }
+
+  .composer-placeholder {
+    min-height: 78px;
+    border-radius: 16px;
+    background: rgba(6,10,16,.80);
+    font-size: clamp(24px, 3.2vw, 31px);
+    color: #8d98aa;
+    letter-spacing: -.04em;
+    padding: 0 28px;
+  }
+
+  .composer-actions {
+    margin-top: 26px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .composer-actions button {
+    height: 78px;
+    border: 0;
+    border-right: 1px solid rgba(255,255,255,.10);
+    border-radius: 0;
+    background: rgba(6,10,16,.58);
+    color: #d7dde7;
+    font-size: clamp(18px, 2.5vw, 24px);
+    font-weight: 950;
+  }
+
+  .composer-actions button:last-child {
+    border-right: 0;
+  }
+
+  .wall-publisher,
+  .publisher-panel,
+  .publisher-card {
+    margin-bottom: 24px !important;
+    border-radius: 22px !important;
+    clip-path: none !important;
+  }
+
+  .home-link-search {
+    border-radius: 22px;
+    clip-path: none;
+    margin-bottom: 24px;
+  }
+
+  .section-title,
+  .feed::before {
+    display: none;
+  }
+
+  .feed {
+    gap: 22px;
+  }
+
+  .feed::after {
+    content: "";
+    display: block;
+    height: 24px;
+  }
+
+  .post {
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 92% 0%, rgba(255,210,31,.055), transparent 28%),
+      rgba(14,19,27,.88);
+    box-shadow: 0 24px 60px rgba(0,0,0,.34);
+  }
+
+  .post-head {
+    grid-template-columns: 68px 1fr auto;
+    gap: 18px;
+    padding: 24px;
+  }
+
+  .post-avatar {
+    width: 62px;
+    height: 62px;
+    border-radius: 18px;
+    font-size: 24px;
+  }
+
+  .post-meta b {
+    font-size: clamp(24px, 3.2vw, 31px);
+    letter-spacing: -.05em;
+  }
+
+  .post-meta span {
+    font-size: clamp(15px, 2.1vw, 19px);
+    margin-top: 9px;
+  }
+
+  .wall-pill {
+    min-height: 42px;
+    border-radius: 11px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+
+  .post-body {
+    padding: 0 24px 24px;
+  }
+
+  .post-body h2 {
+    font-size: clamp(29px, 4vw, 39px);
+    line-height: 1.05;
+  }
+
+  .post-body p {
+    font-size: clamp(20px, 2.8vw, 26px);
+    line-height: 1.42;
+  }
+
+  .media {
+    border-radius: 18px;
+    min-height: 330px;
+  }
+
+  .post-actions {
+    border-radius: 0 0 24px 24px;
+    overflow: hidden;
+  }
+
+  .post-actions button {
+    min-height: 66px;
+    font-size: clamp(18px, 2.4vw, 24px);
+  }
+
+  .post-comments {
+    font-size: 17px;
+    padding: 18px 24px 22px;
+  }
+
+  .mobile-nav {
+    left: 24px;
+    right: 24px;
+    bottom: 16px;
+    z-index: 220;
+    height: 88px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    padding: 8px;
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,.13);
+    background: rgba(7,11,16,.90);
+    backdrop-filter: blur(24px) saturate(1.1);
+    box-shadow: 0 24px 70px rgba(0,0,0,.56);
+  }
+
+  .mobile-nav a,
+  .mobile-nav button {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: 30px 20px;
+    place-items: center;
+    gap: 6px;
+    color: #d8dee8;
+    font-size: 0;
+    border-radius: 16px;
+    position: relative;
+  }
+
+  .mobile-nav a::before,
+  .mobile-nav button::before {
+    font-size: 29px;
+    line-height: 1;
+  }
+
+  .mobile-nav a:nth-child(1)::before { content: "⌂"; }
+  .mobile-nav a:nth-child(2)::before { content: "⌖"; }
+  .mobile-nav a:nth-child(3)::before { content: "+"; font-size: 42px; }
+  .mobile-nav button:nth-child(4)::before { content: "💬"; font-size: 27px; }
+  .mobile-nav a:nth-child(5)::before { content: "♙"; }
+
+  .mobile-nav a:nth-child(1)::after { content: "Home"; }
+  .mobile-nav a:nth-child(2)::after { content: "Città"; }
+  .mobile-nav a:nth-child(3)::after { content: "Pubblica"; }
+  .mobile-nav button:nth-child(4)::after { content: "Chat"; }
+  .mobile-nav a:nth-child(5)::after { content: "Profilo"; }
+
+  .mobile-nav a::after,
+  .mobile-nav button::after {
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 850;
+  }
+
+  .mobile-nav a.active {
+    background: transparent;
+    color: var(--yellow);
+  }
+
+  .mobile-nav a:nth-child(3) {
+    width: 78px;
+    height: 78px;
+    margin: -27px auto 0;
+    border-radius: 50%;
+    grid-template-rows: 42px 16px;
+    color: #07110f;
+    background: linear-gradient(135deg, #ffd21f, #ffb326);
+    box-shadow: 0 18px 42px rgba(255,210,31,.24);
+  }
+
+  .mobile-nav a:nth-child(3)::after {
+    position: absolute;
+    bottom: -24px;
+    color: #d8dee8;
+    font-size: 14px;
+  }
+
+  .mobile-badge {
+    right: 22%;
+    top: 8px;
+    min-width: 21px;
+    height: 21px;
+    border-radius: 7px;
+    font-size: 11px;
+  }
+
+  .chat-drawer {
+    z-index: 260;
+  }
+
+  .chat-backdrop {
+    z-index: 250;
+  }
+
+  /* Hide/neutralize external floating notification widgets near the bottom when they overlap the app nav */
+  iframe[src*="onesignal"],
+  div[id*="onesignal"],
+  div[class*="onesignal"],
+  .onesignal-bell-launcher,
+  .onesignal-customlink-container,
+  .onesignal-slidedown-container,
+  .onesignal-popover-container {
+    bottom: 118px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .app {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .home-brand {
+    grid-template-columns: 74px 1fr 52px;
+    min-height: 96px;
+    gap: 14px;
+  }
+
+  .home-brand img {
+    width: 68px;
+    height: 68px;
+  }
+
+  .home-brand b {
+    font-size: 40px;
+  }
+
+  .home-brand small {
+    font-size: 12px;
+    letter-spacing: .28em;
+  }
+
+  .home-brand::after {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .search {
+    height: 70px;
+    font-size: 22px;
+  }
+
+  .wall-tab,
+  .topic {
+    min-height: 56px;
+    padding: 0 20px;
+    font-size: 20px;
+  }
+
+  .composer {
+    padding: 20px;
+  }
+
+  .composer-top {
+    grid-template-columns: 66px 1fr;
+    gap: 16px;
+  }
+
+  .avatar {
+    width: 62px;
+    height: 62px;
+  }
+
+  .composer-placeholder {
+    min-height: 62px;
+    font-size: 21px;
+    padding: 0 18px;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .composer-actions button {
+    height: 62px;
+    font-size: 18px;
+  }
+}
+
 `;
