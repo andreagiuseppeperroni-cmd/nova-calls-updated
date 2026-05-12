@@ -43,6 +43,16 @@ type ChatProfile = {
   username?: string | null;
   avatar_url: string | null;
   city?: string | null;
+  nova_points?: number | null;
+};
+
+type UserLinkRow = {
+  id: string;
+  requester_id: string;
+  receiver_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type ChatPreview = {
@@ -332,41 +342,66 @@ export function NovaHome() {
       return;
     }
 
-    const { data: rows } = await supabase
-      .from('private_messages')
-      .select('id, link_id, sender_id, receiver_id, body, read_at, created_at')
-      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at', { ascending: false })
-      .limit(40);
+    const [{ data: messageRows }, { data: linkRows }] = await Promise.all([
+      supabase
+        .from('private_messages')
+        .select('id, link_id, sender_id, receiver_id, body, read_at, created_at')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(80),
+      supabase
+        .from('user_links')
+        .select('id, requester_id, receiver_id, status, created_at, updated_at')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('updated_at', { ascending: false }),
+    ]);
 
-    const messages = (rows || []) as PrivateMessageRow[];
-    const otherIds = Array.from(
-      new Set(messages.map((message) => (message.sender_id === user.id ? message.receiver_id : message.sender_id)))
+    const messages = (messageRows || []) as PrivateMessageRow[];
+    const links = (linkRows || []) as UserLinkRow[];
+
+    const messageOtherIds = messages.map((message) =>
+      message.sender_id === user.id ? message.receiver_id : message.sender_id
     );
+
+    const linkOtherIds = links.map((link) =>
+      link.requester_id === user.id ? link.receiver_id : link.requester_id
+    );
+
+    const otherIds = Array.from(new Set([...messageOtherIds, ...linkOtherIds]));
 
     let profiles: ChatProfile[] = [];
 
     if (otherIds.length > 0) {
       const { data: profileRows } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, city')
+        .select('id, full_name, username, avatar_url, city, nova_points')
         .in('id', otherIds);
 
       profiles = (profileRows || []) as ChatProfile[];
     }
 
     const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const linkMap = new Map<string, UserLinkRow>();
+
+    for (const link of links) {
+      const otherUserId = link.requester_id === user.id ? link.receiver_id : link.requester_id;
+      linkMap.set(otherUserId, link);
+    }
+
     const grouped = new Map<string, ChatPreview>();
     const unreadMap = new Map<string, number>();
 
     for (const message of messages) {
       const otherUserId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+
       if (message.receiver_id === user.id && !message.read_at) {
         unreadMap.set(otherUserId, (unreadMap.get(otherUserId) || 0) + 1);
       }
 
       if (!grouped.has(otherUserId)) {
         const profile = profileMap.get(otherUserId);
+        const link = linkMap.get(otherUserId);
         const name = profile?.full_name || profile?.username || 'Utente The Square';
 
         grouped.set(otherUserId, {
@@ -374,9 +409,32 @@ export function NovaHome() {
           name,
           initials: getInitials(name),
           avatarUrl: profile?.avatar_url || null,
-          linkId: message.link_id,
+          linkId: message.link_id || link?.id || null,
           body: message.body || 'Messaggio',
           time: timeLabel(message.created_at),
+          unread: 0,
+          accent: ['cyan', 'pink', 'green', 'blue', 'yellow'][grouped.size % 5] as ChatPreview['accent'],
+        });
+      }
+    }
+
+    for (const link of links) {
+      const otherUserId = link.requester_id === user.id ? link.receiver_id : link.requester_id;
+
+      if (!grouped.has(otherUserId)) {
+        const profile = profileMap.get(otherUserId);
+        const name = profile?.full_name || profile?.username || 'Utente The Square';
+        const city = profile?.city || 'Italia';
+        const points = typeof profile?.nova_points === 'number' ? ` · ${profile.nova_points} punti` : '';
+
+        grouped.set(otherUserId, {
+          otherUserId,
+          name,
+          initials: getInitials(name),
+          avatarUrl: profile?.avatar_url || null,
+          linkId: link.id,
+          body: `${city}${points} · Legame attivo`,
+          time: link.updated_at ? timeLabel(link.updated_at) : '',
           unread: 0,
           accent: ['cyan', 'pink', 'green', 'blue', 'yellow'][grouped.size % 5] as ChatPreview['accent'],
         });
@@ -718,7 +776,7 @@ export function NovaHome() {
         <header className="chat-head">
           <div>
             <h2>Chat personali</h2>
-            <p>Solo legami reciproci, stanze condivise o richieste accettate.</p>
+            <p>Qui trovi tutti i legami attivi; i messaggi compaiono appena la conversazione inizia.</p>
           </div>
           <button type="button" className="close-chat" onClick={() => setChatOpen(false)} aria-label="Chiudi chat">×</button>
         </header>
@@ -767,7 +825,7 @@ export function NovaHome() {
             ) : (
               <>
                 <div className="bubble">{selectedChat?.body || 'Nessun messaggio recente.'}</div>
-                <div className="bubble me">Questa conversazione verrà caricata qui appena avrà messaggi reali.</div>
+                <div className="bubble me">Questa chat è pronta: scrivi qui sotto per iniziare la conversazione.</div>
               </>
             )}
           </div>
