@@ -283,6 +283,9 @@ export function NovaHome() {
   const [activeMessages, setActiveMessages] = useState<PrivateMessageRow[]>([]);
   const [replyBody, setReplyBody] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [chatLinkSearch, setChatLinkSearch] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<ChatPreview | null>(null);
 
   const visiblePosts = useMemo(() => {
     return feedPosts.filter((post) => {
@@ -302,6 +305,28 @@ export function NovaHome() {
   const selectedChat = useMemo(() => {
     return chatPreviews.find((chat) => chat.otherUserId === selectedChatId) || chatPreviews[0] || fallbackChats[0];
   }, [chatPreviews, selectedChatId]);
+
+  const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
+
+  const homeFilteredChats = useMemo(() => {
+    const query = linkSearch.trim().toLowerCase();
+
+    if (!query) return chatsToShow;
+
+    return chatsToShow.filter((chat) =>
+      `${chat.name} ${chat.body} ${chat.initials}`.toLowerCase().includes(query)
+    );
+  }, [chatsToShow, linkSearch]);
+
+  const drawerFilteredChats = useMemo(() => {
+    const query = chatLinkSearch.trim().toLowerCase();
+
+    if (!query) return chatsToShow;
+
+    return chatsToShow.filter((chat) =>
+      `${chat.name} ${chat.body} ${chat.initials}`.toLowerCase().includes(query)
+    );
+  }, [chatsToShow, chatLinkSearch]);
 
   async function loadUnreadCounts() {
     const {
@@ -616,8 +641,6 @@ export function NovaHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen, selectedChatId]);
 
-  const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
-
   return (
     <div className="feed-shell">
       <div className="app">
@@ -635,7 +658,7 @@ export function NovaHome() {
             <Link href="/cities"><span>📍</span><b>Città</b></Link>
             <Link href="#feed"><span>🧱</span><b>Wall</b></Link>
             <Link href="#audio"><span>🎙️</span><b>Audio</b></Link>
-            <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || chatsToShow[0]?.otherUserId)}><span>💬</span><b>Chat</b></button>
+            <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}><span>💬</span><b>Chat</b></button>
             <Link href="/notifications"><span>🔔</span><b>Notifiche</b></Link>
             <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
@@ -717,6 +740,51 @@ export function NovaHome() {
             </div>
           </section>
 
+          <section className="home-link-search">
+            <div className="home-link-search-head">
+              <div>
+                <p>Cerca legame</p>
+                <h2>Trova una persona tra i tuoi legami attivi</h2>
+              </div>
+              <button type="button" onClick={() => setChatOpen(true)}>Apri chat</button>
+            </div>
+
+            <div className="home-link-search-box">
+              <span>⌕</span>
+              <input
+                value={linkSearch}
+                onChange={(event) => setLinkSearch(event.target.value)}
+                placeholder="Cerca per nome, città, interessi o ultimo messaggio..."
+              />
+            </div>
+
+            {linkSearch.trim() && (
+              <div className="home-link-results">
+                {homeFilteredChats.length > 0 ? (
+                  homeFilteredChats.slice(0, 5).map((chat) => (
+                    <button
+                      type="button"
+                      key={chat.otherUserId}
+                      className="home-link-result"
+                      onClick={() => setSelectedProfile(chat)}
+                    >
+                      <AvatarBox chat={chat} />
+                      <span>
+                        <b>{chat.name}</b>
+                        <small>{chat.body}</small>
+                      </span>
+                      {chat.unread > 0 && <em>{chat.unread}</em>}
+                    </button>
+                  ))
+                ) : (
+                  <div className="home-link-empty">
+                    Nessun legame trovato con questa ricerca.
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           <section className="feed" id="feed">
             {visiblePosts.length ? (
               visiblePosts.map((post) => <FeedPostCard key={post.id} post={post} />)
@@ -731,8 +799,11 @@ export function NovaHome() {
 
         <aside className="right">
           <section className="right-panel">
-            <h3>Chat personali</h3>
-            {chatsToShow.slice(0, 3).map((chat) => (
+            <div className="panel-title-row">
+              <h3>Chat personali</h3>
+              <button type="button" onClick={() => setChatOpen(true)}>Apri</button>
+            </div>
+            {chatsToShow.slice(0, 4).map((chat) => (
               <div className="city-card" key={chat.otherUserId}>
                 <AvatarBox chat={chat} />
                 <div><b>{chat.name}</b><span>{chat.body}</span></div>
@@ -782,28 +853,40 @@ export function NovaHome() {
         </header>
 
         <div className="chat-search">
-          <input placeholder="Cerca una conversazione..." />
+          <input
+            value={chatLinkSearch}
+            onChange={(event) => setChatLinkSearch(event.target.value)}
+            placeholder="Cerca tra i tuoi legami..."
+            autoFocus={chatOpen}
+          />
         </div>
 
         <div className="chat-list">
-          {chatsToShow.map((chat) => (
-            <button
-              type="button"
-              className={`chat-item ${selectedChat?.otherUserId === chat.otherUserId ? 'active' : ''}`}
-              key={chat.otherUserId}
-              onClick={() => openChatThread(chat.otherUserId)}
-            >
-              <AvatarBox chat={chat} large />
-              <div className="chat-copy">
-                <b>{chat.name}</b>
-                <span>{chat.body}</span>
-              </div>
-              <div className="chat-meta">
-                {chat.time}
-                {chat.unread > 0 && <div className="unread">{chat.unread}</div>}
-              </div>
-            </button>
-          ))}
+          {drawerFilteredChats.length > 0 ? (
+            drawerFilteredChats.map((chat) => (
+              <button
+                type="button"
+                className={`chat-item ${selectedChat?.otherUserId === chat.otherUserId ? 'active' : ''}`}
+                key={chat.otherUserId}
+                onClick={() => openChatThread(chat.otherUserId)}
+              >
+                <AvatarBox chat={chat} large />
+                <div className="chat-copy">
+                  <b>{chat.name}</b>
+                  <span>{chat.body}</span>
+                </div>
+                <div className="chat-meta">
+                  {chat.time}
+                  {chat.unread > 0 && <div className="unread">{chat.unread}</div>}
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="empty-links">
+              <b>Nessun legame trovato</b>
+              <span>Prova con un altro nome oppure cerca nella Home tra tutti i tuoi legami.</span>
+            </div>
+          )}
         </div>
 
         <section className="mini-thread">
@@ -858,11 +941,53 @@ export function NovaHome() {
         </section>
       </aside>
 
+      {selectedProfile && (
+        <>
+          <div className="profile-backdrop open" onClick={() => setSelectedProfile(null)} />
+          <aside className="profile-drawer" aria-label="Profilo legame">
+            <header className="profile-head">
+              <button type="button" className="close-chat" onClick={() => setSelectedProfile(null)} aria-label="Chiudi profilo">×</button>
+              <AvatarBox chat={selectedProfile} large />
+              <div>
+                <p>Legame attivo</p>
+                <h2>{selectedProfile.name}</h2>
+                <span>{selectedProfile.body}</span>
+              </div>
+            </header>
+
+            <div className="profile-body">
+              <div className="profile-stat">
+                <b>{selectedProfile.unread}</b>
+                <span>messaggi non letti</span>
+              </div>
+              <div className="profile-stat">
+                <b>{selectedProfile.time || '—'}</b>
+                <span>ultimo contatto</span>
+              </div>
+            </div>
+
+            <div className="profile-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = selectedProfile.otherUserId;
+                  setSelectedProfile(null);
+                  openChatThread(id);
+                }}
+              >
+                💬 Apri chat
+              </button>
+              <Link href="/people">Vedi persone</Link>
+            </div>
+          </aside>
+        </>
+      )}
+
       <nav className="mobile-nav">
         <Link href="/" className="active">⌂</Link>
         <Link href="/cities">📍</Link>
         <Link href="#composer">＋</Link>
-        <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || chatsToShow[0]?.otherUserId)}>
+        <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}>
           💬
           {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
         </button>
@@ -1367,6 +1492,157 @@ const styles = `
   cursor: pointer;
 }
 
+
+.home-link-search {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(36,224,210,.12), transparent 32%),
+    linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.015)),
+    rgba(16,22,32,.82);
+  box-shadow: 0 22px 62px rgba(0,0,0,.22);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.home-link-search-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.home-link-search-head p {
+  margin: 0 0 5px;
+  color: var(--cyan);
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.home-link-search-head h2 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+.home-link-search-head button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,210,31,.28);
+  background: rgba(255,210,31,.10);
+  color: var(--yellow);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.home-link-search-box {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,.11);
+  background: rgba(8,10,15,.66);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.home-link-search-box span {
+  display: grid;
+  place-items: center;
+  color: var(--yellow);
+  font-size: 18px;
+}
+
+.home-link-search-box input {
+  width: 100%;
+  height: 50px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.home-link-search-box input::placeholder {
+  color: #657286;
+}
+
+.home-link-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.home-link-result {
+  width: 100%;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.46);
+  color: inherit;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-link-result:hover {
+  border-color: rgba(36,224,210,.28);
+  background: rgba(36,224,210,.08);
+}
+
+.home-link-result b {
+  display: block;
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+.home-link-result small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 780;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-link-result em {
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--pink);
+  color: white;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+.home-link-empty {
+  padding: 13px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.46);
+  color: var(--muted);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .feed {
   display: grid;
   gap: 18px;
@@ -1740,6 +2016,72 @@ const styles = `
   font-weight: 900;
 }
 
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.panel-title-row h3 {
+  margin-bottom: 0;
+}
+
+.panel-title-row button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(36,224,210,.24);
+  background: rgba(36,224,210,.10);
+  color: var(--cyan);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.mini-link-search {
+  margin-bottom: 8px;
+}
+
+.mini-link-search input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.64);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.empty-links {
+  margin: 10px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.52);
+  border-radius: 10px;
+}
+
+.empty-links b {
+  display: block;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+.empty-links span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 760;
+}
+
 .chat-drawer {
   position: fixed;
   top: 18px;
@@ -1979,6 +2321,138 @@ const styles = `
   pointer-events: auto;
 }
 
+
+.profile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(0,0,0,.50);
+}
+
+.profile-drawer {
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  z-index: 120;
+  width: min(420px, calc(100vw - 32px));
+  transform: translateY(-50%);
+  border: 1px solid rgba(255,255,255,.18);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255,210,31,.14), transparent 34%),
+    linear-gradient(180deg, rgba(18,26,38,.98), rgba(8,10,15,.98));
+  box-shadow: -28px 0 90px rgba(0,0,0,.52);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+
+.profile-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 22px 60px 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.profile-head .close-chat {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+}
+
+.profile-head .chat-avatar.large {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  font-size: 20px;
+}
+
+.profile-head p {
+  margin: 0 0 6px;
+  color: var(--yellow);
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.profile-head h2 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 30px;
+  line-height: .95;
+  letter-spacing: -.06em;
+}
+
+.profile-head span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-body {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 14px;
+}
+
+.profile-stat {
+  min-height: 82px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.52);
+  border-radius: 10px;
+}
+
+.profile-stat b {
+  color: #e2e8f0;
+  font-size: 22px;
+  font-weight: 1000;
+}
+
+.profile-stat span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.profile-actions button,
+.profile-actions a {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.profile-actions button {
+  border: 0;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  cursor: pointer;
+}
+
+.profile-actions a {
+  border: 1px solid rgba(36,224,210,.24);
+  color: var(--cyan);
+  background: rgba(36,224,210,.10);
+}
+
 .mobile-nav {
   display: none;
 }
@@ -2041,6 +2515,17 @@ const styles = `
   .composer-actions {
     grid-template-columns: repeat(2, 1fr);
   }
+
+
+  .home-link-search-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-link-search-head button {
+    width: 100%;
+  }
+
 
   .post-head {
     grid-template-columns: 44px 1fr;
