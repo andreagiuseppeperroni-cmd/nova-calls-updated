@@ -43,9 +43,11 @@ type PrivateMessageRow = {
 
 type ChatProfile = {
   id: string;
-  full_name: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  name?: string | null;
   username?: string | null;
-  avatar_url: string | null;
+  avatar_url?: string | null;
   city?: string | null;
   nova_points?: number | null;
 };
@@ -263,6 +265,24 @@ function getInitials(name: string) {
   );
 }
 
+function getProfileName(profile: ChatProfile | undefined | null) {
+  return (
+    profile?.full_name ||
+    profile?.display_name ||
+    profile?.name ||
+    profile?.username ||
+    ''
+  ).trim();
+}
+
+
+function normalizeSearchValue(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function timeLabel(value: string) {
   const date = new Date(value);
   const diff = Date.now() - date.getTime();
@@ -321,22 +341,22 @@ export function NovaHome() {
   const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
 
   const homeFilteredChats = useMemo(() => {
-    const query = linkSearch.trim().toLowerCase();
+    const query = normalizeSearchValue(linkSearch.trim());
 
     if (!query) return chatsToShow;
 
     return chatsToShow.filter((chat) =>
-      `${chat.name} ${chat.body} ${chat.initials}`.toLowerCase().includes(query)
+      normalizeSearchValue(`${chat.name} ${chat.body} ${chat.initials}`).includes(query)
     );
   }, [chatsToShow, linkSearch]);
 
   const drawerFilteredChats = useMemo(() => {
-    const query = chatLinkSearch.trim().toLowerCase();
+    const query = normalizeSearchValue(chatLinkSearch.trim());
 
     if (!query) return chatsToShow;
 
     return chatsToShow.filter((chat) =>
-      `${chat.name} ${chat.body} ${chat.initials}`.toLowerCase().includes(query)
+      normalizeSearchValue(`${chat.name} ${chat.body} ${chat.initials}`).includes(query)
     );
   }, [chatsToShow, chatLinkSearch]);
 
@@ -567,7 +587,7 @@ export function NovaHome() {
     if (userIds.length > 0) {
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, username')
+        .select('*')
         .in('id', userIds);
 
       profileRows = data || [];
@@ -587,7 +607,7 @@ export function NovaHome() {
       const media = mediaMap.get(post.id);
       const city = cityMap.get(post.city_id);
       const profile = profileMap.get(post.user_id);
-      const author = profile?.full_name || profile?.username || 'Utente The Square';
+      const author = getProfileName(profile as ChatProfile) || 'Utente The Square';
       const postType = String(post.post_type || media?.media_type || 'text');
       const kind: FeedKind =
         postType === 'image'
@@ -700,7 +720,7 @@ export function NovaHome() {
     if (otherIds.length > 0) {
       const { data: profileRows } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, city, nova_points')
+        .select('*')
         .in('id', otherIds);
 
       profiles = (profileRows || []) as ChatProfile[];
@@ -727,7 +747,7 @@ export function NovaHome() {
       if (!grouped.has(otherUserId)) {
         const profile = profileMap.get(otherUserId);
         const link = linkMap.get(otherUserId);
-        const name = profile?.full_name || profile?.username || 'Utente The Square';
+        const name = getProfileName(profile) || 'Utente The Square';
 
         grouped.set(otherUserId, {
           otherUserId,
@@ -748,7 +768,7 @@ export function NovaHome() {
 
       if (!grouped.has(otherUserId)) {
         const profile = profileMap.get(otherUserId);
-        const name = profile?.full_name || profile?.username || 'Utente The Square';
+        const name = getProfileName(profile) || 'Utente The Square';
         const city = profile?.city || 'Italia';
         const points = typeof profile?.nova_points === 'number' ? ` · ${profile.nova_points} punti` : '';
 
