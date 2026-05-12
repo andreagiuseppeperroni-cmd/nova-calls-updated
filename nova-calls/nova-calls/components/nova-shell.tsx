@@ -934,7 +934,7 @@ export function NovaHome() {
               <button type="button" className="open-publisher-inline" onClick={() => openComposer('text')}>
                 Apri il modulo per scrivere o allegare file →
               </button>
-            )
+            )}
 
             {composerOpen && (
               <div className="wall-publisher">
