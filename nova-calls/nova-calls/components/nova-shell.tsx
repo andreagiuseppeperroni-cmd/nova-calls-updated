@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
@@ -330,14 +330,7 @@ export function NovaHome() {
   const [composerPosting, setComposerPosting] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const audioInputRef = useRef<HTMLInputElement | null>(null);
-  const videoInputRef = useRef<HTMLInputElement | null>(null);
-
   const visiblePosts = useMemo(() => {
-    const query = normalizeSearchValue(searchQuery.trim());
-
     return [...userPosts, ...feedPosts].filter((post) => {
       const cityMatch = activeCity === 'for-you' || activeCity === 'nearby' || activeCity === 'following' || post.citySlug === activeCity;
       const topicMatch =
@@ -348,13 +341,9 @@ export function NovaHome() {
         (activeTopic === 'audio' && post.kind === 'audio') ||
         (activeTopic === 'video' && post.kind === 'video');
 
-      const searchMatch =
-        !query ||
-        normalizeSearchValue(`${post.author} ${post.city} ${post.topic} ${post.title} ${post.text} ${post.wall}`).includes(query);
-
-      return cityMatch && topicMatch && searchMatch;
+      return cityMatch && topicMatch;
     });
-  }, [activeCity, activeTopic, userPosts, searchQuery]);
+  }, [activeCity, activeTopic, userPosts]);
 
   const selectedChat = useMemo(() => {
     return chatPreviews.find((chat) => chat.otherUserId === selectedChatId) || chatPreviews[0] || fallbackChats[0];
@@ -387,20 +376,6 @@ export function NovaHome() {
     setComposerMediaKind(kind);
     setComposerOpen(true);
     setComposerError(null);
-
-    window.setTimeout(() => {
-      document.getElementById('composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
-  }
-
-  function openComposerWithUpload(kind: ComposerMediaKind) {
-    openComposer(kind);
-
-    window.setTimeout(() => {
-      if (kind === 'image') imageInputRef.current?.click();
-      if (kind === 'audio') audioInputRef.current?.click();
-      if (kind === 'video') videoInputRef.current?.click();
-    }, 140);
   }
 
   function handleComposerFile(event: ChangeEvent<HTMLInputElement>) {
@@ -1075,7 +1050,7 @@ export function NovaHome() {
             <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
 
-          <button type="button" className="side-post" onClick={() => openComposer('text')}>＋ Pubblica</button>
+          <Link href="#composer" className="side-post">＋ Pubblica</Link>
 
           <section className="now-box">
             <h3>Live ora</h3>
@@ -1099,14 +1074,7 @@ export function NovaHome() {
             </div>
 
             <div className="search-row">
-              <label className="search" aria-label="Cerca nella Home">
-                <span>⌕</span>
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Cerca città, wall, creator, eventi locali..."
-                />
-              </label>
+              <div className="search">⌕ Cerca città, wall, creator, eventi locali...</div>
 
               <button
                 type="button"
@@ -1164,10 +1132,10 @@ export function NovaHome() {
               </button>
             </div>
             <div className="composer-actions">
-              <button type="button" onClick={() => openComposerWithUpload('image')}>🖼️ Foto</button>
-              <button type="button" onClick={() => openComposerWithUpload('audio')}>🎙️ Audio</button>
-              <button type="button" onClick={() => openComposerWithUpload('video')}>🎬 Video</button>
-              <Link href="/calls/new">🧩 Stanza 24h</Link>
+              <button type="button" onClick={() => openComposer('image')}>🖼️ Foto</button>
+              <button type="button" onClick={() => openComposer('audio')}>🎙️ Audio</button>
+              <button type="button" onClick={() => openComposer('video')}>🎬 Video</button>
+              <button type="button" onClick={() => openComposer('text')}>🧩 Stanza 24h</button>
             </div>
 
             {!composerOpen && (
@@ -1207,15 +1175,15 @@ export function NovaHome() {
                 <div className="publisher-tools">
                   <label className={composerMediaKind === 'image' ? 'active' : ''}>
                     🖼️ Immagine
-                    <input ref={imageInputRef} type="file" accept="image/*" onChange={handleComposerFile} />
+                    <input type="file" accept="image/*" onChange={handleComposerFile} />
                   </label>
                   <label className={composerMediaKind === 'audio' ? 'active' : ''}>
                     🎙️ Audio
-                    <input ref={audioInputRef} type="file" accept="audio/*" onChange={handleComposerFile} />
+                    <input type="file" accept="audio/*" onChange={handleComposerFile} />
                   </label>
                   <label className={composerMediaKind === 'video' ? 'active' : ''}>
                     🎬 Video
-                    <input ref={videoInputRef} type="file" accept="video/*" onChange={handleComposerFile} />
+                    <input type="file" accept="video/*" onChange={handleComposerFile} />
                   </label>
                   <button type="button" onClick={() => setComposerMediaKind('text')}>✍️ Solo testo</button>
                 </div>
@@ -1480,7 +1448,7 @@ export function NovaHome() {
       <nav className="mobile-nav">
         <Link href="/" className="active">⌂</Link>
         <Link href="/cities">📍</Link>
-        <button type="button" onClick={() => openComposer('text')}>＋</button>
+        <Link href="#composer">＋</Link>
         <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}>
           💬
           {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
@@ -5509,80 +5477,6 @@ const styles = `
     margin-left: -10px;
     margin-right: -10px;
   }
-}
-
-
-/* === FUNCTIONAL BUTTONS PATCH === */
-.search {
-  display: grid !important;
-  grid-template-columns: 24px 1fr !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.search span {
-  color: #d97016;
-  font-weight: 800;
-}
-
-.search input {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-}
-
-.search input::placeholder {
-  color: inherit;
-  opacity: .86;
-}
-
-.composer-actions a {
-  height: 46px;
-  display: grid;
-  place-items: center;
-  color: #3a2a1e;
-  background: rgba(255,250,242,.74);
-  border: 0;
-  border-left: 1px solid rgba(120,78,35,.12);
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.side-post {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.empty-feed {
-  padding: 24px 16px;
-  background: rgba(255,255,255,.78);
-  border-top: 1px solid rgba(120,78,35,.14);
-  border-bottom: 1px solid rgba(120,78,35,.12);
-  color: #201610;
-}
-
-.empty-feed h2,
-.empty-feed b {
-  display: block;
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.empty-feed p,
-.empty-feed span {
-  display: block;
-  margin: 6px 0 0;
-  color: #7a6c5d;
-  font-size: 14px;
-  font-weight: 500;
 }
 
 `;
