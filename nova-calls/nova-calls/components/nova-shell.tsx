@@ -697,13 +697,15 @@ export function NovaHome() {
       supabase
         .from('user_links')
         .select('id, requester_id, receiver_id, status, created_at, updated_at')
-        .eq('status', 'accepted')
         .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('updated_at', { ascending: false }),
     ]);
 
     const messages = (messageRows || []) as PrivateMessageRow[];
-    const links = (linkRows || []) as UserLinkRow[];
+    const allowedLinkStatuses = new Set(['accepted', 'active', 'connected']);
+    const links = ((linkRows || []) as UserLinkRow[]).filter((link) =>
+      !link.status || allowedLinkStatuses.has(String(link.status).toLowerCase())
+    );
 
     const messageOtherIds = messages.map((message) =>
       message.sender_id === user.id ? message.receiver_id : message.sender_id
