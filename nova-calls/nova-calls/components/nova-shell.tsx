@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ProfileOrb } from '@/components/profile-store';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 type FeedKind = 'text' | 'photo' | 'audio' | 'video' | 'news';
 
@@ -24,6 +25,36 @@ type FeedPost = {
   audioReplies: number;
   rooms: number;
   accent?: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
+};
+
+type PrivateMessageRow = {
+  id: string;
+  link_id: string | null;
+  sender_id: string;
+  receiver_id: string;
+  body: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+type ChatProfile = {
+  id: string;
+  full_name: string | null;
+  username?: string | null;
+  avatar_url: string | null;
+  city?: string | null;
+};
+
+type ChatPreview = {
+  otherUserId: string;
+  name: string;
+  initials: string;
+  avatarUrl: string | null;
+  linkId: string | null;
+  body: string;
+  time: string;
+  unread: number;
+  accent: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
 };
 
 const cityTabs = [
@@ -170,14 +201,75 @@ const followedCities = [
   ['NA', 'Napoli', '88 post oggi · 18 eventi'],
 ];
 
-const hotRooms = [
-  ['🧩', 'Viabilità Prati', '24h · 32 persone dentro'],
-  ['🧩', 'Eventi da soli', '18h · 18 persone dentro'],
+const fallbackChats: ChatPreview[] = [
+  {
+    otherUserId: 'demo-giulia',
+    name: 'Giulia Romano',
+    initials: 'G',
+    avatarUrl: null,
+    linkId: null,
+    body: 'Ti ho mandato l’audio dell’evento di venerdì.',
+    time: 'demo',
+    unread: 0,
+    accent: 'cyan',
+  },
+  {
+    otherUserId: 'demo-marco',
+    name: 'Marco B.',
+    initials: 'M',
+    avatarUrl: null,
+    linkId: null,
+    body: 'Ho creato una stanza su Isola, entra quando vuoi.',
+    time: 'demo',
+    unread: 0,
+    accent: 'pink',
+  },
+  {
+    otherUserId: 'demo-sara',
+    name: 'Sara N.',
+    initials: 'S',
+    avatarUrl: null,
+    linkId: null,
+    body: 'Mi consigli quel coworking zona Roma Est?',
+    time: 'demo',
+    unread: 0,
+    accent: 'green',
+  },
 ];
 
+function getInitials(name: string) {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'TS'
+  );
+}
+
+function timeLabel(value: string) {
+  const date = new Date(value);
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.max(0, Math.round(diff / 60000));
+
+  if (Number.isNaN(date.getTime())) return '';
+  if (minutes < 1) return 'ora';
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} h`;
+  return `${Math.round(minutes / 1440)} g`;
+}
+
 export function NovaHome() {
+  const supabase = useMemo(() => createBrowserSupabase(), []);
   const [activeCity, setActiveCity] = useState('for-you');
   const [activeTopic, setActiveTopic] = useState('all');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [chatPreviews, setChatPreviews] = useState<ChatPreview[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
   const visiblePosts = useMemo(() => {
     return feedPosts.filter((post) => {
@@ -186,13 +278,187 @@ export function NovaHome() {
         activeTopic === 'all' ||
         post.topicSlug === activeTopic ||
         (activeTopic === 'eventi' && post.topicSlug === 'audio' && post.topic === 'Eventi') ||
-        (activeTopic === 'news' && post.kind === 'news') ||
+        (activeTopic === 'news' && (post.kind === 'news' || post.topic === 'News')) ||
         (activeTopic === 'audio' && post.kind === 'audio') ||
         (activeTopic === 'video' && post.kind === 'video');
 
       return cityMatch && topicMatch;
     });
   }, [activeCity, activeTopic]);
+
+  const selectedChat = useMemo(() => {
+    return chatPreviews.find((chat) => chat.otherUserId === selectedChatId) || chatPreviews[0] || fallbackChats[0];
+  }, [chatPreviews, selectedChatId]);
+
+  async function loadUnreadCounts() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
+      setChatPreviews([]);
+      return;
+    }
+
+    const [messagesResult, notificationsResult] = await Promise.all([
+      supabase
+        .from('private_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .is('read_at', null),
+      supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false),
+    ]);
+
+    setUnreadMessagesCount(messagesResult.count || 0);
+    setUnreadNotificationsCount(notificationsResult.count || 0);
+  }
+
+  async function loadChatPreviews() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setChatPreviews([]);
+      return;
+    }
+
+    const { data: rows } = await supabase
+      .from('private_messages')
+      .select('id, link_id, sender_id, receiver_id, body, read_at, created_at')
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(40);
+
+    const messages = (rows || []) as PrivateMessageRow[];
+    const otherIds = Array.from(
+      new Set(messages.map((message) => (message.sender_id === user.id ? message.receiver_id : message.sender_id)))
+    );
+
+    let profiles: ChatProfile[] = [];
+
+    if (otherIds.length > 0) {
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url, city')
+        .in('id', otherIds);
+
+      profiles = (profileRows || []) as ChatProfile[];
+    }
+
+    const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const grouped = new Map<string, ChatPreview>();
+    const unreadMap = new Map<string, number>();
+
+    for (const message of messages) {
+      const otherUserId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+      if (message.receiver_id === user.id && !message.read_at) {
+        unreadMap.set(otherUserId, (unreadMap.get(otherUserId) || 0) + 1);
+      }
+
+      if (!grouped.has(otherUserId)) {
+        const profile = profileMap.get(otherUserId);
+        const name = profile?.full_name || profile?.username || 'Utente The Square';
+
+        grouped.set(otherUserId, {
+          otherUserId,
+          name,
+          initials: getInitials(name),
+          avatarUrl: profile?.avatar_url || null,
+          linkId: message.link_id,
+          body: message.body || 'Messaggio',
+          time: timeLabel(message.created_at),
+          unread: 0,
+          accent: ['cyan', 'pink', 'green', 'blue', 'yellow'][grouped.size % 5] as ChatPreview['accent'],
+        });
+      }
+    }
+
+    const previews = Array.from(grouped.values()).map((preview) => ({
+      ...preview,
+      unread: unreadMap.get(preview.otherUserId) || 0,
+    }));
+
+    setChatPreviews(previews);
+    setSelectedChatId((current) => current || previews[0]?.otherUserId || null);
+  }
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function start() {
+      if (!mounted) return;
+      await loadUnreadCounts();
+      await loadChatPreviews();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const channel = supabase
+        .channel(`home-badges-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'private_messages',
+            filter: `receiver_id=eq.${user.id}`,
+          },
+          async () => {
+            await loadUnreadCounts();
+            await loadChatPreviews();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'private_messages',
+            filter: `sender_id=eq.${user.id}`,
+          },
+          async () => {
+            await loadChatPreviews();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          async () => {
+            await loadUnreadCounts();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+
+    const cleanupPromise = start();
+
+    return () => {
+      mounted = false;
+      cleanupPromise.then((cleanup) => cleanup?.()).catch(() => undefined);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
+
+  const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
 
   return (
     <div className="feed-shell">
@@ -211,7 +477,7 @@ export function NovaHome() {
             <Link href="/cities"><span>📍</span><b>Città</b></Link>
             <Link href="#feed"><span>🧱</span><b>Wall</b></Link>
             <Link href="#audio"><span>🎙️</span><b>Audio</b></Link>
-            <Link href="#video"><span>🎬</span><b>Video</b></Link>
+            <button type="button" onClick={() => setChatOpen(true)}><span>💬</span><b>Chat</b></button>
             <Link href="/notifications"><span>🔔</span><b>Notifiche</b></Link>
             <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
@@ -223,7 +489,7 @@ export function NovaHome() {
             <div className="trend-line"><span>Roma</span><small>128 post</small></div>
             <div className="trend-line"><span>Eventi</span><small>43 audio</small></div>
             <div className="trend-line"><span>Mobilità</span><small>hot</small></div>
-            <div className="trend-line"><span>Milano</span><small>96 post</small></div>
+            <div className="trend-line"><span>Chat attive</span><small>{unreadMessagesCount} nuove</small></div>
           </section>
         </aside>
 
@@ -231,8 +497,25 @@ export function NovaHome() {
           <header className="topbar">
             <div className="search-row">
               <div className="search">⌕ Cerca città, wall, creator, eventi locali...</div>
-              <Link className="icon-btn" href="/notifications">🔔</Link>
-              <Link className="icon-btn profile-mini" href="/profile"><ProfileOrb className="h-full w-full" /></Link>
+
+              <button
+                type="button"
+                className={`icon-btn ${chatOpen ? 'active' : ''}`}
+                onClick={() => setChatOpen(true)}
+                aria-label="Apri chat"
+              >
+                💬
+                {unreadMessagesCount > 0 && <span className="badge">{unreadMessagesCount}</span>}
+              </button>
+
+              <Link className="icon-btn" href="/notifications" aria-label="Notifiche">
+                🔔
+                {unreadNotificationsCount > 0 && <span className="badge">{unreadNotificationsCount}</span>}
+              </Link>
+
+              <Link className="icon-btn profile-button" href="/profile" aria-label="Profilo">
+                <ProfileOrb className="h-full w-full" />
+              </Link>
             </div>
 
             <nav className="wall-tabs" aria-label="Filtro città">
@@ -290,6 +573,19 @@ export function NovaHome() {
 
         <aside className="right">
           <section className="right-panel">
+            <h3>Chat personali</h3>
+            {chatsToShow.slice(0, 3).map((chat) => (
+              <div className="city-card" key={chat.otherUserId}>
+                <AvatarBox chat={chat} />
+                <div><b>{chat.name}</b><span>{chat.body}</span></div>
+                <button type="button" className="follow" onClick={() => { setSelectedChatId(chat.otherUserId); setChatOpen(true); }}>
+                  Apri
+                </button>
+              </div>
+            ))}
+          </section>
+
+          <section className="right-panel">
             <h3>Wall che segui</h3>
             {followedCities.map(([code, city, meta]) => (
               <div className="city-card" key={city}>
@@ -313,29 +609,84 @@ export function NovaHome() {
               <span>📰 News</span>
             </div>
           </section>
-
-          <section className="right-panel">
-            <h3>Stanze nate dai post</h3>
-            {hotRooms.map(([icon, title, meta]) => (
-              <div className="city-card" key={title}>
-                <div className="city-avatar">{icon}</div>
-                <div><b>{title}</b><span>{meta}</span></div>
-                <button type="button" className="follow">Entra</button>
-              </div>
-            ))}
-          </section>
         </aside>
       </div>
+
+      <div className={`chat-backdrop ${chatOpen ? 'open' : ''}`} onClick={() => setChatOpen(false)} />
+
+      <aside className={`chat-drawer ${chatOpen ? 'open' : ''}`} aria-label="Chat personali">
+        <header className="chat-head">
+          <div>
+            <h2>Chat personali</h2>
+            <p>Solo legami reciproci, stanze condivise o richieste accettate.</p>
+          </div>
+          <button type="button" className="close-chat" onClick={() => setChatOpen(false)} aria-label="Chiudi chat">×</button>
+        </header>
+
+        <div className="chat-search">
+          <input placeholder="Cerca una conversazione..." />
+        </div>
+
+        <div className="chat-list">
+          {chatsToShow.map((chat) => (
+            <button
+              type="button"
+              className={`chat-item ${selectedChat?.otherUserId === chat.otherUserId ? 'active' : ''}`}
+              key={chat.otherUserId}
+              onClick={() => setSelectedChatId(chat.otherUserId)}
+            >
+              <AvatarBox chat={chat} large />
+              <div className="chat-copy">
+                <b>{chat.name}</b>
+                <span>{chat.body}</span>
+              </div>
+              <div className="chat-meta">
+                {chat.time}
+                {chat.unread > 0 && <div className="unread">{chat.unread}</div>}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <section className="mini-thread">
+          <div className="mini-thread-title">
+            <span>Anteprima conversazione · {selectedChat?.name || 'Chat'}</span>
+            <Link href={selectedChat?.linkId ? `/messages?link=${selectedChat.linkId}` : '/messages'}>Apri chat completa →</Link>
+          </div>
+          <div className="bubble">{selectedChat?.body || 'Nessun messaggio recente.'}</div>
+          <div className="bubble me">Rispondi dalla chat completa per mantenere lo storico reale.</div>
+          <div className="reply-row">
+            <input placeholder="Scrivi un messaggio..." disabled />
+            <Link href={selectedChat?.linkId ? `/messages?link=${selectedChat.linkId}` : '/messages'}>➤</Link>
+          </div>
+        </section>
+      </aside>
 
       <nav className="mobile-nav">
         <Link href="/" className="active">⌂</Link>
         <Link href="/cities">📍</Link>
         <Link href="#composer">＋</Link>
-        <Link href="#feed">🧩</Link>
+        <button type="button" onClick={() => setChatOpen(true)}>
+          💬
+          {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
+        </button>
         <Link href="/profile">👤</Link>
       </nav>
 
       <style jsx global>{styles}</style>
+    </div>
+  );
+}
+
+function AvatarBox({ chat, large }: { chat: ChatPreview; large?: boolean }) {
+  return (
+    <div className={`chat-avatar ${large ? 'large' : ''} ${chat.accent}`}>
+      {chat.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={chat.avatarUrl} alt="" />
+      ) : (
+        chat.initials
+      )}
     </div>
   );
 }
@@ -411,7 +762,6 @@ const styles = `
   --bg: #080a0f;
   --panel: #101620;
   --panel-2: #151d2a;
-  --panel-3: #0c1119;
   --ink: #f8fafc;
   --muted: #8c98aa;
   --line: rgba(255,255,255,.11);
@@ -526,7 +876,9 @@ const styles = `
   box-shadow: 0 22px 60px rgba(0,0,0,.28);
 }
 
-.side-nav a {
+.side-nav a,
+.side-nav button {
+  width: 100%;
   min-height: 48px;
   display: grid;
   grid-template-columns: 32px 1fr;
@@ -535,11 +887,15 @@ const styles = `
   border: 1px solid transparent;
   padding: 0 10px;
   color: #cbd5e1;
+  background: transparent;
   font-size: 13px;
   font-weight: 900;
+  text-align: left;
+  cursor: pointer;
 }
 
-.side-nav a span {
+.side-nav a span,
+.side-nav button span {
   width: 32px;
   height: 32px;
   display: grid;
@@ -550,7 +906,8 @@ const styles = `
 }
 
 .side-nav a.active,
-.side-nav a:hover {
+.side-nav a:hover,
+.side-nav button:hover {
   color: var(--yellow);
   background: rgba(255,210,31,.10);
   border-color: rgba(255,210,31,.22);
@@ -570,11 +927,13 @@ const styles = `
   box-shadow: 0 18px 38px rgba(255,157,46,.18);
 }
 
-.now-box {
+.now-box,
+.right-panel {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid var(--line);
   background: rgba(16,22,32,.72);
+  box-shadow: 0 22px 60px rgba(0,0,0,.28);
 }
 
 .now-box h3,
@@ -626,7 +985,7 @@ const styles = `
 .search-row {
   min-height: 58px;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -646,19 +1005,39 @@ const styles = `
 }
 
 .icon-btn {
+  position: relative;
   width: 52px;
   height: 52px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
   background: rgba(16,22,32,.80);
+  color: var(--ink);
   font-size: 20px;
   border-radius: 8px;
+  cursor: pointer;
   overflow: hidden;
 }
 
-.profile-mini {
-  padding: 3px;
+.icon-btn.active {
+  border-color: rgba(255,210,31,.42);
+  background: rgba(255,210,31,.12);
+}
+
+.badge {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--pink);
+  color: white;
+  border: 1px solid rgba(255,255,255,.28);
+  font-size: 10px;
+  font-weight: 1000;
 }
 
 .wall-tabs,
@@ -842,10 +1221,29 @@ const styles = `
   font-weight: 1000;
 }
 
-.avatar-cyan { background: linear-gradient(135deg, var(--cyan), var(--blue)); color: white; }
-.avatar-pink { background: linear-gradient(135deg, var(--pink), var(--orange)); color: white; }
-.avatar-green { background: linear-gradient(135deg, var(--green), var(--cyan)); color: #06110f; }
-.avatar-blue { background: linear-gradient(135deg, var(--blue), #7c3aed); color: white; }
+.avatar-cyan,
+.chat-avatar.cyan {
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  color: white;
+}
+
+.avatar-pink,
+.chat-avatar.pink {
+  background: linear-gradient(135deg, var(--pink), var(--orange));
+  color: white;
+}
+
+.avatar-green,
+.chat-avatar.green {
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  color: #06110f;
+}
+
+.avatar-blue,
+.chat-avatar.blue {
+  background: linear-gradient(135deg, var(--blue), #7c3aed);
+  color: white;
+}
 
 .post-meta b {
   display: block;
@@ -1051,10 +1449,7 @@ const styles = `
 }
 
 .right-panel {
-  padding: 14px;
-  border: 1px solid var(--line);
-  background: rgba(16,22,32,.78);
-  box-shadow: 0 22px 60px rgba(0,0,0,.28);
+  margin-top: 0;
   margin-bottom: 14px;
 }
 
@@ -1071,15 +1466,33 @@ const styles = `
   border-top: 0;
 }
 
-.city-avatar {
+.city-avatar,
+.chat-avatar {
   width: 38px;
   height: 38px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border-radius: 8px;
   background: rgba(255,210,31,.12);
   color: var(--yellow);
   font-weight: 1000;
+}
+
+.chat-avatar {
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+}
+
+.chat-avatar.large {
+  width: 46px;
+  height: 46px;
+}
+
+.chat-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .city-card b {
@@ -1094,6 +1507,10 @@ const styles = `
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
+  max-width: 190px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .follow {
@@ -1127,6 +1544,232 @@ const styles = `
   font-weight: 900;
 }
 
+.chat-drawer {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 100;
+  width: min(430px, calc(100vw - 24px));
+  height: calc(100vh - 36px);
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  border: 1px solid rgba(255,255,255,.18);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(36,224,210,.14), transparent 32%),
+    linear-gradient(180deg, rgba(18,26,38,.98), rgba(8,10,15,.98));
+  box-shadow: -28px 0 90px rgba(0,0,0,.52);
+  transform: translateX(calc(100% + 30px));
+  transition: transform .28s ease;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+
+.chat-drawer.open {
+  transform: translateX(0);
+}
+
+.chat-head {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.chat-head h2 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+.chat-head p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.close-chat {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(8,10,15,.62);
+  color: white;
+  border-radius: 8px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.chat-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.chat-search input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.64);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0 13px;
+  outline: none;
+  font-weight: 800;
+}
+
+.chat-list {
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.chat-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 11px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-item:hover,
+.chat-item.active {
+  background: rgba(255,255,255,.055);
+  border-color: rgba(255,255,255,.10);
+}
+
+.chat-copy b {
+  display: block;
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+.chat-copy span {
+  display: block;
+  max-width: 230px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-meta {
+  text-align: right;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.unread {
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin: 6px 0 0 auto;
+  border-radius: 6px;
+  background: var(--yellow);
+  color: #06110f;
+  font-size: 10px;
+  font-weight: 1000;
+}
+
+.mini-thread {
+  border-top: 1px solid rgba(255,255,255,.10);
+  padding: 12px;
+  background: rgba(8,10,15,.36);
+}
+
+.mini-thread-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+.mini-thread-title a {
+  color: var(--yellow);
+}
+
+.bubble {
+  width: fit-content;
+  max-width: 82%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.07);
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.bubble.me {
+  margin-left: auto;
+  color: #07110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+}
+
+.reply-row {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reply-row input {
+  min-height: 42px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.65);
+  color: #e2e8f0;
+  border-radius: 9px;
+  padding: 0 12px;
+  outline: none;
+  font-weight: 800;
+}
+
+.reply-row a {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.chat-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0,0,0,.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease;
+}
+
+.chat-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .mobile-nav {
   display: none;
 }
@@ -1147,13 +1790,15 @@ const styles = `
     display: none;
   }
 
-  .side-nav a {
+  .side-nav a,
+  .side-nav button {
     grid-template-columns: 1fr;
     justify-items: center;
     padding: 0;
   }
 
   .side-nav a b,
+  .side-nav button b,
   .now-box,
   .side-post {
     display: none;
@@ -1177,10 +1822,10 @@ const styles = `
   }
 
   .search-row {
-    grid-template-columns: 1fr 48px;
+    grid-template-columns: 1fr 48px 48px;
   }
 
-  .search-row .icon-btn:nth-child(3) {
+  .search-row .icon-btn.profile-button {
     display: none;
   }
 
@@ -1237,12 +1882,28 @@ const styles = `
     font-size: 18px;
   }
 
+  .chat-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(86vh, 760px);
+    transform: translateY(calc(100% + 30px));
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+    border-radius: 18px 18px 0 0;
+  }
+
+  .chat-drawer.open {
+    transform: translateY(0);
+  }
+
   .mobile-nav {
     position: fixed;
     left: 10px;
     right: 10px;
     bottom: 10px;
-    z-index: 90;
+    z-index: 80;
     height: 64px;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -1255,10 +1916,14 @@ const styles = `
     box-shadow: 0 20px 60px rgba(0,0,0,.42);
   }
 
-  .mobile-nav a {
+  .mobile-nav a,
+  .mobile-nav button {
+    position: relative;
     display: grid;
     place-items: center;
     color: #cbd5e1;
+    background: transparent;
+    border: 0;
     border-radius: 10px;
     font-size: 20px;
   }
@@ -1266,6 +1931,21 @@ const styles = `
   .mobile-nav a.active {
     background: linear-gradient(135deg, var(--yellow), var(--orange));
     color: #06110f;
+  }
+
+  .mobile-badge {
+    position: absolute;
+    right: 16px;
+    top: 5px;
+    min-width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    background: var(--pink);
+    color: white;
+    font-size: 10px;
+    font-weight: 1000;
   }
 }
 
