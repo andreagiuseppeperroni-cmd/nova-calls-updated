@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
@@ -25,7 +25,11 @@ type FeedPost = {
   audioReplies: number;
   rooms: number;
   accent?: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
+  mediaUrl?: string;
+  mediaName?: string;
 };
+
+type ComposerMediaKind = 'text' | 'image' | 'audio' | 'video';
 
 type PrivateMessageRow = {
   id: string;
@@ -286,9 +290,17 @@ export function NovaHome() {
   const [linkSearch, setLinkSearch] = useState('');
   const [chatLinkSearch, setChatLinkSearch] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ChatPreview | null>(null);
+  const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerText, setComposerText] = useState('');
+  const [composerMediaKind, setComposerMediaKind] = useState<ComposerMediaKind>('text');
+  const [composerFile, setComposerFile] = useState<File | null>(null);
+  const [composerPreviewUrl, setComposerPreviewUrl] = useState('');
+  const [composerPosting, setComposerPosting] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
 
   const visiblePosts = useMemo(() => {
-    return feedPosts.filter((post) => {
+    return [...userPosts, ...feedPosts].filter((post) => {
       const cityMatch = activeCity === 'for-you' || activeCity === 'nearby' || activeCity === 'following' || post.citySlug === activeCity;
       const topicMatch =
         activeTopic === 'all' ||
@@ -300,7 +312,7 @@ export function NovaHome() {
 
       return cityMatch && topicMatch;
     });
-  }, [activeCity, activeTopic]);
+  }, [activeCity, activeTopic, userPosts]);
 
   const selectedChat = useMemo(() => {
     return chatPreviews.find((chat) => chat.otherUserId === selectedChatId) || chatPreviews[0] || fallbackChats[0];
@@ -327,6 +339,173 @@ export function NovaHome() {
       `${chat.name} ${chat.body} ${chat.initials}`.toLowerCase().includes(query)
     );
   }, [chatsToShow, chatLinkSearch]);
+
+
+  function openComposer(kind: ComposerMediaKind = 'text') {
+    setComposerMediaKind(kind);
+    setComposerOpen(true);
+    setComposerError(null);
+  }
+
+  function handleComposerFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setComposerFile(file);
+    setComposerError(null);
+
+    if (composerPreviewUrl) {
+      URL.revokeObjectURL(composerPreviewUrl);
+    }
+
+    setComposerPreviewUrl(URL.createObjectURL(file));
+
+    if (file.type.startsWith('image/')) setComposerMediaKind('image');
+    else if (file.type.startsWith('audio/')) setComposerMediaKind('audio');
+    else if (file.type.startsWith('video/')) setComposerMediaKind('video');
+  }
+
+  function resetComposer() {
+    setComposerText('');
+    setComposerMediaKind('text');
+    setComposerFile(null);
+    if (composerPreviewUrl) URL.revokeObjectURL(composerPreviewUrl);
+    setComposerPreviewUrl('');
+    setComposerError(null);
+  }
+
+  async function publishWallPost() {
+    const content = composerText.trim();
+
+    if (!content && !composerFile) {
+      setComposerError('Scrivi qualcosa oppure allega un file prima di pubblicare.');
+      return;
+    }
+
+    setComposerPosting(true);
+    setComposerError(null);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setComposerError('Devi effettuare il login per pubblicare sul Wall.');
+        return;
+      }
+
+      const citySlug = ['roma', 'milano', 'napoli'].includes(activeCity) ? activeCity : 'roma';
+      const { data: cityRow, error: cityError } = await supabase
+        .from('cities')
+        .select('id, name, slug')
+        .eq('slug', citySlug)
+        .single();
+
+      if (cityError || !cityRow) {
+        setComposerError('Non riesco a trovare la città selezionata su Supabase.');
+        return;
+      }
+
+      const detectedKind: ComposerMediaKind = composerFile?.type.startsWith('image/')
+        ? 'image'
+        : composerFile?.type.startsWith('audio/')
+          ? 'audio'
+          : composerFile?.type.startsWith('video/')
+            ? 'video'
+            : composerMediaKind;
+
+      const postType = composerFile ? detectedKind : 'text';
+
+      const { data: postRow, error: postError } = await supabase
+        .from('city_wall_posts')
+        .insert({
+          city_id: cityRow.id,
+          user_id: user.id,
+          content: content || (composerFile ? `Nuovo contenuto ${detectedKind} pubblicato sul Wall.` : ''),
+          post_type: postType,
+          visibility: 'public',
+          status: 'published',
+        })
+        .select('id, created_at')
+        .single();
+
+      if (postError || !postRow) {
+        setComposerError(postError?.message || 'Non sono riuscito a pubblicare il post.');
+        return;
+      }
+
+      let publicUrl = '';
+
+      if (composerFile) {
+        const safeName = composerFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+        const filePath = `${user.id}/${postRow.id}/${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('city-wall-media')
+          .upload(filePath, composerFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: composerFile.type,
+          });
+
+        if (uploadError) {
+          setComposerError(uploadError.message);
+          return;
+        }
+
+        const { data: publicData } = supabase.storage.from('city-wall-media').getPublicUrl(filePath);
+        publicUrl = publicData.publicUrl;
+
+        const { error: mediaError } = await supabase.from('city_wall_post_media').insert({
+          post_id: postRow.id,
+          user_id: user.id,
+          media_type: detectedKind,
+          file_url: publicUrl,
+          file_path: filePath,
+          mime_type: composerFile.type,
+          size_bytes: composerFile.size,
+        });
+
+        if (mediaError) {
+          setComposerError(mediaError.message);
+          return;
+        }
+      }
+
+      const title = content ? content.split('\n')[0].slice(0, 110) : composerFile ? `Nuovo ${detectedKind} sul Wall` : 'Nuovo post sul Wall';
+
+      setUserPosts((posts) => [
+        {
+          id: postRow.id,
+          author: 'Tu',
+          initials: 'TU',
+          city: cityRow.name,
+          citySlug: cityRow.slug,
+          topic: topics.find((topic) => topic.slug === activeTopic)?.label || 'Wall',
+          topicSlug: activeTopic === 'all' ? 'socialita' : activeTopic,
+          time: 'ora',
+          wall: `Wall ${cityRow.name}`,
+          kind: detectedKind === 'image' ? 'photo' : detectedKind === 'audio' ? 'audio' : detectedKind === 'video' ? 'video' : 'text',
+          title,
+          text: content || (composerFile ? composerFile.name : ''),
+          likes: 0,
+          comments: 0,
+          audioReplies: 0,
+          rooms: 0,
+          accent: 'yellow',
+          mediaUrl: publicUrl || composerPreviewUrl,
+          mediaName: composerFile?.name,
+        },
+        ...posts,
+      ]);
+
+      resetComposer();
+      setComposerOpen(false);
+    } finally {
+      setComposerPosting(false);
+    }
+  }
 
   async function loadUnreadCounts() {
     const {
@@ -737,17 +916,76 @@ export function NovaHome() {
             </nav>
           </header>
 
-          <section className="composer" id="composer">
+          <section className={`composer ${composerOpen ? 'is-open' : ''}`} id="composer">
             <div className="composer-top">
               <div className="avatar">A</div>
-              <button type="button" className="composer-placeholder">Cosa vuoi dire al Wall di Roma?</button>
+              <button type="button" className="composer-placeholder" onClick={() => openComposer('text')}>
+                Cosa vuoi dire al Wall di {['roma', 'milano', 'napoli'].includes(activeCity) ? cityTabs.find((city) => city.slug === activeCity)?.label : 'Roma'}?
+              </button>
             </div>
             <div className="composer-actions">
-              <button type="button">🖼️ Foto</button>
-              <button type="button">🎙️ Audio</button>
-              <button type="button">🎬 Video</button>
-              <button type="button">🧩 Stanza 24h</button>
+              <button type="button" onClick={() => openComposer('image')}>🖼️ Foto</button>
+              <button type="button" onClick={() => openComposer('audio')}>🎙️ Audio</button>
+              <button type="button" onClick={() => openComposer('video')}>🎬 Video</button>
+              <button type="button" onClick={() => openComposer('text')}>🧩 Stanza 24h</button>
             </div>
+
+            {composerOpen && (
+              <div className="wall-publisher">
+                <div className="publisher-head">
+                  <div>
+                    <p>Pubblica sul Wall</p>
+                    <h3>Scrivi, allega e condividi con la città</h3>
+                  </div>
+                  <button type="button" onClick={() => { resetComposer(); setComposerOpen(false); }} aria-label="Chiudi composer">×</button>
+                </div>
+
+                <textarea
+                  value={composerText}
+                  onChange={(event) => setComposerText(event.target.value)}
+                  placeholder="Scrivi un pensiero, una domanda, una segnalazione o un aggiornamento locale..."
+                />
+
+                {composerPreviewUrl && (
+                  <div className="publisher-preview">
+                    {composerMediaKind === 'image' && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={composerPreviewUrl} alt={composerFile?.name || 'Anteprima'} />
+                    )}
+                    {composerMediaKind === 'audio' && <audio src={composerPreviewUrl} controls />}
+                    {composerMediaKind === 'video' && <video src={composerPreviewUrl} controls />}
+                    <span>{composerFile?.name}</span>
+                  </div>
+                )}
+
+                <div className="publisher-tools">
+                  <label className={composerMediaKind === 'image' ? 'active' : ''}>
+                    🖼️ Immagine
+                    <input type="file" accept="image/*" onChange={handleComposerFile} />
+                  </label>
+                  <label className={composerMediaKind === 'audio' ? 'active' : ''}>
+                    🎙️ Audio
+                    <input type="file" accept="audio/*" onChange={handleComposerFile} />
+                  </label>
+                  <label className={composerMediaKind === 'video' ? 'active' : ''}>
+                    🎬 Video
+                    <input type="file" accept="video/*" onChange={handleComposerFile} />
+                  </label>
+                  <button type="button" onClick={() => setComposerMediaKind('text')}>✍️ Solo testo</button>
+                </div>
+
+                {composerError && <div className="publisher-error">{composerError}</div>}
+
+                <div className="publisher-bottom">
+                  <span>
+                    Wall: {['roma', 'milano', 'napoli'].includes(activeCity) ? cityTabs.find((city) => city.slug === activeCity)?.label : 'Roma'} · Topic: {topics.find((topic) => topic.slug === activeTopic)?.label || 'Tutto'}
+                  </span>
+                  <button type="button" onClick={publishWallPost} disabled={composerPosting}>
+                    {composerPosting ? 'Pubblico...' : 'Pubblica sul Wall →'}
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="home-link-search">
@@ -1037,9 +1275,9 @@ function FeedPostCard({ post }: { post: FeedPost }) {
       <div className="post-body">
         <h2>{post.title}</h2>
         <p>{post.text}</p>
-        {post.kind === 'photo' && <PhotoMedia />}
-        {post.kind === 'audio' && <AudioMedia />}
-        {post.kind === 'video' && <VideoMedia />}
+        {post.kind === 'photo' && <PhotoMedia src={post.mediaUrl} name={post.mediaName} />}
+        {post.kind === 'audio' && <AudioMedia src={post.mediaUrl} />}
+        {post.kind === 'video' && <VideoMedia src={post.mediaUrl} />}
       </div>
 
       <div className="post-actions">
@@ -1059,31 +1297,40 @@ function FeedPostCard({ post }: { post: FeedPost }) {
   );
 }
 
-function PhotoMedia() {
+function PhotoMedia({ src, name }: { src?: string; name?: string }) {
   return (
     <div className="media photo-media">
-      <div className="photo-shape" />
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="real-media" src={src} alt={name || 'Immagine pubblicata sul Wall'} />
+      ) : (
+        <div className="photo-shape" />
+      )}
       <div className="media-label">Foto · caricata sul Wall locale</div>
     </div>
   );
 }
 
-function AudioMedia() {
+function AudioMedia({ src }: { src?: string }) {
   return (
     <div className="media audio-media" id="audio">
       <div className="audio-play">▶</div>
-      <div className="wave">
-        {Array.from({ length: 14 }).map((_, index) => <i key={index} />)}
-      </div>
+      {src ? (
+        <audio className="real-audio" src={src} controls />
+      ) : (
+        <div className="wave">
+          {Array.from({ length: 14 }).map((_, index) => <i key={index} />)}
+        </div>
+      )}
       <span className="duration">0:42</span>
     </div>
   );
 }
 
-function VideoMedia() {
+function VideoMedia({ src }: { src?: string }) {
   return (
     <div className="media video-media" id="video">
-      <div className="play-big">▶</div>
+      {src ? <video className="real-video" src={src} controls /> : <div className="play-big">▶</div>}
     </div>
   );
 }
@@ -1548,6 +1795,183 @@ const styles = `
   font-weight: 900;
   font-family: inherit;
   cursor: pointer;
+}
+
+.wall-publisher {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(8,10,15,.72);
+  border-radius: 12px;
+}
+
+.publisher-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.publisher-head p {
+  margin: 0 0 5px;
+  color: var(--yellow);
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .20em;
+  text-transform: uppercase;
+}
+
+.publisher-head h3 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 22px;
+  letter-spacing: -.055em;
+}
+
+.publisher-head button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: white;
+  border-radius: 8px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.wall-publisher textarea {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(13,17,23,.86);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  outline: none;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.wall-publisher textarea::placeholder {
+  color: #64748b;
+}
+
+.publisher-preview {
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(13,17,23,.76);
+  border-radius: 12px;
+}
+
+.publisher-preview img,
+.publisher-preview video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+}
+
+.publisher-preview audio {
+  width: calc(100% - 20px);
+  margin: 14px 10px;
+}
+
+.publisher-preview span {
+  display: block;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.publisher-tools {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.publisher-tools label,
+.publisher-tools button {
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(16,22,32,.72);
+  color: #cbd5e1;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.publisher-tools label.active {
+  color: var(--yellow);
+  border-color: rgba(255,210,31,.32);
+  background: rgba(255,210,31,.10);
+}
+
+.publisher-tools input {
+  display: none;
+}
+
+.publisher-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,61,110,.30);
+  background: rgba(255,61,110,.10);
+  color: #fecdd3;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.publisher-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.publisher-bottom span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.publisher-bottom button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 16px;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  font-size: 13px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.publisher-bottom button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.real-media,
+.real-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.real-audio {
+  width: 100%;
 }
 
 
@@ -2588,6 +3012,19 @@ const styles = `
 
   .composer-actions {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .publisher-tools {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .publisher-bottom {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .publisher-bottom button {
+    width: 100%;
   }
 
 
