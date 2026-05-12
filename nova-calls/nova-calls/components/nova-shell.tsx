@@ -270,6 +270,9 @@ export function NovaHome() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [chatPreviews, setChatPreviews] = useState<ChatPreview[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [activeMessages, setActiveMessages] = useState<PrivateMessageRow[]>([]);
+  const [replyBody, setReplyBody] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const visiblePosts = useMemo(() => {
     return feedPosts.filter((post) => {
@@ -389,6 +392,95 @@ export function NovaHome() {
     setSelectedChatId((current) => current || previews[0]?.otherUserId || null);
   }
 
+  async function loadActiveThread(otherUserId?: string | null) {
+    const selectedOtherUserId = otherUserId || selectedChatId || chatPreviews[0]?.otherUserId;
+
+    if (!selectedOtherUserId || selectedOtherUserId.startsWith('demo-')) {
+      setActiveMessages([]);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setActiveMessages([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('private_messages')
+      .select('id, link_id, sender_id, receiver_id, body, read_at, created_at')
+      .or(
+        `and(sender_id.eq.${user.id},receiver_id.eq.${selectedOtherUserId}),and(sender_id.eq.${selectedOtherUserId},receiver_id.eq.${user.id})`
+      )
+      .order('created_at', { ascending: true })
+      .limit(80);
+
+    setActiveMessages((data || []) as PrivateMessageRow[]);
+  }
+
+  async function markSelectedChatAsRead(otherUserId?: string | null) {
+    const selectedOtherUserId = otherUserId || selectedChatId || chatPreviews[0]?.otherUserId;
+
+    if (!selectedOtherUserId || selectedOtherUserId.startsWith('demo-')) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    await supabase
+      .from('private_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('sender_id', selectedOtherUserId)
+      .eq('receiver_id', user.id)
+      .is('read_at', null);
+
+    await loadUnreadCounts();
+    await loadChatPreviews();
+  }
+
+  async function openChatThread(otherUserId: string) {
+    setSelectedChatId(otherUserId);
+    setChatOpen(true);
+    await loadActiveThread(otherUserId);
+    await markSelectedChatAsRead(otherUserId);
+  }
+
+  async function sendPrivateReply() {
+    const content = replyBody.trim();
+    const receiverId = selectedChat?.otherUserId;
+
+    if (!content || !receiverId || receiverId.startsWith('demo-') || sendingMessage) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    setSendingMessage(true);
+
+    try {
+      await supabase.from('private_messages').insert({
+        link_id: selectedChat?.linkId || null,
+        sender_id: user.id,
+        receiver_id: receiverId,
+        body: content,
+      });
+
+      setReplyBody('');
+      await loadActiveThread(receiverId);
+      await loadChatPreviews();
+    } finally {
+      setSendingMessage(false);
+    }
+  }
+
+
   useEffect(() => {
     let mounted = true;
 
@@ -458,6 +550,14 @@ export function NovaHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    loadActiveThread(selectedChatId || chatPreviews[0]?.otherUserId);
+    markSelectedChatAsRead(selectedChatId || chatPreviews[0]?.otherUserId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatOpen, selectedChatId]);
+
   const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
 
   return (
@@ -477,7 +577,7 @@ export function NovaHome() {
             <Link href="/cities"><span>📍</span><b>Città</b></Link>
             <Link href="#feed"><span>🧱</span><b>Wall</b></Link>
             <Link href="#audio"><span>🎙️</span><b>Audio</b></Link>
-            <button type="button" onClick={() => setChatOpen(true)}><span>💬</span><b>Chat</b></button>
+            <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || chatsToShow[0]?.otherUserId)}><span>💬</span><b>Chat</b></button>
             <Link href="/notifications"><span>🔔</span><b>Notifiche</b></Link>
             <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
@@ -578,7 +678,7 @@ export function NovaHome() {
               <div className="city-card" key={chat.otherUserId}>
                 <AvatarBox chat={chat} />
                 <div><b>{chat.name}</b><span>{chat.body}</span></div>
-                <button type="button" className="follow" onClick={() => { setSelectedChatId(chat.otherUserId); setChatOpen(true); }}>
+                <button type="button" className="follow" onClick={() => openChatThread(chat.otherUserId)}>
                   Apri
                 </button>
               </div>
@@ -633,7 +733,7 @@ export function NovaHome() {
               type="button"
               className={`chat-item ${selectedChat?.otherUserId === chat.otherUserId ? 'active' : ''}`}
               key={chat.otherUserId}
-              onClick={() => setSelectedChatId(chat.otherUserId)}
+              onClick={() => openChatThread(chat.otherUserId)}
             >
               <AvatarBox chat={chat} large />
               <div className="chat-copy">
@@ -650,14 +750,52 @@ export function NovaHome() {
 
         <section className="mini-thread">
           <div className="mini-thread-title">
-            <span>Anteprima conversazione · {selectedChat?.name || 'Chat'}</span>
-            <Link href={selectedChat?.linkId ? `/messages?link=${selectedChat.linkId}` : '/messages'}>Apri chat completa →</Link>
+            <span>Conversazione · {selectedChat?.name || 'Chat'}</span>
+            <span>{activeMessages.length || selectedChat?.body ? 'Chat integrata' : 'Nessun messaggio'}</span>
           </div>
-          <div className="bubble">{selectedChat?.body || 'Nessun messaggio recente.'}</div>
-          <div className="bubble me">Rispondi dalla chat completa per mantenere lo storico reale.</div>
+
+          <div className="thread-messages">
+            {activeMessages.length > 0 ? (
+              activeMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`bubble ${message.sender_id === selectedChat?.otherUserId ? '' : 'me'}`}
+                >
+                  {message.body || 'Messaggio'}
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="bubble">{selectedChat?.body || 'Nessun messaggio recente.'}</div>
+                <div className="bubble me">Questa conversazione verrà caricata qui appena avrà messaggi reali.</div>
+              </>
+            )}
+          </div>
+
           <div className="reply-row">
-            <input placeholder="Scrivi un messaggio..." disabled />
-            <Link href={selectedChat?.linkId ? `/messages?link=${selectedChat.linkId}` : '/messages'}>➤</Link>
+            <input
+              placeholder={
+                selectedChat?.otherUserId?.startsWith('demo-')
+                  ? 'Chat demo: crea una conversazione reale per rispondere'
+                  : 'Scrivi un messaggio...'
+              }
+              value={replyBody}
+              onChange={(event) => setReplyBody(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  sendPrivateReply();
+                }
+              }}
+              disabled={selectedChat?.otherUserId?.startsWith('demo-') || sendingMessage}
+            />
+            <button
+              type="button"
+              onClick={sendPrivateReply}
+              disabled={selectedChat?.otherUserId?.startsWith('demo-') || sendingMessage || !replyBody.trim()}
+            >
+              ➤
+            </button>
           </div>
         </section>
       </aside>
@@ -666,7 +804,7 @@ export function NovaHome() {
         <Link href="/" className="active">⌂</Link>
         <Link href="/cities">📍</Link>
         <Link href="#composer">＋</Link>
-        <button type="button" onClick={() => setChatOpen(true)}>
+        <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || chatsToShow[0]?.otherUserId)}>
           💬
           {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
         </button>
@@ -1726,6 +1864,12 @@ const styles = `
   background: linear-gradient(135deg, var(--yellow), var(--orange));
 }
 
+.thread-messages {
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .reply-row {
   display: grid;
   grid-template-columns: 1fr 44px;
@@ -1744,15 +1888,22 @@ const styles = `
   font-weight: 800;
 }
 
-.reply-row a {
+.reply-row button {
   min-height: 42px;
   display: grid;
   place-items: center;
+  border: 0;
   border-radius: 9px;
   color: #06110f;
   background: linear-gradient(135deg, var(--yellow), var(--orange));
   font-size: 18px;
   font-weight: 1000;
+  cursor: pointer;
+}
+
+.reply-row button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 
 .chat-backdrop {
