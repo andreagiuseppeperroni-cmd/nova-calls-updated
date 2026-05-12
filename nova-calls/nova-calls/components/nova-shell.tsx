@@ -313,12 +313,13 @@ function Topbar() {
   return (
     <header className="topbar">
       <Link className="brand" href="/">
-        <span className="mark"><i /><i /><i /><i /></span>
-        <span>
-          <span className="brand-word">The Square</span>
-          <span className="brand-sub">City Wall Network</span>
-        </span>
-      </Link>
+  <img src="/icon-192.png" alt="The Square" className="brand-app-icon" />
+
+  <span>
+    <span className="brand-word">The Square</span>
+    <span className="brand-sub">City Wall Network</span>
+  </span>
+</Link>
 
       <div className="top-search">
         <span>Cerca città, Wall, creator, eventi locali...</span>
