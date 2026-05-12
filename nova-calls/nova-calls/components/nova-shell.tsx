@@ -676,6 +676,16 @@ export function NovaHome() {
 
         <main className="center">
           <header className="topbar">
+            <div className="home-brand-row">
+              <Link href="/" className="home-brand">
+                <img src="/icon-192.png" alt="The Square" />
+                <span>
+                  <b>The Square</b>
+                  <small>City Wall Network</small>
+                </span>
+              </Link>
+            </div>
+
             <div className="search-row">
               <div className="search">⌕ Cerca città, wall, creator, eventi locali...</div>
 
@@ -1301,6 +1311,54 @@ const styles = `
   padding: 18px 0 12px;
   backdrop-filter: blur(18px);
   background: linear-gradient(180deg, rgba(8,10,15,.96), rgba(8,10,15,.76), transparent);
+}
+
+
+.home-brand-row {
+  display: none;
+  margin-bottom: 12px;
+}
+
+.home-brand {
+  min-height: 68px;
+  display: inline-grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-2);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255,210,31,.14), transparent 34%),
+    linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.home-brand img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255,210,31,.35);
+  box-shadow: 0 0 0 4px rgba(255,210,31,.08), 0 18px 38px rgba(255,157,46,.18);
+}
+
+.home-brand b {
+  display: block;
+  font-family: var(--title);
+  font-size: 30px;
+  line-height: .9;
+  letter-spacing: -.075em;
+  color: var(--ink);
+}
+
+.home-brand small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .22em;
+  text-transform: uppercase;
 }
 
 .search-row {
@@ -2462,6 +2520,14 @@ const styles = `
     grid-template-columns: 88px minmax(0, 720px) 320px;
   }
 
+  .home-brand-row {
+    display: block;
+  }
+
+  .home-brand {
+    width: 100%;
+  }
+
   .brand {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -2502,6 +2568,14 @@ const styles = `
 
   .topbar {
     margin-top: 0;
+  }
+
+  .home-brand-row {
+    display: block;
+  }
+
+  .home-brand {
+    width: 100%;
   }
 
   .search-row {
