@@ -500,11 +500,132 @@ export function NovaHome() {
         ...posts,
       ]);
 
+      await loadWallPosts();
       resetComposer();
       setComposerOpen(false);
     } finally {
       setComposerPosting(false);
     }
+  }
+
+
+  async function loadWallPosts() {
+    const { data: postRows, error: postsError } = await supabase
+      .from('city_wall_posts')
+      .select('id, city_id, user_id, content, post_type, status, created_at')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+      .limit(80);
+
+    if (postsError) {
+      setComposerError(postsError.message);
+      return;
+    }
+
+    const posts = postRows || [];
+    const postIds = posts.map((post) => post.id);
+    const cityIds = Array.from(new Set(posts.map((post) => post.city_id).filter(Boolean)));
+    const userIds = Array.from(new Set(posts.map((post) => post.user_id).filter(Boolean)));
+
+    let mediaRows: Array<{
+      post_id: string;
+      media_type: string | null;
+      file_url: string | null;
+      file_path: string | null;
+    }> = [];
+
+    let cityRows: Array<{
+      id: string;
+      name: string | null;
+      slug: string | null;
+    }> = [];
+
+    let profileRows: Array<{
+      id: string;
+      full_name: string | null;
+      username: string | null;
+    }> = [];
+
+    if (postIds.length > 0) {
+      const { data } = await supabase
+        .from('city_wall_post_media')
+        .select('post_id, media_type, file_url, file_path')
+        .in('post_id', postIds);
+
+      mediaRows = data || [];
+    }
+
+    if (cityIds.length > 0) {
+      const { data } = await supabase
+        .from('cities')
+        .select('id, name, slug')
+        .in('id', cityIds);
+
+      cityRows = data || [];
+    }
+
+    if (userIds.length > 0) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+
+      profileRows = data || [];
+    }
+
+    const mediaMap = new Map<string, typeof mediaRows[number]>();
+    for (const media of mediaRows) {
+      if (!mediaMap.has(media.post_id)) {
+        mediaMap.set(media.post_id, media);
+      }
+    }
+
+    const cityMap = new Map(cityRows.map((city) => [city.id, city]));
+    const profileMap = new Map(profileRows.map((profile) => [profile.id, profile]));
+
+    const mappedPosts: FeedPost[] = posts.map((post) => {
+      const media = mediaMap.get(post.id);
+      const city = cityMap.get(post.city_id);
+      const profile = profileMap.get(post.user_id);
+      const author = profile?.full_name || profile?.username || 'Utente The Square';
+      const postType = String(post.post_type || media?.media_type || 'text');
+      const kind: FeedKind =
+        postType === 'image'
+          ? 'photo'
+          : postType === 'audio'
+            ? 'audio'
+            : postType === 'video'
+              ? 'video'
+              : 'text';
+
+      const content = post.content || '';
+      const cityName = city?.name || 'Roma';
+      const citySlug = city?.slug || 'roma';
+
+      return {
+        id: post.id,
+        author,
+        initials: getInitials(author),
+        city: cityName,
+        citySlug,
+        topic: kind === 'audio' ? 'Audio' : kind === 'video' ? 'Video' : 'Wall',
+        topicSlug: kind === 'audio' ? 'audio' : kind === 'video' ? 'video' : 'socialita',
+        time: timeLabel(post.created_at),
+        wall: `Wall ${cityName}`,
+        kind,
+        title: content ? content.split('\n')[0].slice(0, 110) : `Nuovo post sul Wall di ${cityName}`,
+        text: content || media?.file_path || '',
+        likes: 0,
+        comments: 0,
+        audioReplies: 0,
+        rooms: 0,
+        accent: 'yellow',
+        mediaUrl: media?.file_url || '',
+        mediaName: media?.file_path || '',
+      };
+    });
+
+    setUserPosts(mappedPosts);
   }
 
   async function loadUnreadCounts() {
@@ -748,6 +869,7 @@ export function NovaHome() {
 
     async function start() {
       if (!mounted) return;
+      await loadWallPosts();
       await loadUnreadCounts();
       await loadChatPreviews();
 
@@ -794,6 +916,28 @@ export function NovaHome() {
           },
           async () => {
             await loadUnreadCounts();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'city_wall_posts',
+          },
+          async () => {
+            await loadWallPosts();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'city_wall_post_media',
+          },
+          async () => {
+            await loadWallPosts();
           }
         )
         .subscribe();
