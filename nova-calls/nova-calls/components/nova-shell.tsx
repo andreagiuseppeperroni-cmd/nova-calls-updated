@@ -1,694 +1,1285 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, type ChangeEvent } from 'react';
-import { officialItalianCities } from '@/lib/italian-cities';
-import type { WallPost } from '@/lib/city-wall-types';
+import { useMemo, useState } from 'react';
 import { ProfileOrb } from '@/components/profile-store';
 
-const WALL_STORAGE_KEY = 'the-square:wall-posts';
+type FeedKind = 'text' | 'photo' | 'audio' | 'video' | 'news';
 
-const navItems = [
-  ['🏠', 'Home', '/'],
-  ['🧱', 'The Wall', '#wall'],
-  ['🎙️', 'Voice Wall', '#voice-wall'],
-  ['📍', 'Città', '/cities'],
-  ['📰', 'News', '/world-news'],
-  ['🎟️', 'Eventi', '/events'],
-  ['👥', 'Persone', '/people'],
-  ['👤', 'Profilo', '/profile'],
+type FeedPost = {
+  id: string;
+  author: string;
+  initials: string;
+  city: string;
+  citySlug: string;
+  topic: string;
+  topicSlug: string;
+  time: string;
+  wall: string;
+  kind: FeedKind;
+  title: string;
+  text: string;
+  likes: number;
+  comments: number;
+  audioReplies: number;
+  rooms: number;
+  accent?: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
+};
+
+const cityTabs = [
+  { label: 'Per te', slug: 'for-you', icon: '✨' },
+  { label: 'Roma', slug: 'roma', icon: '📍' },
+  { label: 'Milano', slug: 'milano', icon: '🏙️' },
+  { label: 'Napoli', slug: 'napoli', icon: '🌊' },
+  { label: 'Vicino a me', slug: 'nearby', icon: '🧭' },
+  { label: 'Seguiti', slug: 'following', icon: '👥' },
 ];
 
-const defaultPosts: WallPost[] = [
+const topics = [
+  { label: 'Tutto', slug: 'all' },
+  { label: 'Eventi', slug: 'eventi', icon: '🎟️' },
+  { label: 'News', slug: 'news', icon: '📰' },
+  { label: 'Mobilità', slug: 'mobilita', icon: '🚇' },
+  { label: 'Food', slug: 'food', icon: '🍝' },
+  { label: 'Lavoro', slug: 'lavoro', icon: '💼' },
+  { label: 'Audio', slug: 'audio', icon: '🎙️' },
+  { label: 'Video', slug: 'video', icon: '🎬' },
+  { label: 'Socialità', slug: 'socialita', icon: '🤝' },
+];
+
+const feedPosts: FeedPost[] = [
   {
-    id: 'demo-roma-1',
+    id: 'roma-mobilita-1',
+    author: 'Andrea Perroni',
+    initials: 'A',
+    city: 'Roma',
     citySlug: 'roma',
-    cityName: 'Roma',
-    authorName: 'Andrea',
-    authorInitials: 'A',
-    neighborhood: 'Roma Nord',
-    targetType: 'city_wall',
-    postType: 'text',
-    title: 'Qualcuno conosce un posto tranquillo per lavorare al pc zona Prati?',
-    content:
-      'Mi servirebbe un locale luminoso, non troppo rumoroso e con prese comode. Meglio se aperto anche nel pomeriggio.',
-    reactions: ['💬 Rispondi', '🎙️ Lascia audio', '🔖 Salva', '↗ Porta nella mia Piazza'],
-    createdAtLabel: '12 minuti fa',
+    topic: 'Mobilità',
+    topicSlug: 'mobilita',
+    time: '12 minuti fa',
+    wall: 'Wall Roma',
+    kind: 'photo',
+    title: 'La nuova viabilità a Prati funziona davvero o sta solo spostando il traffico?',
+    text: 'Mi piacerebbe sentire chi vive lì tutti i giorni. Io ho visto più caos nelle vie laterali, ma magari è solo questione di abitudine.',
+    likes: 128,
+    comments: 42,
+    audioReplies: 9,
+    rooms: 3,
+    accent: 'yellow',
   },
   {
-    id: 'demo-roma-2',
+    id: 'roma-eventi-audio-1',
+    author: 'Giulia Romano',
+    initials: 'G',
+    city: 'Roma',
     citySlug: 'roma',
-    cityName: 'Roma',
-    authorName: 'Giulia',
-    authorInitials: 'G',
-    neighborhood: 'Trastevere',
-    targetType: 'city_wall',
-    postType: 'audio',
-    title: 'Ho lasciato un pensiero vocale sugli eventi del weekend.',
-    content:
-      'Secondo me il vero problema non è trovare eventi, ma andarci con qualcuno senza sentirsi fuori posto.',
-    audioDuration: '0:42',
-    reactions: ['💬 8 risposte', '👥 12 interessati', '🎟️ Collega evento'],
-    createdAtLabel: '35 minuti fa',
+    topic: 'Eventi',
+    topicSlug: 'audio',
+    time: '35 minuti fa',
+    wall: 'Voice Wall',
+    kind: 'audio',
+    title: 'Andare agli eventi da soli è ancora un tabù?',
+    text: 'Ho lasciato un audio perché secondo me il vero problema non è trovare eventi, ma andarci senza sentirsi fuori posto.',
+    likes: 84,
+    comments: 18,
+    audioReplies: 21,
+    rooms: 1,
+    accent: 'cyan',
   },
   {
-    id: 'demo-roma-3',
+    id: 'milano-food-1',
+    author: 'Marco B.',
+    initials: 'M',
+    city: 'Milano',
+    citySlug: 'milano',
+    topic: 'Food',
+    topicSlug: 'food',
+    time: '1 ora fa',
+    wall: 'Wall Milano',
+    kind: 'text',
+    title: 'Il miglior posto per cena economica ma bella in zona Isola?',
+    text: 'Budget 25/30 euro, atmosfera tranquilla, magari con tavoli esterni. Vale anche qualcosa di poco conosciuto.',
+    likes: 51,
+    comments: 33,
+    audioReplies: 4,
+    rooms: 0,
+    accent: 'pink',
+  },
+  {
+    id: 'napoli-news-video-1',
+    author: 'Square News',
+    initials: 'S',
+    city: 'Napoli',
+    citySlug: 'napoli',
+    topic: 'News',
+    topicSlug: 'video',
+    time: '1 ora fa',
+    wall: 'News locale',
+    kind: 'video',
+    title: 'Nuovo evento musicale sul lungomare: il Wall sta già organizzando gruppi',
+    text: 'Da questa notizia sono nate due stanze: una per chi cerca compagnia e una per chi vuole arrivare prima e organizzarsi.',
+    likes: 211,
+    comments: 76,
+    audioReplies: 15,
+    rooms: 2,
+    accent: 'green',
+  },
+  {
+    id: 'roma-lavoro-1',
+    author: 'Sara N.',
+    initials: 'S',
+    city: 'Roma',
     citySlug: 'roma',
-    cityName: 'Roma',
-    authorName: 'Marco',
-    authorInitials: 'M',
-    neighborhood: 'San Lorenzo',
-    targetType: 'city_wall',
-    postType: 'event',
-    title: 'Stasera qualcuno va al live in zona San Lorenzo?',
-    content: 'Io ci sto pensando, ma vorrei capire se c’è qualcuno interessato a fare gruppo prima.',
-    reactions: ['📍 Ci vado', '👥 Cerco compagnia', '💬 Ne parliamo'],
-    createdAtLabel: '1 ora fa',
+    topic: 'Lavoro',
+    topicSlug: 'lavoro',
+    time: '2 ore fa',
+    wall: 'Wall Roma',
+    kind: 'text',
+    title: 'Cerco un coworking non freddo e non troppo “startup finta” a Roma Est',
+    text: 'Mi serve un posto umano, dove lavorare ma anche conoscere qualcuno. Avete esperienze dirette?',
+    likes: 67,
+    comments: 29,
+    audioReplies: 6,
+    rooms: 1,
+    accent: 'blue',
+  },
+  {
+    id: 'milano-socialita-audio-1',
+    author: 'Luca V.',
+    initials: 'L',
+    city: 'Milano',
+    citySlug: 'milano',
+    topic: 'Socialità',
+    topicSlug: 'audio',
+    time: '3 ore fa',
+    wall: 'Voice Wall',
+    kind: 'audio',
+    title: 'A Milano è facile conoscere persone o siamo tutti troppo di corsa?',
+    text: 'Una riflessione vocale sul fatto che la città offre tantissimo, ma spesso manca il contesto giusto per iniziare una conversazione.',
+    likes: 142,
+    comments: 58,
+    audioReplies: 24,
+    rooms: 4,
+    accent: 'cyan',
   },
 ];
 
-function readLocalPosts() {
-  if (typeof window === 'undefined') return [] as WallPost[];
+const followedCities = [
+  ['RM', 'Roma', '128 post oggi · 43 audio'],
+  ['MI', 'Milano', '96 post oggi · 21 video'],
+  ['NA', 'Napoli', '88 post oggi · 18 eventi'],
+];
 
-  try {
-    return JSON.parse(window.localStorage.getItem(WALL_STORAGE_KEY) || '[]') as WallPost[];
-  } catch {
-    return [] as WallPost[];
-  }
-}
-
-function saveLocalPosts(posts: WallPost[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(WALL_STORAGE_KEY, JSON.stringify(posts.slice(0, 40)));
-}
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function formatPostType(type: WallPost['postType']) {
-  const labels: Record<WallPost['postType'], string> = {
-    text: 'Pensiero',
-    image: 'Immagine',
-    audio: 'Audio',
-    mixed: 'Post multimediale',
-    news: 'Notizia',
-    event: 'Evento',
-  };
-
-  return labels[type];
-}
+const hotRooms = [
+  ['🧩', 'Viabilità Prati', '24h · 32 persone dentro'],
+  ['🧩', 'Eventi da soli', '18h · 18 persone dentro'],
+];
 
 export function NovaHome() {
-  const [selectedCitySlug, setSelectedCitySlug] = useState('roma');
-  const [targetType, setTargetType] = useState<'city_wall' | 'personal_square'>('city_wall');
-  const [wallText, setWallText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  const [imagePreview, setImagePreview] = useState('');
-  const [imageName, setImageName] = useState('');
-  const [audioName, setAudioName] = useState('');
-  const [localPosts, setLocalPosts] = useState<WallPost[]>([]);
+  const [activeCity, setActiveCity] = useState('for-you');
+  const [activeTopic, setActiveTopic] = useState('all');
 
-  const selectedCity = useMemo(() => {
-    return officialItalianCities.find((city) => city.slug === selectedCitySlug) || officialItalianCities[0];
-  }, [selectedCitySlug]);
+  const visiblePosts = useMemo(() => {
+    return feedPosts.filter((post) => {
+      const cityMatch = activeCity === 'for-you' || activeCity === 'nearby' || activeCity === 'following' || post.citySlug === activeCity;
+      const topicMatch =
+        activeTopic === 'all' ||
+        post.topicSlug === activeTopic ||
+        (activeTopic === 'eventi' && post.topicSlug === 'audio' && post.topic === 'Eventi') ||
+        (activeTopic === 'news' && post.kind === 'news') ||
+        (activeTopic === 'audio' && post.kind === 'audio') ||
+        (activeTopic === 'video' && post.kind === 'video');
 
-  const posts = useMemo(() => {
-    const storedPosts = localPosts.length ? localPosts : [];
-    return [...storedPosts, ...defaultPosts].filter(
-      (post) => post.citySlug === selectedCity.slug || post.targetType === 'personal_square'
-    );
-  }, [localPosts, selectedCity.slug]);
-
-  function loadLocalPostsOnce() {
-    if (!localPosts.length) setLocalPosts(readLocalPosts());
-  }
-
-  function handleImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImageName(file.name);
-    setImagePreview(URL.createObjectURL(file));
-  }
-
-  function handleAudio(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setAudioName(file.name);
-  }
-
-  function publishPost() {
-    const content = wallText.trim();
-
-    if (!content && !imageName && !audioName) {
-      alert('Scrivi qualcosa oppure carica un’immagine/audio prima di pubblicare.');
-      return;
-    }
-
-    const title = content ? content.split('\n')[0].slice(0, 96) : imageName ? 'Nuovo post con immagine' : 'Nuovo audio sul Voice Wall';
-    const postType: WallPost['postType'] = imageName && audioName ? 'mixed' : imageName ? 'image' : audioName ? 'audio' : 'text';
-
-    const newPost: WallPost = {
-      id: `local-${Date.now()}`,
-      citySlug: selectedCity.slug,
-      cityName: selectedCity.name,
-      authorName: isAnonymous ? 'Anonimo' : 'Tu',
-      authorInitials: isAnonymous ? 'AN' : 'TU',
-      neighborhood: selectedCity.name,
-      targetType,
-      postType,
-      title,
-      content: content || (imageName ? `Immagine caricata: ${imageName}` : `Audio caricato: ${audioName}`),
-      imageUrl: imagePreview || undefined,
-      imageName: imageName || undefined,
-      audioName: audioName || undefined,
-      audioDuration: audioName ? '0:59' : undefined,
-      isAnonymous,
-      reactions: ['💬 Rispondi', '🎙️ Lascia audio', '🔖 Salva'],
-      createdAtLabel: 'adesso',
-    };
-
-    const updated = [newPost, ...readLocalPosts()];
-    saveLocalPosts(updated);
-    setLocalPosts(updated);
-    setWallText('');
-    setImageName('');
-    setImagePreview('');
-    setAudioName('');
-  }
+      return cityMatch && topicMatch;
+    });
+  }, [activeCity, activeTopic]);
 
   return (
-    <div className="square-shell" onMouseEnter={loadLocalPostsOnce}>
-      <Topbar />
+    <div className="feed-shell">
+      <div className="app">
+        <aside className="rail">
+          <Link href="/" className="brand">
+            <img src="/icon-192.png" alt="The Square" className="brand-icon" />
+            <div>
+              <b>The Square</b>
+              <span>City Wall Network</span>
+            </div>
+          </Link>
 
-      <main className="square-layout">
-        <aside className="square-sidebar">
-          <nav>
-            {navItems.map(([icon, label, href]) => (
-              <Link href={href} key={label} className={label === 'Home' ? 'active' : ''}>
-                <span>{icon}</span>
-                <b>{label}</b>
-              </Link>
-            ))}
+          <nav className="side-nav">
+            <Link href="/" className="active"><span>⌂</span><b>Home</b></Link>
+            <Link href="/cities"><span>📍</span><b>Città</b></Link>
+            <Link href="#feed"><span>🧱</span><b>Wall</b></Link>
+            <Link href="#audio"><span>🎙️</span><b>Audio</b></Link>
+            <Link href="#video"><span>🎬</span><b>Video</b></Link>
+            <Link href="/notifications"><span>🔔</span><b>Notifiche</b></Link>
+            <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
 
-          <Link href="#composer" className="side-cta">
-            <span>⊕</span>
-            Scrivi sul Wall
-          </Link>
+          <Link href="#composer" className="side-post">＋ Pubblica</Link>
+
+          <section className="now-box">
+            <h3>Live ora</h3>
+            <div className="trend-line"><span>Roma</span><small>128 post</small></div>
+            <div className="trend-line"><span>Eventi</span><small>43 audio</small></div>
+            <div className="trend-line"><span>Mobilità</span><small>hot</small></div>
+            <div className="trend-line"><span>Milano</span><small>96 post</small></div>
+          </section>
         </aside>
 
-        <section className="square-main">
-          <Hero city={selectedCity.name} />
+        <main className="center">
+          <header className="topbar">
+            <div className="search-row">
+              <div className="search">⌕ Cerca città, wall, creator, eventi locali...</div>
+              <Link className="icon-btn" href="/notifications">🔔</Link>
+              <Link className="icon-btn profile-mini" href="/profile"><ProfileOrb className="h-full w-full" /></Link>
+            </div>
 
-          <section className="wall-composer" id="composer">
-            <div className="composer-head">
-              <div>
-                <p className="eyebrow">The Wall</p>
-                <h2>Cosa vuoi dire alla tua città oggi?</h2>
-              </div>
-
-              <div className="composer-tabs">
-                <button type="button" className={targetType === 'city_wall' ? 'active' : ''} onClick={() => setTargetType('city_wall')}>
-                  Wall locale · {selectedCity.name}
-                </button>
+            <nav className="wall-tabs" aria-label="Filtro città">
+              {cityTabs.map((tab) => (
                 <button
                   type="button"
-                  className={targetType === 'personal_square' ? 'active' : ''}
-                  onClick={() => setTargetType('personal_square')}
+                  key={tab.slug}
+                  className={`wall-tab ${activeCity === tab.slug ? 'active' : ''}`}
+                  onClick={() => setActiveCity(tab.slug)}
                 >
-                  La mia Piazza
+                  {tab.icon} {tab.label}
                 </button>
-                <button type="button" className={audioName ? 'active' : ''}>Voice Wall</button>
-              </div>
-            </div>
-
-            <textarea
-              value={wallText}
-              onChange={(event) => setWallText(event.target.value)}
-              placeholder="Scrivi una domanda, una segnalazione, un pensiero, una richiesta locale..."
-            />
-
-            {imagePreview && (
-              <div className="upload-preview">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagePreview} alt="Anteprima immagine caricata" />
-                <span>{imageName}</span>
-              </div>
-            )}
-
-            {audioName && (
-              <div className="audio-preview">
-                <span className="play">▶</span>
-                <Wave />
-                <b>{audioName}</b>
-              </div>
-            )}
-
-            <div className="composer-bottom">
-              <div className="tools">
-                <label>
-                  🖼️ Immagine
-                  <input type="file" accept="image/*" onChange={handleImage} />
-                </label>
-                <label>
-                  🎙️ Audio
-                  <input type="file" accept="audio/*" onChange={handleAudio} />
-                </label>
-                <button type="button">📍 {selectedCity.name}</button>
-                <button type="button">📰 Notizia</button>
-                <button type="button">🎟️ Evento</button>
-                <button type="button" className={isAnonymous ? 'active' : ''} onClick={() => setIsAnonymous((value) => !value)}>
-                  ◒ Anonimo
-                </button>
-              </div>
-
-              <button type="button" onClick={publishPost} className="publish-btn">
-                Pubblica sul Wall →
-              </button>
-            </div>
-          </section>
-
-          <CitySelector selectedCitySlug={selectedCitySlug} onSelectCity={setSelectedCitySlug} />
-
-          <div className="section-title" id="wall">
-            <div>
-              <h2>🧱 The Wall — {selectedCity.name}</h2>
-              <p>Messaggi, audio, immagini, domande, eventi e notizie pubblicati dalla città.</p>
-            </div>
-            <Link href={`/cities/${selectedCity.slug}`}>Apri città →</Link>
-          </div>
-
-          <section className="content-grid">
-            <div className="wall-feed">
-              {posts.map((post, index) => (
-                <WallPostCard key={post.id} post={post} featured={index === 0} />
               ))}
+              <Link className="wall-tab" href="/cities">＋ Cambia città</Link>
+            </nav>
+
+            <nav className="topic-tabs" aria-label="Filtro argomenti">
+              {topics.map((topic) => (
+                <button
+                  type="button"
+                  key={topic.slug}
+                  className={`topic ${activeTopic === topic.slug ? 'active' : ''}`}
+                  onClick={() => setActiveTopic(topic.slug)}
+                >
+                  {topic.icon ? `${topic.icon} ` : ''}{topic.label}
+                </button>
+              ))}
+            </nav>
+          </header>
+
+          <section className="composer" id="composer">
+            <div className="composer-top">
+              <div className="avatar">A</div>
+              <button type="button" className="composer-placeholder">Cosa vuoi dire al Wall di Roma?</button>
             </div>
-
-            <CityRail city={selectedCity} />
+            <div className="composer-actions">
+              <button type="button">🖼️ Foto</button>
+              <button type="button">🎙️ Audio</button>
+              <button type="button">🎬 Video</button>
+              <button type="button">🧩 Stanza 24h</button>
+            </div>
           </section>
-        </section>
 
-        <aside className="right-rail">
-          <MySquare />
-          <EchoPanel city={selectedCity.name} stats={selectedCity.wallStats} />
-          <ActiveCities />
-          <VoiceWall />
+          <section className="feed" id="feed">
+            {visiblePosts.length ? (
+              visiblePosts.map((post) => <FeedPostCard key={post.id} post={post} />)
+            ) : (
+              <section className="empty-feed">
+                <h2>Nessun post con questi filtri</h2>
+                <p>Cambia città o argomento, oppure pubblica tu il primo contenuto su questo Wall.</p>
+              </section>
+            )}
+          </section>
+        </main>
+
+        <aside className="right">
+          <section className="right-panel">
+            <h3>Wall che segui</h3>
+            {followedCities.map(([code, city, meta]) => (
+              <div className="city-card" key={city}>
+                <div className="city-avatar">{code}</div>
+                <div><b>{city}</b><span>{meta}</span></div>
+                <button type="button" className="follow">Segui</button>
+              </div>
+            ))}
+          </section>
+
+          <section className="right-panel">
+            <h3>Argomenti caldi</h3>
+            <div className="topic-grid">
+              <span>🚇 Mobilità</span>
+              <span>🎟️ Eventi</span>
+              <span>🍝 Food</span>
+              <span>💼 Lavoro</span>
+              <span>🏠 Casa</span>
+              <span>🤝 Socialità</span>
+              <span>🎙️ Audio</span>
+              <span>📰 News</span>
+            </div>
+          </section>
+
+          <section className="right-panel">
+            <h3>Stanze nate dai post</h3>
+            {hotRooms.map(([icon, title, meta]) => (
+              <div className="city-card" key={title}>
+                <div className="city-avatar">{icon}</div>
+                <div><b>{title}</b><span>{meta}</span></div>
+                <button type="button" className="follow">Entra</button>
+              </div>
+            ))}
+          </section>
         </aside>
-      </main>
+      </div>
+
+      <nav className="mobile-nav">
+        <Link href="/" className="active">⌂</Link>
+        <Link href="/cities">📍</Link>
+        <Link href="#composer">＋</Link>
+        <Link href="#feed">🧩</Link>
+        <Link href="/profile">👤</Link>
+      </nav>
 
       <style jsx global>{styles}</style>
     </div>
   );
 }
 
-function Topbar() {
+function FeedPostCard({ post }: { post: FeedPost }) {
   return (
-    <header className="topbar">
-      <Link className="brand" href="/">
-        <img src="/icon-192.png" alt="The Square" className="brand-app-icon" />
-
-        <span>
-          <span className="brand-word">The Square</span>
-          <span className="brand-sub">City Wall Network</span>
-        </span>
-      </Link>
-
-      <div className="top-search">
-        <span>Cerca città, Wall, creator, eventi locali...</span>
-        <b>⌕</b>
-      </div>
-
-      <nav className="top-actions">
-        <Link href="/cities" className="top-icon">🌇</Link>
-        <Link href="/world-news" className="top-icon">🗞️</Link>
-        <Link href="/notifications" className="top-icon badge">📢</Link>
-        <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
-          <ProfileOrb className="h-full w-full" />
-        </Link>
-        <Link href="#composer" className="top-cta">⊕ Scrivi sul Wall</Link>
-      </nav>
-    </header>
-  );
-}
-
-function Hero({ city }: { city: string }) {
-  return (
-    <section className="hero">
-      <div className="city-silhouette">
-        <div className="tower" />
-        <div className="dome" />
-        <div className="block b-a" />
-        <div className="block b-b" />
-        <div className="arch" />
-        <div className="plaza-line" />
-      </div>
-
-      <div className="hero-content">
-        <p className="eyebrow">Ogni città ha un Wall</p>
-        <h1>
-          La città parla. Lascia il tuo <span>segno.</span>
-        </h1>
-        <p>
-          The Square trasforma ogni città in un Wall vivo: pensieri, audio, immagini, notizie locali,
-          eventi e Piazze personali. Niente feed generico: solo ciò che succede davvero intorno a te.
-        </p>
-
-        <div className="hero-actions">
-          <Link href="/cities" className="hero-btn yellow">Esplora città</Link>
-          <Link href="#composer" className="hero-btn green">Pubblica sul Wall di {city}</Link>
-          <Link href="/my-square" className="hero-btn blue">Apri la mia Piazza</Link>
+    <article className="post">
+      <div className="post-head">
+        <div className={`post-avatar avatar-${post.accent || 'yellow'}`}>{post.initials}</div>
+        <div className="post-meta">
+          <b>{post.author}</b>
+          <span>{post.city} · {post.topic} · {post.time}</span>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function CitySelector({ selectedCitySlug, onSelectCity }: { selectedCitySlug: string; onSelectCity: (slug: string) => void }) {
-  const [query, setQuery] = useState('');
-
-  const visibleCities = officialItalianCities
-    .filter((city) => `${city.name} ${city.region} ${city.province}`.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, query ? 50 : 14);
-
-  return (
-    <section className="city-search">
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca città, quartiere o provincia..." />
-      <Link href="/cities" className="hero-btn blue">Tutte le città</Link>
-
-      <div className="city-chips">
-        {visibleCities.map((city) => (
-          <button
-            type="button"
-            key={city.slug}
-            onClick={() => onSelectCity(city.slug)}
-            className={selectedCitySlug === city.slug ? 'active' : ''}
-          >
-            {city.name}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function WallPostCard({ post, featured }: { post: WallPost; featured?: boolean }) {
-  return (
-    <article className={`wall-post ${featured ? 'featured' : ''}`}>
-      <div className="post-top">
-        <div className="post-user">
-          <span className={`avatar ${post.authorInitials === 'A' ? 'andrea' : post.authorInitials === 'G' ? 'giulia' : 'marco'}`}>
-            {post.authorInitials || getInitials(post.authorName)}
-          </span>
-          <div>
-            <b>{post.authorName}{post.neighborhood ? ` · ${post.neighborhood}` : ''}</b>
-            <span>{post.createdAtLabel} · {post.targetType === 'personal_square' ? 'La mia Piazza' : `Wall di ${post.cityName}`}</span>
-          </div>
-        </div>
-        <span className={`post-type ${post.postType === 'audio' ? 'blue' : post.postType === 'event' ? 'pink' : ''}`}>
-          {formatPostType(post.postType)}
-        </span>
+        <div className="wall-pill">{post.wall}</div>
       </div>
 
-      <h3>{post.title}</h3>
-      <p>{post.content}</p>
-
-      {post.imageUrl && (
-        <div className="image-post">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.imageUrl} alt={post.imageName || post.title} />
-        </div>
-      )}
-
-      {(post.postType === 'audio' || post.audioName || post.audioDuration) && (
-        <div className="voice-card" id="voice-wall">
-          <span className="play">▶</span>
-          <Wave />
-          <span className="duration">{post.audioDuration || '0:59'}</span>
-        </div>
-      )}
+      <div className="post-body">
+        <h2>{post.title}</h2>
+        <p>{post.text}</p>
+        {post.kind === 'photo' && <PhotoMedia />}
+        {post.kind === 'audio' && <AudioMedia />}
+        {post.kind === 'video' && <VideoMedia />}
+      </div>
 
       <div className="post-actions">
-        {post.reactions.map((reaction, index) => (
-          <a key={reaction} className={index === 0 ? 'highlight' : ''}>{reaction}</a>
-        ))}
+        <button type="button">❤️ {post.likes}</button>
+        <button type="button">💬 {post.comments}</button>
+        <button type="button">🎙️ {post.audioReplies}</button>
+        <button type="button">↗</button>
+        <button type="button" className="primary">🧩 Stanza</button>
+      </div>
+
+      <div className="post-comments">
+        {post.rooms > 0
+          ? `Vedi ${post.comments} commenti · ${post.audioReplies} risposte audio · ${post.rooms} stanze nate da questo post`
+          : `Vedi ${post.comments} commenti · ${post.audioReplies} risposte audio · Segui ${post.city} + ${post.topic}`}
       </div>
     </article>
   );
 }
 
-function Wave() {
+function PhotoMedia() {
   return (
-    <div className="wave">
-      {Array.from({ length: 10 }).map((_, index) => <i key={index} />)}
+    <div className="media photo-media">
+      <div className="photo-shape" />
+      <div className="media-label">Foto · caricata sul Wall locale</div>
     </div>
   );
 }
 
-function CityRail({ city }: { city: typeof officialItalianCities[number] }) {
+function AudioMedia() {
   return (
-    <aside className="city-rail">
-      <section className="side-card">
-        <div className="mini-title"><h3>📰 News locali</h3><Link href="/world-news">Vedi tutte</Link></div>
-        <NewsLine title={`${city.name}, nuova viabilità in centro: cosa cambia da questo weekend`} source="Fonte locale · 2 ore fa" />
-        <NewsLine title="Eventi culturali gratuiti in programma nei municipi" source="Comune e territorio · oggi" />
-      </section>
-
-      <section className="side-card">
-        <div className="mini-title"><h3>🎟️ Eventi a {city.name}</h3><Link href="/events">Calendario</Link></div>
-        <EventMini title="Aperitivo networking" text="24 interessati · 8 cercano compagnia · venerdì 19:30" />
-        <EventMini title="Live music night" text="17 interessati · 5 persone compatibili · stasera" pink />
-      </section>
-    </aside>
-  );
-}
-
-function NewsLine({ title, source }: { title: string; source: string }) {
-  return (
-    <div className="news-line">
-      <b>{title}</b>
-      <span>{source}</span>
-      <div className="news-actions"><a>Discuti sul Wall</a><a>Lascia audio</a></div>
+    <div className="media audio-media" id="audio">
+      <div className="audio-play">▶</div>
+      <div className="wave">
+        {Array.from({ length: 14 }).map((_, index) => <i key={index} />)}
+      </div>
+      <span className="duration">0:42</span>
     </div>
   );
 }
 
-function EventMini({ title, text, pink }: { title: string; text: string; pink?: boolean }) {
+function VideoMedia() {
   return (
-    <div className={`event-mini ${pink ? 'pink' : ''}`}>
-      <h4>{title}</h4>
-      <p>{text}</p>
-      <div><a>Ci vado</a><a>Cerco compagnia</a></div>
+    <div className="media video-media" id="video">
+      <div className="play-big">▶</div>
     </div>
-  );
-}
-
-function MySquare() {
-  return (
-    <section className="personal-square">
-      <div className="personal-head">
-        <span className="avatar andrea">A</span>
-        <div><b>Andrea’s Square</b><span>La tua Piazza personale</span></div>
-      </div>
-      <div className="personal-stats">
-        <div><b>128</b><span>persone</span></div>
-        <div><b>14</b><span>post</span></div>
-        <div><b>6</b><span>audio</span></div>
-      </div>
-      <div className="post-actions"><Link href="/my-square" className="highlight">Apri Piazza</Link><a>Pubblica qui</a></div>
-    </section>
-  );
-}
-
-function EchoPanel({ city, stats }: { city: string; stats: typeof officialItalianCities[number]['wallStats'] }) {
-  return (
-    <section className="echo-card">
-      <h3>🧠 Echo locale — {city}</h3>
-      <p>Oggi il Wall parla soprattutto di eventi, mobilità, posti per lavorare, nuove conoscenze e vita di quartiere.</p>
-      <div className="topic-list"><span>eventi</span><span>mobilità</span><span>lavoro</span><span>amicizie</span><span>quartieri</span></div>
-      <div className="live-strip">
-        <div><b>{stats.postsToday}</b><span>post oggi</span></div>
-        <div><b>{stats.audioToday}</b><span>audio</span></div>
-        <div><b>{stats.localEvents}</b><span>eventi</span></div>
-      </div>
-    </section>
-  );
-}
-
-function ActiveCities() {
-  return (
-    <section className="side-card">
-      <div className="mini-title"><h3>🔥 Città attive</h3><Link href="/cities">Tutte</Link></div>
-      {officialItalianCities.slice(0, 5).map((city) => (
-        <div className="news-line" key={city.slug}>
-          <b>{city.name}</b>
-          <span>{city.wallStats.postsToday} post oggi · {city.wallStats.audioToday} audio · {city.wallStats.localEvents} eventi</span>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function VoiceWall() {
-  return (
-    <section className="side-card">
-      <div className="mini-title"><h3>🎙️ Voice Wall</h3><a>Ascolta</a></div>
-      <div className="voice-card"><span className="play">▶</span><Wave /><span className="duration">1:08</span></div>
-      <p className="side-copy">“Cosa manca davvero alla vita sociale di Roma?”</p>
-    </section>
   );
 }
 
 const styles = `
 :root {
-  --bg: #0d1117;
-  --panel: #121824;
-  --panel-2: #171f2e;
+  --bg: #080a0f;
+  --panel: #101620;
+  --panel-2: #151d2a;
+  --panel-3: #0c1119;
   --ink: #f8fafc;
-  --muted: #94a3b8;
-  --line: rgba(255,255,255,.10);
-  --yellow: #facc15;
-  --orange: #fb923c;
-  --cyan: #22d3ee;
-  --blue: #3b82f6;
-  --pink: #f43f5e;
-  --lime: #a3e635;
-  --title-font: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+  --muted: #8c98aa;
+  --line: rgba(255,255,255,.11);
+  --line-2: rgba(255,255,255,.18);
+  --yellow: #ffd21f;
+  --orange: #ff9d2e;
+  --cyan: #24e0d2;
+  --blue: #2f8dff;
+  --pink: #ff3d6e;
+  --green: #a6ff4d;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --title: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
 }
-.square-shell, .square-shell * { box-sizing: border-box; }
-.square-shell { min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 10% 0%, rgba(250,204,21,.18), transparent 28%), radial-gradient(circle at 92% 8%, rgba(34,211,238,.16), transparent 30%), radial-gradient(circle at 74% 90%, rgba(244,63,94,.13), transparent 26%), linear-gradient(180deg, #0d1117 0%, #111827 48%, #10141d 100%); padding: 18px 20px 52px; position: relative; overflow-x: hidden; }
-.square-shell:before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .28; background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, black, transparent 88%); }
-.topbar { position: relative; z-index: 2; max-width: 1540px; min-height: 68px; display: grid; grid-template-columns: 250px minmax(320px, 1fr) auto; gap: 16px; align-items: center; margin: 0 auto 18px; padding: 10px; border: 1px solid var(--line); background: rgba(18,24,36,.74); backdrop-filter: blur(22px) saturate(1.15); box-shadow: 0 18px 44px rgba(0,0,0,.22); border-radius: 18px; }
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none; color: var(--ink); }
-.brand-app-icon { width: 52px; height: 52px; min-width: 52px; max-width: 52px; border-radius: 14px; object-fit: cover; display: block; box-shadow: 0 12px 28px rgba(250,204,21,.18); }
-.brand-word { display: block; font-family: var(--title-font); font-size: 28px; font-weight: 1000; letter-spacing: -.075em; white-space: nowrap; }
-.brand-sub { display: block; margin-top: -2px; color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.top-search { height: 47px; display: flex; align-items: center; gap: 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.10); background: rgba(15,23,42,.76); padding: 0 15px; color: var(--muted); font-size: 13px; font-weight: 700; }
-.top-search b { margin-left: auto; color: var(--yellow); font-size: 18px; }
-.top-actions { display: flex; align-items: center; gap: 10px; }
-.top-icon, .profile-orb-wrap { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; border: 1px solid rgba(255,255,255,.10); background: rgba(15,23,42,.78); color: #e2e8f0; font-size: 19px; text-decoration: none; overflow: hidden; }
-.top-icon.badge:after { content: "3"; position: absolute; right: -5px; top: -7px; min-width: 18px; height: 18px; display: grid; place-items: center; border-radius: 999px; background: var(--pink); color: white; font-size: 11px; font-weight: 1000; }
-.top-cta { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 13px; padding: 0 18px; color: #111827; background: linear-gradient(135deg, var(--yellow), var(--orange)); box-shadow: 0 18px 34px rgba(250,204,21,.18); font-size: 13px; font-weight: 1000; text-decoration: none; }
-.square-layout { position: relative; z-index: 1; max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 210px minmax(0, 1fr) 345px; gap: 18px; align-items: start; }
-.square-sidebar { position: sticky; top: 18px; display: grid; gap: 14px; }
-.square-sidebar nav { display: grid; gap: 8px; padding: 12px; border-radius: 18px; background: rgba(18,24,36,.82); border: 1px solid var(--line); box-shadow: 0 18px 44px rgba(0,0,0,.22); }
-.square-sidebar a { min-height: 45px; display: flex; align-items: center; gap: 11px; padding: 0 12px; border-radius: 13px; color: #cbd5e1; text-decoration: none; font-size: 13px; font-weight: 900; }
-.square-sidebar a.active, .square-sidebar a:hover { color: var(--yellow); background: rgba(250,204,21,.10); }
-.side-cta { min-height: 68px !important; justify-content: center; background: linear-gradient(135deg, var(--yellow), var(--orange)) !important; color: #111827 !important; }
-.square-main, .right-rail { min-width: 0; }
-.right-rail { position: sticky; top: 18px; display: grid; gap: 14px; }
-.hero { position: relative; min-height: 430px; border-radius: 24px; overflow: hidden; background: linear-gradient(90deg, rgba(13,17,23,.96), rgba(13,17,23,.64) 47%, rgba(13,17,23,.18)), radial-gradient(circle at 76% 44%, rgba(250,204,21,.26), transparent 24%), linear-gradient(135deg, #172033, #0f172a 64%, #111827); box-shadow: 0 26px 90px rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.10); isolation: isolate; }
-.hero:before { content: ""; position: absolute; inset: 0; opacity: .42; background: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px); background-size: 44px 44px; transform: perspective(900px) rotateX(58deg) scale(1.4) translateY(120px); transform-origin: bottom; }
-.city-silhouette { position: absolute; right: 0; bottom: 0; width: 58%; height: 70%; opacity: .82; }
-.tower, .block, .dome, .arch { position: absolute; bottom: 64px; background: linear-gradient(180deg, rgba(250,204,21,.48), rgba(251,146,60,.16)); border: 1px solid rgba(250,204,21,.16); }
-.tower { right: 52%; width: 48px; height: 172px; clip-path: polygon(42% 0,58% 0,58% 20%,70% 20%,70% 100%,30% 100%,30% 20%,42% 20%); }
-.dome { right: 35%; width: 150px; height: 98px; border-radius: 95px 95px 8px 8px; }
-.block.b-a { right: 12%; width: 160px; height: 130px; border-radius: 12px 12px 0 0; }
-.block.b-b { right: 0; width: 120px; height: 100px; border-radius: 12px 0 0 0; }
-.arch { right: 27%; width: 88px; height: 74px; border-radius: 44px 44px 0 0; background: linear-gradient(180deg, rgba(34,211,238,.40), rgba(59,130,246,.16)); }
-.plaza-line { position: absolute; right: 0; bottom: 60px; width: 62%; height: 3px; background: linear-gradient(90deg, transparent, rgba(250,204,21,.72), transparent); box-shadow: 0 0 24px rgba(250,204,21,.42); }
-.hero-content { position: relative; z-index: 2; padding: 62px 0 56px 56px; max-width: 650px; }
-.eyebrow { width: fit-content; display: inline-flex; align-items: center; gap: 7px; min-height: 28px; border-radius: 999px; padding: 0 11px; background: rgba(250,204,21,.12); border: 1px solid rgba(250,204,21,.20); color: var(--yellow); font-size: 10px; font-weight: 1000; letter-spacing: .12em; text-transform: uppercase; }
-.hero h1 { margin: 12px 0 16px; color: #f8fafc; font-family: var(--title-font); font-size: clamp(50px,5.6vw,84px); line-height: .88; letter-spacing: -.075em; font-weight: 1000; }
-.hero h1 span { background: linear-gradient(92deg, var(--yellow), var(--orange), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hero p { max-width: 560px; margin: 0; color: #cbd5e1; font-size: 16px; line-height: 1.55; font-weight: 680; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-.hero-btn { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,255,255,.10); border-radius: 13px; padding: 0 20px; color: #e2e8f0; background: rgba(15,23,42,.80); box-shadow: 0 18px 44px rgba(0,0,0,.22); font-size: 13px; font-weight: 900; text-decoration: none; }
-.hero-btn.yellow { color: #111827; background: linear-gradient(135deg, var(--yellow), var(--orange)); border-color: rgba(250,204,21,.25); }
-.hero-btn.green { color: #13210a; background: linear-gradient(135deg, var(--lime), #65a30d); border-color: rgba(163,230,53,.25); }
-.hero-btn.blue { color: white; background: linear-gradient(135deg, var(--cyan), var(--blue)); border-color: rgba(34,211,238,.25); }
-.wall-composer { position: relative; z-index: 5; margin: -58px 28px 0; padding: 18px; border-radius: 20px; background: radial-gradient(circle at 92% 0%, rgba(34,211,238,.10), transparent 30%), rgba(18,24,36,.94); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 26px 90px rgba(0,0,0,.34); backdrop-filter: blur(22px) saturate(1.15); }
-.composer-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
-.composer-head h2 { margin: 0; color: #f8fafc; font-family: var(--title-font); font-size: 22px; letter-spacing: -.055em; font-weight: 1000; }
-.composer-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-.composer-tabs button { height: 32px; display: inline-flex; align-items: center; border-radius: 999px; border: 1px solid rgba(255,255,255,.10); padding: 0 12px; background: rgba(15,23,42,.80); color: var(--muted); font-size: 11px; font-weight: 900; cursor: pointer; }
-.composer-tabs button.active { background: rgba(250,204,21,.14); color: var(--yellow); border-color: rgba(250,204,21,.22); }
-.wall-composer textarea { min-height: 116px; width: 100%; resize: none; border: 1px solid rgba(255,255,255,.10); outline: 0; border-radius: 16px; background: rgba(15,23,42,.74); padding: 16px; color: #e2e8f0; font-size: 15px; font-weight: 650; }
-.wall-composer textarea::placeholder { color: #64748b; }
-.upload-preview { margin-top: 12px; border: 1px solid rgba(255,255,255,.10); background: rgba(15,23,42,.72); border-radius: 16px; overflow: hidden; }
-.upload-preview img { width: 100%; max-height: 260px; object-fit: cover; display: block; }
-.upload-preview span { display: block; padding: 10px 12px; color: #cbd5e1; font-size: 12px; font-weight: 800; }
-.audio-preview { margin-top: 12px; min-height: 58px; display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; border-radius: 15px; background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(15,23,42,.58)); border: 1px solid rgba(34,211,238,.20); padding: 10px 12px; color: #cbd5e1; font-size: 12px; }
-.composer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-.tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.tools label, .tools button { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.10); border-radius: 11px; background: rgba(15,23,42,.72); padding: 0 12px; color: #cbd5e1; font-size: 12px; font-weight: 850; cursor: pointer; }
-.tools label input { display: none; }
-.tools button.active { color: var(--yellow); border-color: rgba(250,204,21,.28); background: rgba(250,204,21,.12); }
-.publish-btn { min-height: 46px; border: 0; border-radius: 13px; padding: 0 20px; color: #111827; background: linear-gradient(135deg, var(--yellow), var(--orange)); font-size: 13px; font-weight: 1000; cursor: pointer; }
-.city-search { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 16px; margin-top: 16px; border-radius: 18px; background: rgba(18,24,36,.82); border: 1px solid var(--line); box-shadow: 0 18px 44px rgba(0,0,0,.22); }
-.city-search input { min-height: 48px; border: 1px solid rgba(255,255,255,.10); border-radius: 13px; outline: 0; background: rgba(15,23,42,.76); padding: 0 16px; color: #e2e8f0; font-weight: 750; }
-.city-search input::placeholder { color: #64748b; }
-.city-chips { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 12px; grid-column: 1 / -1; }
-.city-chips button { min-height: 34px; display: inline-flex; align-items: center; border-radius: 999px; padding: 0 12px; background: rgba(15,23,42,.72); border: 1px solid rgba(255,255,255,.10); color: #cbd5e1; font-size: 12px; font-weight: 900; cursor: pointer; }
-.city-chips button.active { background: rgba(250,204,21,.14); color: var(--yellow); border-color: rgba(250,204,21,.24); }
-.section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 24px 4px 12px; }
-.section-title h2 { margin: 0; color: #f8fafc; font-family: var(--title-font); font-size: 23px; letter-spacing: -.055em; font-weight: 1000; }
-.section-title p { margin: 4px 0 0; color: var(--muted); font-size: 12px; font-weight: 700; }
-.section-title a { color: var(--cyan); font-size: 12px; font-weight: 900; text-decoration: none; }
-.content-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px,.75fr); gap: 14px; }
-.wall-feed, .city-rail { display: grid; gap: 12px; align-content: start; }
-.wall-post, .side-card, .echo-card, .personal-square { border-radius: 18px; background: rgba(18,24,36,.82); border: 1px solid var(--line); box-shadow: 0 18px 44px rgba(0,0,0,.22); }
-.wall-post { padding: 17px; }
-.wall-post.featured { border-color: rgba(250,204,21,.24); background: radial-gradient(circle at 94% 0%, rgba(250,204,21,.12), transparent 28%), rgba(18,24,36,.88); }
-.post-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.post-user { display: flex; align-items: center; gap: 10px; }
-.avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; overflow: hidden; color: white; font-weight: 1000; border: 1px solid rgba(255,255,255,.14); flex: 0 0 auto; }
-.avatar.andrea { background: linear-gradient(135deg, #facc15, #fb7185 48%, #6366f1); color: #0f172a; }
-.avatar.giulia { background: linear-gradient(135deg, #f43f5e, #fda4af); }
-.avatar.marco { background: linear-gradient(135deg, #0ea5e9, #67e8f9); color: #082f49; }
-.post-user b { display: block; color: #f8fafc; font-size: 13px; font-weight: 1000; }
-.post-user span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 700; }
-.post-type { min-height: 28px; display: inline-flex; align-items: center; border-radius: 999px; padding: 0 10px; background: rgba(250,204,21,.13); border: 1px solid rgba(250,204,21,.20); color: var(--yellow); font-size: 10px; font-weight: 1000; white-space: nowrap; }
-.post-type.blue { color: var(--cyan); background: rgba(34,211,238,.10); border-color: rgba(34,211,238,.20); }
-.post-type.pink { color: #fb7185; background: rgba(244,63,94,.10); border-color: rgba(244,63,94,.20); }
-.wall-post h3 { margin: 0 0 8px; color: #f8fafc; font-family: var(--title-font); font-size: 19px; line-height: 1.18; letter-spacing: -.045em; font-weight: 1000; }
-.wall-post p { margin: 0; color: #cbd5e1; font-size: 13px; line-height: 1.5; font-weight: 650; }
-.image-post { margin-top: 13px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.10); }
-.image-post img { display: block; width: 100%; max-height: 360px; object-fit: cover; }
-.voice-card { margin-top: 13px; min-height: 62px; display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; border-radius: 15px; background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(15,23,42,.58)); border: 1px solid rgba(34,211,238,.20); padding: 10px 12px; }
-.play { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: linear-gradient(135deg, var(--cyan), var(--blue)); color: white; }
-.wave { height: 28px; display: flex; align-items: center; gap: 4px; }
-.wave i { width: 4px; border-radius: 999px; background: var(--cyan); opacity: .78; }
-.wave i:nth-child(1){height:12px}.wave i:nth-child(2){height:22px}.wave i:nth-child(3){height:16px}.wave i:nth-child(4){height:27px}.wave i:nth-child(5){height:19px}.wave i:nth-child(6){height:24px}.wave i:nth-child(7){height:13px}.wave i:nth-child(8){height:20px}.wave i:nth-child(9){height:15px}.wave i:nth-child(10){height:25px}
-.duration { color: #cbd5e1; font-size: 11px; font-weight: 900; }
-.post-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.post-actions a { min-height: 31px; display: inline-flex; align-items: center; border-radius: 999px; padding: 0 11px; background: rgba(15,23,42,.74); border: 1px solid rgba(255,255,255,.09); color: #cbd5e1; font-size: 11px; font-weight: 850; text-decoration: none; }
-.post-actions a.highlight, .post-actions .highlight { color: #111827; background: linear-gradient(135deg, var(--yellow), var(--orange)); border: 0; }
-.side-card, .echo-card, .personal-square { padding: 17px; }
-.mini-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.mini-title h3, .echo-card h3, .personal-head b { margin: 0; color: #f8fafc; font-family: var(--title-font); font-size: 17px; font-weight: 1000; letter-spacing: -.035em; }
-.mini-title a { color: var(--cyan); font-size: 11px; font-weight: 900; text-decoration: none; }
-.news-line { padding: 12px 0; border-top: 1px solid var(--line); }
-.news-line:first-of-type { border-top: 0; padding-top: 0; }
-.news-line b { display: block; color: #e2e8f0; font-family: var(--title-font); font-size: 13px; line-height: 1.25; font-weight: 950; }
-.news-line span, .side-copy { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 700; }
-.news-actions { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
-.news-actions a { min-height: 28px; display: inline-flex; align-items: center; border-radius: 999px; padding: 0 10px; background: rgba(15,23,42,.74); border: 1px solid rgba(255,255,255,.08); color: #cbd5e1; font-size: 10px; font-weight: 850; }
-.event-mini { position: relative; min-height: 118px; overflow: hidden; border-radius: 16px; padding: 15px; margin-top: 9px; color: white; background: linear-gradient(90deg, rgba(15,23,42,.90), rgba(15,23,42,.35)), linear-gradient(135deg, var(--yellow), var(--cyan)); border: 1px solid rgba(255,255,255,.10); }
-.event-mini.pink { background: linear-gradient(90deg, rgba(15,23,42,.90), rgba(15,23,42,.35)), linear-gradient(135deg, var(--pink), var(--yellow)); }
-.event-mini h4 { margin: 0; max-width: 225px; font-family: var(--title-font); font-size: 18px; line-height: 1.06; letter-spacing: -.035em; font-weight: 1000; }
-.event-mini p { max-width: 230px; margin: 8px 0 0; color: rgba(255,255,255,.82); font-size: 11px; line-height: 1.38; font-weight: 700; }
-.event-mini div { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
-.event-mini a { min-height: 28px; display: inline-flex; align-items: center; border-radius: 999px; padding: 0 10px; background: rgba(255,255,255,.90); color: #111827; font-size: 10px; font-weight: 950; }
-.personal-head { display: flex; align-items: center; gap: 12px; }
-.personal-head .avatar { width: 58px; height: 58px; border-radius: 17px; font-size: 22px; }
-.personal-head span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 750; }
-.personal-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
-.personal-stats div, .live-strip div { min-height: 52px; border-radius: 13px; background: rgba(15,23,42,.70); display: grid; place-items: center; text-align: center; border: 1px solid rgba(255,255,255,.08); }
-.personal-stats b, .live-strip b { display: block; color: #f8fafc; font-size: 16px; line-height: 1; }
-.personal-stats span, .live-strip span { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; }
-.echo-card p { margin: 0; color: #cbd5e1; font-size: 13px; line-height: 1.5; font-weight: 650; }
-.topic-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
-.topic-list span { min-height: 28px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(15,23,42,.74); border: 1px solid rgba(255,255,255,.08); padding: 0 10px; color: #cbd5e1; font-size: 10px; font-weight: 850; }
-.live-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; margin-top: 15px; }
-@media (max-width: 1360px) { .square-layout { grid-template-columns: 190px minmax(0,1fr); } .right-rail { grid-column: 2; position: relative; top: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); } .content-grid { grid-template-columns: 1fr; } }
-@media (max-width: 980px) { .square-shell { padding: 12px 11px 110px; } .topbar { grid-template-columns: 1fr; } .brand { justify-content: center; } .brand-app-icon { width: 46px; height: 46px; min-width: 46px; max-width: 46px; border-radius: 13px; } .top-search { order: 3; width: 100%; } .top-actions { justify-content: center; flex-wrap: wrap; } .top-icon:nth-child(n+4), .profile-orb-wrap { display: none; } .top-cta { width: 100%; } .square-layout { display: block; } .square-sidebar { position: fixed; left: 10px; right: 10px; bottom: 10px; top: auto; z-index: 80; } .square-sidebar nav { display: flex; overflow-x: auto; scrollbar-width: none; padding: 8px; border-radius: 18px; } .square-sidebar nav::-webkit-scrollbar { display: none; } .square-sidebar nav a { flex: 0 0 74px; min-height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 5px; font-size: 10px; text-align: center; } .side-cta { display: none !important; } .hero { min-height: auto; border-radius: 20px; } .hero-content { padding: 42px 22px 92px; max-width: none; } .hero h1 { font-size: clamp(43px,13vw,64px); } .city-silhouette { width: 100%; opacity: .30; } .wall-composer { margin: -58px 12px 0; } .composer-head, .composer-bottom, .section-title { align-items: flex-start; flex-direction: column; } .tools, .publish-btn, .hero-btn { width: 100%; } .tools label, .tools button, .publish-btn { width: 100%; justify-content: center; } .city-search { grid-template-columns: 1fr; } .right-rail { grid-template-columns: 1fr; margin-top: 14px; } .post-top { align-items: flex-start; flex-direction: column; } .live-strip { grid-template-columns: 1fr; } }
+
+.feed-shell,
+.feed-shell * {
+  box-sizing: border-box;
+}
+
+.feed-shell {
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255,210,31,.18), transparent 30%),
+    radial-gradient(circle at 92% 7%, rgba(36,224,210,.15), transparent 32%),
+    radial-gradient(circle at 70% 100%, rgba(255,61,110,.10), transparent 30%),
+    linear-gradient(180deg, #0b1018 0%, #080a0f 100%);
+  overflow-x: hidden;
+}
+
+.feed-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+.feed-shell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  width: min(1540px, calc(100% - 28px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 238px minmax(0, 720px) 360px;
+  gap: 22px;
+  padding: 18px 0 40px;
+}
+
+.rail,
+.right {
+  position: sticky;
+  top: 18px;
+  height: calc(100vh - 36px);
+  overflow: hidden;
+}
+
+.brand {
+  height: 74px;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.brand-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255,210,31,.35);
+  box-shadow: 0 0 0 4px rgba(255,210,31,.08), 0 18px 38px rgba(255,157,46,.18);
+}
+
+.brand b {
+  display: block;
+  font-family: var(--title);
+  font-size: 28px;
+  line-height: .9;
+  letter-spacing: -.075em;
+}
+
+.brand span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.side-nav {
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.78);
+  box-shadow: 0 22px 60px rgba(0,0,0,.28);
+}
+
+.side-nav a {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 11px;
+  align-items: center;
+  border: 1px solid transparent;
+  padding: 0 10px;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.side-nav a span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 7px;
+}
+
+.side-nav a.active,
+.side-nav a:hover {
+  color: var(--yellow);
+  background: rgba(255,210,31,.10);
+  border-color: rgba(255,210,31,.22);
+}
+
+.side-post {
+  margin-top: 14px;
+  min-height: 76px;
+  display: grid;
+  place-items: center;
+  padding: 0 18px;
+  color: #07110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  font-size: 14px;
+  font-weight: 1000;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  box-shadow: 0 18px 38px rgba(255,157,46,.18);
+}
+
+.now-box {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.72);
+}
+
+.now-box h3,
+.right-panel h3 {
+  margin: 0 0 12px;
+  font-family: var(--title);
+  font-size: 20px;
+  letter-spacing: -.045em;
+}
+
+.now-box h3 {
+  font-size: 18px;
+}
+
+.trend-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trend-line:first-of-type {
+  border-top: 0;
+}
+
+.trend-line small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.center {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: -18px 0 0;
+  padding: 18px 0 12px;
+  backdrop-filter: blur(18px);
+  background: linear-gradient(180deg, rgba(8,10,15,.96), rgba(8,10,15,.76), transparent);
+}
+
+.search-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.search {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 15px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.80);
+  font-size: 13px;
+  font-weight: 800;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+
+.icon-btn {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.80);
+  font-size: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-mini {
+  padding: 3px;
+}
+
+.wall-tabs,
+.topic-tabs {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.wall-tabs {
+  margin-top: 12px;
+}
+
+.topic-tabs {
+  margin-top: 9px;
+  gap: 8px;
+}
+
+.wall-tabs::-webkit-scrollbar,
+.topic-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.wall-tab,
+.topic {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.78);
+  color: #cbd5e1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.wall-tab {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.wall-tab.active {
+  color: #07110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  border-color: rgba(255,210,31,.38);
+}
+
+.topic {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.topic.active {
+  color: var(--cyan);
+  border-color: rgba(36,224,210,.28);
+  background: rgba(36,224,210,.10);
+}
+
+.composer {
+  margin: 12px 0 16px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background:
+    linear-gradient(90deg, rgba(255,210,31,.10), transparent 48%),
+    rgba(16,22,32,.86);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.composer-top {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: linear-gradient(135deg, var(--yellow), var(--pink) 52%, var(--blue));
+  color: #07110f;
+  font-weight: 1000;
+}
+
+.composer-placeholder {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 13px;
+  color: #68768a;
+  background: rgba(8,10,15,.68);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  font-family: inherit;
+}
+
+.composer-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.composer-actions button {
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(8,10,15,.64);
+  color: #cbd5e1;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.feed {
+  display: grid;
+  gap: 18px;
+}
+
+.empty-feed,
+.post {
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.06), transparent 28%),
+    rgba(16,22,32,.86);
+  box-shadow: 0 22px 62px rgba(0,0,0,.30);
+}
+
+.empty-feed {
+  padding: 28px;
+}
+
+.empty-feed h2 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 28px;
+  letter-spacing: -.05em;
+}
+
+.empty-feed p {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.post-head {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+}
+
+.post-avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  font-weight: 1000;
+}
+
+.avatar-cyan { background: linear-gradient(135deg, var(--cyan), var(--blue)); color: white; }
+.avatar-pink { background: linear-gradient(135deg, var(--pink), var(--orange)); color: white; }
+.avatar-green { background: linear-gradient(135deg, var(--green), var(--cyan)); color: #06110f; }
+.avatar-blue { background: linear-gradient(135deg, var(--blue), #7c3aed); color: white; }
+
+.post-meta b {
+  display: block;
+  font-family: var(--title);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+
+.post-meta span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wall-pill {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--cyan);
+  background: rgba(36,224,210,.10);
+  border: 1px solid rgba(36,224,210,.24);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.post-body {
+  padding: 0 14px 14px;
+}
+
+.post-body h2 {
+  margin: 0;
+  font-family: var(--title);
+  font-size: 26px;
+  line-height: 1.02;
+  letter-spacing: -.055em;
+}
+
+.post-body p {
+  margin: 10px 0 0;
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 670;
+}
+
+.media {
+  margin-top: 14px;
+  min-height: 430px;
+  position: relative;
+  overflow: hidden;
+  background: #0b1119;
+  border-top: 1px solid rgba(255,255,255,.10);
+  border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.photo-media {
+  display: grid;
+  place-items: end start;
+  padding: 18px;
+  background:
+    linear-gradient(0deg, rgba(0,0,0,.62), transparent 55%),
+    radial-gradient(circle at 26% 24%, rgba(255,210,31,.62), transparent 18%),
+    radial-gradient(circle at 70% 34%, rgba(36,224,210,.34), transparent 24%),
+    linear-gradient(135deg, #243044, #0e1622 58%, #111827);
+}
+
+.photo-shape {
+  position: absolute;
+  inset: 42px 54px 70px 54px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.16), transparent 28%),
+    linear-gradient(135deg, rgba(255,210,31,.72), rgba(255,157,46,.45) 42%, rgba(36,224,210,.34));
+  clip-path: polygon(0 18%, 75% 0, 100% 28%, 82% 100%, 14% 88%);
+  opacity: .72;
+}
+
+.video-media {
+  display: grid;
+  place-items: center;
+  min-height: 520px;
+  background:
+    radial-gradient(circle at center, rgba(255,61,110,.36), transparent 28%),
+    linear-gradient(160deg, #1c2433, #0a1018 66%);
+}
+
+.play-big {
+  width: 86px;
+  height: 86px;
+  display: grid;
+  place-items: center;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  border-radius: 50%;
+  font-size: 34px;
+  box-shadow: 0 0 0 18px rgba(255,210,31,.08), 0 30px 70px rgba(0,0,0,.34);
+}
+
+.audio-media {
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: 74px 1fr 52px;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 92% 20%, rgba(36,224,210,.18), transparent 26%),
+    linear-gradient(135deg, rgba(36,224,210,.08), rgba(8,10,15,.85));
+}
+
+.audio-play {
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  color: #06110f;
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  border-radius: 10px;
+  font-size: 28px;
+  font-weight: 1000;
+}
+
+.wave {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 80px;
+}
+
+.wave i {
+  width: 6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--cyan), var(--blue));
+  opacity: .9;
+}
+
+.wave i:nth-child(1){height:20px}
+.wave i:nth-child(2){height:42px}
+.wave i:nth-child(3){height:30px}
+.wave i:nth-child(4){height:66px}
+.wave i:nth-child(5){height:54px}
+.wave i:nth-child(6){height:72px}
+.wave i:nth-child(7){height:44px}
+.wave i:nth-child(8){height:60px}
+.wave i:nth-child(9){height:24px}
+.wave i:nth-child(10){height:48px}
+.wave i:nth-child(11){height:35px}
+.wave i:nth-child(12){height:66px}
+.wave i:nth-child(13){height:28px}
+.wave i:nth-child(14){height:58px}
+
+.media-label {
+  position: relative;
+  z-index: 2;
+  max-width: 420px;
+  padding: 12px;
+  background: rgba(8,10,15,.72);
+  border: 1px solid rgba(255,255,255,.12);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.post-actions {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid rgba(255,255,255,.10);
+}
+
+.post-actions button {
+  min-height: 52px;
+  border: 0;
+  border-right: 1px solid rgba(255,255,255,.08);
+  background: rgba(8,10,15,.34);
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.post-actions button:last-child {
+  border-right: 0;
+}
+
+.post-actions button.primary {
+  color: #07110f;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+}
+
+.post-comments {
+  padding: 12px 14px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.right-panel {
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(16,22,32,.78);
+  box-shadow: 0 22px 60px rgba(0,0,0,.28);
+  margin-bottom: 14px;
+}
+
+.city-card {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.city-card:first-of-type {
+  border-top: 0;
+}
+
+.city-avatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255,210,31,.12);
+  color: var(--yellow);
+  font-weight: 1000;
+}
+
+.city-card b {
+  display: block;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.city-card span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.follow {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,210,31,.26);
+  background: rgba(255,210,31,.10);
+  color: var(--yellow);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.topic-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topic-grid span {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: #cbd5e1;
+  background: rgba(8,10,15,.62);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1220px) {
+  .app {
+    grid-template-columns: 88px minmax(0, 720px) 320px;
+  }
+
+  .brand {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    height: auto;
+  }
+
+  .brand b,
+  .brand span {
+    display: none;
+  }
+
+  .side-nav a {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 0;
+  }
+
+  .side-nav a b,
+  .now-box,
+  .side-post {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .app {
+    width: min(720px, calc(100% - 20px));
+    display: block;
+    padding-bottom: 96px;
+  }
+
+  .rail,
+  .right {
+    display: none;
+  }
+
+  .topbar {
+    margin-top: 0;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr 48px;
+  }
+
+  .search-row .icon-btn:nth-child(3) {
+    display: none;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .post-head {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .post-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .wall-pill {
+    grid-column: 1 / -1;
+    width: fit-content;
+    margin-left: 56px;
+  }
+
+  .media {
+    min-height: 350px;
+  }
+
+  .video-media {
+    min-height: 520px;
+  }
+
+  .audio-media {
+    grid-template-columns: 60px 1fr;
+  }
+
+  .audio-play {
+    width: 60px;
+    height: 60px;
+  }
+
+  .audio-media .duration {
+    grid-column: 1 / -1;
+  }
+
+  .post-actions {
+    grid-template-columns: repeat(5, minmax(0,1fr));
+  }
+
+  .post-actions button {
+    min-height: 48px;
+    font-size: 0;
+  }
+
+  .post-actions button::first-letter {
+    font-size: 18px;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 90;
+    height: 64px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 7px;
+    border: 1px solid var(--line-2);
+    background: rgba(10,16,24,.88);
+    backdrop-filter: blur(18px);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.42);
+  }
+
+  .mobile-nav a {
+    display: grid;
+    place-items: center;
+    color: #cbd5e1;
+    border-radius: 10px;
+    font-size: 20px;
+  }
+
+  .mobile-nav a.active {
+    background: linear-gradient(135deg, var(--yellow), var(--orange));
+    color: #06110f;
+  }
+}
+
+@media (max-width: 520px) {
+  .post-body h2 {
+    font-size: 23px;
+  }
+
+  .photo-media {
+    min-height: 390px;
+  }
+
+  .video-media {
+    min-height: 560px;
+  }
+}
 `;
