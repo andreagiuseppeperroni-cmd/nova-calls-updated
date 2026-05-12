@@ -291,7 +291,7 @@ export function NovaHome() {
   const [chatLinkSearch, setChatLinkSearch] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ChatPreview | null>(null);
   const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(true);
   const [composerText, setComposerText] = useState('');
   const [composerMediaKind, setComposerMediaKind] = useState<ComposerMediaKind>('text');
   const [composerFile, setComposerFile] = useState<File | null>(null);
@@ -403,7 +403,7 @@ export function NovaHome() {
         .single();
 
       if (cityError || !cityRow) {
-        setComposerError('Non riesco a trovare la città selezionata su Supabase.');
+        setComposerError('Non riesco a trovare la città selezionata su Supabase. Controlla che la tabella cities contenga Roma/Milano/Napoli e che is_active sia true.');
         return;
       }
 
@@ -930,12 +930,18 @@ export function NovaHome() {
               <button type="button" onClick={() => openComposer('text')}>🧩 Stanza 24h</button>
             </div>
 
+            {!composerOpen && (
+              <button type="button" className="open-publisher-inline" onClick={() => openComposer('text')}>
+                Apri il modulo per scrivere o allegare file →
+              </button>
+            )
+
             {composerOpen && (
               <div className="wall-publisher">
                 <div className="publisher-head">
                   <div>
                     <p>Pubblica sul Wall</p>
-                    <h3>Scrivi, allega e condividi con la città</h3>
+                    <h3>Scrivi, allega foto/audio/video e pubblica sul Wall</h3>
                   </div>
                   <button type="button" onClick={() => { resetComposer(); setComposerOpen(false); }} aria-label="Chiudi composer">×</button>
                 </div>
@@ -1794,6 +1800,19 @@ const styles = `
   font-size: 12px;
   font-weight: 900;
   font-family: inherit;
+  cursor: pointer;
+}
+
+.open-publisher-inline {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  border: 1px solid rgba(255,210,31,.28);
+  background: rgba(255,210,31,.10);
+  color: var(--yellow);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 1000;
   cursor: pointer;
 }
 
