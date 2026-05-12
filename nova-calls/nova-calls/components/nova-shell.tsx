@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -10,7 +9,7 @@ import { ProfileOrb } from '@/components/profile-store';
 const WALL_STORAGE_KEY = 'the-square:wall-posts';
 
 const navItems = [
-  ['⌂', 'Home', '/'],
+  ['🏠', 'Home', '/'],
   ['🧱', 'The Wall', '#wall'],
   ['🎙️', 'Voice Wall', '#voice-wall'],
   ['📍', 'Città', '/cities'],
@@ -121,13 +120,13 @@ export function NovaHome() {
 
   const posts = useMemo(() => {
     const storedPosts = localPosts.length ? localPosts : [];
-    return [...storedPosts, ...defaultPosts].filter((post) => post.citySlug === selectedCity.slug || post.targetType === 'personal_square');
+    return [...storedPosts, ...defaultPosts].filter(
+      (post) => post.citySlug === selectedCity.slug || post.targetType === 'personal_square'
+    );
   }, [localPosts, selectedCity.slug]);
 
   function loadLocalPostsOnce() {
-    if (!localPosts.length) {
-      setLocalPosts(readLocalPosts());
-    }
+    if (!localPosts.length) setLocalPosts(readLocalPosts());
   }
 
   function handleImage(event: ChangeEvent<HTMLInputElement>) {
@@ -141,6 +140,7 @@ export function NovaHome() {
   function handleAudio(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
     setAudioName(file.name);
   }
 
@@ -216,16 +216,17 @@ export function NovaHome() {
               </div>
 
               <div className="composer-tabs">
-                <button className={targetType === 'city_wall' ? 'active' : ''} onClick={() => setTargetType('city_wall')}>
+                <button type="button" className={targetType === 'city_wall' ? 'active' : ''} onClick={() => setTargetType('city_wall')}>
                   Wall locale · {selectedCity.name}
                 </button>
                 <button
+                  type="button"
                   className={targetType === 'personal_square' ? 'active' : ''}
                   onClick={() => setTargetType('personal_square')}
                 >
                   La mia Piazza
                 </button>
-                <button className={audioName ? 'active' : ''}>Voice Wall</button>
+                <button type="button" className={audioName ? 'active' : ''}>Voice Wall</button>
               </div>
             </div>
 
@@ -313,13 +314,13 @@ function Topbar() {
   return (
     <header className="topbar">
       <Link className="brand" href="/">
-  <img src="/icon-192.png" alt="The Square" className="brand-app-icon" />
+        <img src="/icon-192.png" alt="The Square" className="brand-app-icon" />
 
-  <span>
-    <span className="brand-word">The Square</span>
-    <span className="brand-sub">City Wall Network</span>
-  </span>
-</Link>
+        <span>
+          <span className="brand-word">The Square</span>
+          <span className="brand-sub">City Wall Network</span>
+        </span>
+      </Link>
 
       <div className="top-search">
         <span>Cerca città, Wall, creator, eventi locali...</span>
@@ -327,9 +328,9 @@ function Topbar() {
       </div>
 
       <nav className="top-actions">
-        <Link href="/cities" className="top-icon">⌂</Link>
-        <Link href="/world-news" className="top-icon">◉</Link>
-        <Link href="/notifications" className="top-icon badge">♢</Link>
+        <Link href="/cities" className="top-icon">🌇</Link>
+        <Link href="/world-news" className="top-icon">🗞️</Link>
+        <Link href="/notifications" className="top-icon badge">📢</Link>
         <Link href="/profile" className="profile-orb-wrap" aria-label="Profilo">
           <ProfileOrb className="h-full w-full" />
         </Link>
@@ -412,7 +413,9 @@ function WallPostCard({ post, featured }: { post: WallPost; featured?: boolean }
             <span>{post.createdAtLabel} · {post.targetType === 'personal_square' ? 'La mia Piazza' : `Wall di ${post.cityName}`}</span>
           </div>
         </div>
-        <span className={`post-type ${post.postType === 'audio' ? 'blue' : post.postType === 'event' ? 'pink' : ''}`}>{formatPostType(post.postType)}</span>
+        <span className={`post-type ${post.postType === 'audio' ? 'blue' : post.postType === 'event' ? 'pink' : ''}`}>
+          {formatPostType(post.postType)}
+        </span>
       </div>
 
       <h3>{post.title}</h3>
@@ -565,8 +568,7 @@ const styles = `
 .square-shell:before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .28; background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, black, transparent 88%); }
 .topbar { position: relative; z-index: 2; max-width: 1540px; min-height: 68px; display: grid; grid-template-columns: 250px minmax(320px, 1fr) auto; gap: 16px; align-items: center; margin: 0 auto 18px; padding: 10px; border: 1px solid var(--line); background: rgba(18,24,36,.74); backdrop-filter: blur(22px) saturate(1.15); box-shadow: 0 18px 44px rgba(0,0,0,.22); border-radius: 18px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none; color: var(--ink); }
-.mark { width: 45px; height: 45px; display: grid; grid-template-columns: repeat(2,1fr); gap: 5px; flex: 0 0 auto; padding: 4px; border: 1px solid rgba(250,204,21,.24); background: #0f172a; border-radius: 14px; box-shadow: 0 0 34px rgba(250,204,21,.12); }
-.mark i { display: block; border-radius: 5px; background: linear-gradient(145deg, var(--yellow), var(--orange)); }
+.brand-app-icon { width: 52px; height: 52px; min-width: 52px; max-width: 52px; border-radius: 14px; object-fit: cover; display: block; box-shadow: 0 12px 28px rgba(250,204,21,.18); }
 .brand-word { display: block; font-family: var(--title-font); font-size: 28px; font-weight: 1000; letter-spacing: -.075em; white-space: nowrap; }
 .brand-sub { display: block; margin-top: -2px; color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
 .top-search { height: 47px; display: flex; align-items: center; gap: 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.10); background: rgba(15,23,42,.76); padding: 0 15px; color: var(--muted); font-size: 13px; font-weight: 700; }
@@ -688,5 +690,5 @@ const styles = `
 .topic-list span { min-height: 28px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(15,23,42,.74); border: 1px solid rgba(255,255,255,.08); padding: 0 10px; color: #cbd5e1; font-size: 10px; font-weight: 850; }
 .live-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; margin-top: 15px; }
 @media (max-width: 1360px) { .square-layout { grid-template-columns: 190px minmax(0,1fr); } .right-rail { grid-column: 2; position: relative; top: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); } .content-grid { grid-template-columns: 1fr; } }
-@media (max-width: 980px) { .square-shell { padding: 12px 11px 110px; } .topbar { grid-template-columns: 1fr; } .brand { justify-content: center; } .top-search { order: 3; width: 100%; } .top-actions { justify-content: center; flex-wrap: wrap; } .top-icon:nth-child(n+4), .profile-orb-wrap { display: none; } .top-cta { width: 100%; } .square-layout { display: block; } .square-sidebar { position: fixed; left: 10px; right: 10px; bottom: 10px; top: auto; z-index: 80; } .square-sidebar nav { display: flex; overflow-x: auto; scrollbar-width: none; padding: 8px; border-radius: 18px; } .square-sidebar nav::-webkit-scrollbar { display: none; } .square-sidebar nav a { flex: 0 0 74px; min-height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 5px; font-size: 10px; text-align: center; } .side-cta { display: none !important; } .hero { min-height: auto; border-radius: 20px; } .hero-content { padding: 42px 22px 92px; max-width: none; } .hero h1 { font-size: clamp(43px,13vw,64px); } .city-silhouette { width: 100%; opacity: .30; } .wall-composer { margin: -58px 12px 0; } .composer-head, .composer-bottom, .section-title { align-items: flex-start; flex-direction: column; } .tools, .publish-btn, .hero-btn { width: 100%; } .tools label, .tools button, .publish-btn { width: 100%; justify-content: center; } .city-search { grid-template-columns: 1fr; } .right-rail { grid-template-columns: 1fr; margin-top: 14px; } .post-top { align-items: flex-start; flex-direction: column; } .live-strip { grid-template-columns: 1fr; } }
+@media (max-width: 980px) { .square-shell { padding: 12px 11px 110px; } .topbar { grid-template-columns: 1fr; } .brand { justify-content: center; } .brand-app-icon { width: 46px; height: 46px; min-width: 46px; max-width: 46px; border-radius: 13px; } .top-search { order: 3; width: 100%; } .top-actions { justify-content: center; flex-wrap: wrap; } .top-icon:nth-child(n+4), .profile-orb-wrap { display: none; } .top-cta { width: 100%; } .square-layout { display: block; } .square-sidebar { position: fixed; left: 10px; right: 10px; bottom: 10px; top: auto; z-index: 80; } .square-sidebar nav { display: flex; overflow-x: auto; scrollbar-width: none; padding: 8px; border-radius: 18px; } .square-sidebar nav::-webkit-scrollbar { display: none; } .square-sidebar nav a { flex: 0 0 74px; min-height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 5px; font-size: 10px; text-align: center; } .side-cta { display: none !important; } .hero { min-height: auto; border-radius: 20px; } .hero-content { padding: 42px 22px 92px; max-width: none; } .hero h1 { font-size: clamp(43px,13vw,64px); } .city-silhouette { width: 100%; opacity: .30; } .wall-composer { margin: -58px 12px 0; } .composer-head, .composer-bottom, .section-title { align-items: flex-start; flex-direction: column; } .tools, .publish-btn, .hero-btn { width: 100%; } .tools label, .tools button, .publish-btn { width: 100%; justify-content: center; } .city-search { grid-template-columns: 1fr; } .right-rail { grid-template-columns: 1fr; margin-top: 14px; } .post-top { align-items: flex-start; flex-direction: column; } .live-strip { grid-template-columns: 1fr; } }
 `;
