@@ -3905,4 +3905,554 @@ const styles = `
   }
 }
 
+
+/* === RESPONSIVE REFINEMENT — smartphone + tablet === */
+
+/* Tablet portrait / small desktop */
+@media (min-width: 981px) and (max-width: 1220px) {
+  .app {
+    width: min(100% - 28px, 1120px);
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .right {
+    display: none;
+  }
+
+  .center {
+    max-width: none;
+  }
+
+  .rail {
+    height: calc(100vh - 28px);
+    top: 14px;
+  }
+
+  .brand {
+    height: 86px;
+    padding: 12px;
+  }
+
+  .brand-icon {
+    width: 58px;
+    height: 58px;
+  }
+
+  .side-nav {
+    padding: 10px 8px;
+  }
+
+  .side-nav a,
+  .side-nav button {
+    min-height: 58px;
+  }
+
+  .topbar {
+    margin-top: 0;
+  }
+
+  .home-brand-row {
+    display: block;
+  }
+
+  .home-brand {
+    width: 100%;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr 54px 54px 54px;
+  }
+
+  .search {
+    height: 56px;
+  }
+
+  .wall-tabs,
+  .topic-tabs {
+    padding-bottom: 8px;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .post {
+    border-radius: 20px;
+  }
+
+  .media {
+    min-height: 390px;
+  }
+
+  .chat-drawer {
+    width: min(470px, calc(100vw - 24px));
+  }
+}
+
+/* Tablet landscape */
+@media (min-width: 768px) and (max-width: 980px) {
+  .app {
+    width: min(100% - 32px, 880px);
+    padding: 20px 0 116px;
+  }
+
+  .home-brand-row {
+    margin-bottom: 18px;
+  }
+
+  .home-brand {
+    min-height: 96px;
+    grid-template-columns: 76px 1fr 58px;
+    gap: 16px;
+  }
+
+  .home-brand img {
+    width: 74px;
+    height: 74px;
+  }
+
+  .home-brand b {
+    font-size: 48px;
+  }
+
+  .home-brand small {
+    font-size: 13px;
+  }
+
+  .search {
+    height: 72px;
+    font-size: 24px;
+  }
+
+  .wall-tab {
+    min-height: 60px;
+    padding: 0 24px;
+    font-size: 23px;
+  }
+
+  .topic {
+    min-height: 56px;
+    padding: 0 20px;
+    font-size: 20px;
+  }
+
+  .composer {
+    padding: 22px;
+  }
+
+  .composer-top {
+    grid-template-columns: 74px 1fr;
+  }
+
+  .avatar {
+    width: 68px;
+    height: 68px;
+  }
+
+  .composer-placeholder {
+    min-height: 68px;
+    font-size: 25px;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .post-body h2 {
+    font-size: 34px;
+  }
+
+  .post-body p {
+    font-size: 22px;
+  }
+
+  .media {
+    min-height: 420px;
+  }
+
+  .mobile-nav {
+    left: 32px;
+    right: 32px;
+    height: 90px;
+  }
+
+  .chat-drawer {
+    left: auto;
+    right: 18px;
+    bottom: 18px;
+    width: min(460px, calc(100vw - 36px));
+    height: min(82vh, 720px);
+    border-radius: 20px;
+    transform: translateX(calc(100% + 36px));
+  }
+
+  .chat-drawer.open {
+    transform: translateX(0);
+  }
+
+  .profile-drawer {
+    left: auto;
+    right: 24px;
+    bottom: 112px;
+    width: min(430px, calc(100vw - 48px));
+  }
+}
+
+/* Smartphone grande */
+@media (min-width: 521px) and (max-width: 767px) {
+  .app {
+    width: 100%;
+    padding: 18px 18px 116px;
+  }
+
+  .home-brand {
+    min-height: 86px;
+    grid-template-columns: 66px 1fr 52px;
+    gap: 14px;
+  }
+
+  .home-brand img {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+
+  .home-brand b {
+    font-size: 38px;
+  }
+
+  .home-brand small {
+    margin-top: 7px;
+    font-size: 11px;
+    letter-spacing: .24em;
+  }
+
+  .home-brand::after {
+    width: 50px;
+    height: 50px;
+    border-radius: 15px;
+    font-size: 22px;
+  }
+
+  .home-brand::before {
+    right: 1px;
+    top: 9px;
+  }
+
+  .search {
+    height: 66px;
+    font-size: 21px;
+    padding: 0 20px;
+  }
+
+  .wall-tabs,
+  .topic-tabs {
+    gap: 10px;
+    margin-left: -18px;
+    margin-right: -18px;
+    padding-left: 18px;
+    padding-right: 18px;
+    scroll-snap-type: x proximity;
+  }
+
+  .wall-tab,
+  .topic {
+    scroll-snap-align: start;
+  }
+
+  .wall-tab {
+    min-height: 54px;
+    padding: 0 19px;
+    font-size: 19px;
+    border-radius: 18px;
+  }
+
+  .topic {
+    min-height: 52px;
+    padding: 0 17px;
+    font-size: 17px;
+  }
+
+  .composer {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .composer-top {
+    grid-template-columns: 62px 1fr;
+    gap: 14px;
+  }
+
+  .avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    font-size: 22px;
+  }
+
+  .composer-placeholder {
+    min-height: 58px;
+    padding: 0 16px;
+    font-size: 20px;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(2, 1fr);
+    border-radius: 14px;
+  }
+
+  .composer-actions button {
+    height: 58px;
+    font-size: 17px;
+  }
+
+  .post-head {
+    grid-template-columns: 54px 1fr;
+    gap: 13px;
+    padding: 18px;
+  }
+
+  .post-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+  }
+
+  .post-meta b {
+    font-size: 24px;
+  }
+
+  .post-meta span {
+    font-size: 14px;
+  }
+
+  .wall-pill {
+    grid-column: 1 / -1;
+    margin-left: 65px;
+  }
+
+  .post-body {
+    padding: 0 18px 18px;
+  }
+
+  .post-body h2 {
+    font-size: 27px;
+  }
+
+  .post-body p {
+    font-size: 18px;
+  }
+
+  .media {
+    min-height: 320px;
+  }
+
+  .post-actions button {
+    min-height: 56px;
+  }
+
+  .mobile-nav {
+    left: 14px;
+    right: 14px;
+    bottom: 12px;
+    height: 82px;
+    border-radius: 20px;
+  }
+
+  .mobile-nav a:nth-child(3) {
+    width: 72px;
+    height: 72px;
+  }
+
+  .chat-drawer {
+    height: min(86vh, 720px);
+  }
+}
+
+/* Smartphone piccolo */
+@media (max-width: 390px) {
+  .app {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-bottom: 108px;
+  }
+
+  .home-brand {
+    grid-template-columns: 58px 1fr 46px;
+    gap: 11px;
+  }
+
+  .home-brand img {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+
+  .home-brand b {
+    font-size: 32px;
+  }
+
+  .home-brand small {
+    font-size: 9px;
+    letter-spacing: .22em;
+  }
+
+  .home-brand::after {
+    width: 44px;
+    height: 44px;
+    font-size: 19px;
+  }
+
+  .home-brand::before {
+    min-width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+
+  .search {
+    height: 58px;
+    padding: 0 16px;
+    font-size: 18px;
+    border-radius: 16px;
+  }
+
+  .wall-tabs,
+  .topic-tabs {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .wall-tab {
+    min-height: 48px;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+
+  .topic {
+    min-height: 46px;
+    padding: 0 14px;
+    font-size: 15px;
+  }
+
+  .composer {
+    padding: 14px;
+  }
+
+  .composer-top {
+    grid-template-columns: 52px 1fr;
+    gap: 11px;
+  }
+
+  .avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 14px;
+    font-size: 19px;
+  }
+
+  .composer-placeholder {
+    min-height: 50px;
+    padding: 0 13px;
+    font-size: 17px;
+  }
+
+  .composer-actions button {
+    height: 52px;
+    font-size: 15px;
+  }
+
+  .post-head {
+    padding: 14px;
+  }
+
+  .post-body {
+    padding: 0 14px 14px;
+  }
+
+  .post-body h2 {
+    font-size: 23px;
+  }
+
+  .post-body p {
+    font-size: 16px;
+  }
+
+  .media {
+    min-height: 260px;
+  }
+
+  .post-actions {
+    grid-template-columns: repeat(5, minmax(0,1fr));
+  }
+
+  .post-actions button {
+    min-height: 50px;
+  }
+
+  .mobile-nav {
+    left: 10px;
+    right: 10px;
+    height: 76px;
+    bottom: 10px;
+    border-radius: 18px;
+  }
+
+  .mobile-nav a,
+  .mobile-nav button {
+    grid-template-rows: 26px 18px;
+  }
+
+  .mobile-nav a::before,
+  .mobile-nav button::before {
+    font-size: 24px;
+  }
+
+  .mobile-nav a::after,
+  .mobile-nav button::after {
+    font-size: 12px;
+  }
+
+  .mobile-nav a:nth-child(3) {
+    width: 64px;
+    height: 64px;
+    margin-top: -22px;
+  }
+
+  .mobile-nav a:nth-child(3)::before {
+    font-size: 34px;
+  }
+
+  .chat-drawer {
+    height: min(88vh, 700px);
+  }
+
+  .chat-head h2 {
+    font-size: 23px;
+  }
+
+  .mini-thread-title {
+    letter-spacing: .07em;
+  }
+}
+
+/* Safe area for iPhone home indicator */
+@supports (padding: max(0px)) {
+  @media (max-width: 980px) {
+    .app {
+      padding-bottom: max(118px, calc(104px + env(safe-area-inset-bottom)));
+    }
+
+    .mobile-nav {
+      bottom: max(10px, env(safe-area-inset-bottom));
+    }
+
+    .chat-drawer {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+}
+
 `;
