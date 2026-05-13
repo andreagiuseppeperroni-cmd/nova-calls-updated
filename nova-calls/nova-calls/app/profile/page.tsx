@@ -1,8 +1,53 @@
 'use client';
 
 import Link from 'next/link';
-import { type ChangeEvent, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { ProfileOrb, useNovaProfile } from '@/components/profile-store';
+import { createBrowserSupabase } from '@/lib/supabase-browser';
+
+type WallPostRow = {
+  id: string;
+  city_id: string | null;
+  user_id: string | null;
+  content: string | null;
+  post_type: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+type CityRow = {
+  id: string;
+  name: string | null;
+  slug: string | null;
+  region?: string | null;
+};
+
+type MediaRow = {
+  post_id: string;
+  media_type: string | null;
+  file_url: string | null;
+  file_path: string | null;
+};
+
+type ProfileWallPost = {
+  id: string;
+  cityName: string;
+  citySlug: string;
+  content: string;
+  type: string;
+  mediaType: string;
+  mediaUrl: string;
+  createdAt: string;
+};
+
+type FrequentSquare = {
+  cityName: string;
+  citySlug: string;
+  region: string;
+  posts: number;
+  lastActivity: string;
+  types: string[];
+};
 
 function splitTags(value: string) {
   return value
@@ -11,12 +56,42 @@ function splitTags(value: string) {
     .filter(Boolean);
 }
 
+function getPostTypeLabel(type: string) {
+  if (type === 'image') return 'Foto';
+  if (type === 'audio') return 'Audio';
+  if (type === 'video') return 'Video';
+  if (type === 'mixed') return 'Multimedia';
+  if (type === 'event') return 'Evento';
+  if (type === 'news') return 'News';
+  return 'Testo';
+}
+
+function formatDate(value: string) {
+  if (!value) return 'recente';
+
+  try {
+    return new Intl.DateTimeFormat('it-IT', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return 'recente';
+  }
+}
+
 export default function ProfilePage() {
   const { profile, save, uploadAvatar, loading, syncError } = useNovaProfile();
+  const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const [wallPosts, setWallPosts] = useState<ProfileWallPost[]>([]);
+  const [frequentSquares, setFrequentSquares] = useState<FrequentSquare[]>([]);
+  const [wallLoading, setWallLoading] = useState(true);
 
   function update(field: keyof typeof profile, value: string) {
     save({ [field]: value });
@@ -51,6 +126,162 @@ export default function ProfilePage() {
     window.setTimeout(() => setSaved(false), 1800);
   }
 
+  async function loadProfileWallActivity() {
+    setWallLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setWallPosts([]);
+      setFrequentSquares([]);
+      setWallLoading(false);
+      return;
+    }
+
+    const { data: postRows, error: postsError } = await supabase
+      .from('city_wall_posts')
+      .select('id, city_id, user_id, content, post_type, status, created_at')
+      .eq('user_id', user.id)
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+      .limit(80);
+
+    if (postsError) {
+      setLocalError(postsError.message);
+      setWallPosts([]);
+      setFrequentSquares([]);
+      setWallLoading(false);
+      return;
+    }
+
+    const posts = (postRows || []) as WallPostRow[];
+    const postIds = posts.map((post) => post.id);
+    const cityIds = Array.from(new Set(posts.map((post) => post.city_id).filter(Boolean))) as string[];
+
+    let mediaRows: MediaRow[] = [];
+    let cityRows: CityRow[] = [];
+
+    if (postIds.length > 0) {
+      const { data } = await supabase
+        .from('city_wall_post_media')
+        .select('post_id, media_type, file_url, file_path')
+        .in('post_id', postIds);
+
+      mediaRows = (data || []) as MediaRow[];
+    }
+
+    if (cityIds.length > 0) {
+      const { data } = await supabase
+        .from('cities')
+        .select('id, name, slug, region')
+        .in('id', cityIds);
+
+      cityRows = (data || []) as CityRow[];
+    }
+
+    const mediaMap = new Map<string, MediaRow>();
+    for (const media of mediaRows) {
+      if (!mediaMap.has(media.post_id)) {
+        mediaMap.set(media.post_id, media);
+      }
+    }
+
+    const cityMap = new Map(cityRows.map((city) => [city.id, city]));
+
+    const mappedPosts: ProfileWallPost[] = posts.map((post) => {
+      const city = post.city_id ? cityMap.get(post.city_id) : null;
+      const media = mediaMap.get(post.id);
+      const type = post.post_type || media?.media_type || 'text';
+
+      return {
+        id: post.id,
+        cityName: city?.name || 'Wall',
+        citySlug: city?.slug || 'cities',
+        content: post.content || 'Post pubblicato sul Wall.',
+        type,
+        mediaType: media?.media_type || '',
+        mediaUrl: media?.file_url || '',
+        createdAt: post.created_at || '',
+      };
+    });
+
+    const squaresMap = new Map<string, FrequentSquare>();
+
+    for (const post of mappedPosts) {
+      const key = post.citySlug || post.cityName;
+      const current = squaresMap.get(key);
+
+      if (!current) {
+        const city = cityRows.find((item) => (item.slug || item.name) === key || item.name === post.cityName);
+
+        squaresMap.set(key, {
+          cityName: post.cityName,
+          citySlug: post.citySlug,
+          region: city?.region || 'Italia',
+          posts: 1,
+          lastActivity: post.createdAt,
+          types: [getPostTypeLabel(post.type)],
+        });
+      } else {
+        current.posts += 1;
+        current.types = Array.from(new Set([...current.types, getPostTypeLabel(post.type)])).slice(0, 4);
+
+        if (post.createdAt && (!current.lastActivity || new Date(post.createdAt) > new Date(current.lastActivity))) {
+          current.lastActivity = post.createdAt;
+        }
+      }
+    }
+
+    setWallPosts(mappedPosts);
+    setFrequentSquares(Array.from(squaresMap.values()).sort((a, b) => b.posts - a.posts));
+    setWallLoading(false);
+  }
+
+  useEffect(() => {
+    let active = true;
+
+    async function start() {
+      if (!active) return;
+      await loadProfileWallActivity();
+    }
+
+    start();
+
+    const channel = supabase
+      .channel('profile-wall-activity')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'city_wall_posts',
+        },
+        async () => {
+          await loadProfileWallActivity();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'city_wall_post_media',
+        },
+        async () => {
+          await loadProfileWallActivity();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
+
   const tags = [...splitTags(profile.passions), ...splitTags(profile.interests)].slice(0, 8);
 
   return (
@@ -76,7 +307,7 @@ export default function ProfilePage() {
           <p className="ts-eyebrow">Profilo personale</p>
           <h1>La tua Piazza su The Square</h1>
           <p className="ts-lead">
-            Gestisci nome, città, biografia, interessi e presenza pubblica con lo stesso stile della nuova Home.
+            Qui trovi identità, informazioni personali, post pubblicati sui Wall e Piazze che frequenti.
           </p>
 
           {loading && <p className="ts-status">Sincronizzo il profilo reale…</p>}
@@ -120,12 +351,12 @@ export default function ProfilePage() {
               <span>Punti</span>
             </div>
             <div>
-              <b>{profile.contributions}</b>
-              <span>Contributi</span>
+              <b>{wallPosts.length}</b>
+              <span>Post Wall</span>
             </div>
             <div>
-              <b>{profile.callsJoined}</b>
-              <span>Call</span>
+              <b>{frequentSquares.length}</b>
+              <span>Piazze</span>
             </div>
           </div>
         </aside>
@@ -226,6 +457,105 @@ export default function ProfilePage() {
         </article>
       </section>
 
+      <section className="ts-profile-card ts-wall-section">
+        <div className="ts-section-head ts-section-split">
+          <div>
+            <p className="ts-eyebrow">Attività pubblica</p>
+            <h2>Post pubblicati sui Wall</h2>
+          </div>
+          <Link href="/#composer">Pubblica nuovo</Link>
+        </div>
+
+        {wallLoading && (
+          <div className="ts-empty-state">
+            <b>Carico i tuoi post…</b>
+            <span>Sto leggendo le pubblicazioni dai Wall di città.</span>
+          </div>
+        )}
+
+        {!wallLoading && wallPosts.length === 0 && (
+          <div className="ts-empty-state">
+            <b>Nessun post pubblicato</b>
+            <span>Quando pubblicherai su un Wall, i tuoi contenuti appariranno qui.</span>
+            <Link href="/#composer">Scrivi il primo post</Link>
+          </div>
+        )}
+
+        {!wallLoading && wallPosts.length > 0 && (
+          <div className="ts-wall-posts">
+            {wallPosts.slice(0, 12).map((post) => (
+              <article className="ts-wall-post" key={post.id}>
+                <div className="ts-wall-post-head">
+                  <span>{getPostTypeLabel(post.type)}</span>
+                  <small>{formatDate(post.createdAt)}</small>
+                </div>
+
+                <h3>{post.content.split('\n')[0].slice(0, 92)}</h3>
+
+                <p>{post.content}</p>
+
+                {post.mediaUrl && post.mediaType === 'image' && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={post.mediaUrl} alt="" />
+                )}
+
+                {post.mediaUrl && post.mediaType === 'audio' && (
+                  <audio controls src={post.mediaUrl} />
+                )}
+
+                {post.mediaUrl && post.mediaType === 'video' && (
+                  <video controls src={post.mediaUrl} />
+                )}
+
+                <Link href={`/cities/${post.citySlug}`}>Wall di {post.cityName} →</Link>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="ts-profile-card ts-square-section">
+        <div className="ts-section-head">
+          <p className="ts-eyebrow">Piazze frequentate</p>
+          <h2>Wall e città dove sei più presente</h2>
+        </div>
+
+        {wallLoading && (
+          <div className="ts-empty-state">
+            <b>Carico le Piazze…</b>
+            <span>Sto ricostruendo i Wall in cui hai pubblicato.</span>
+          </div>
+        )}
+
+        {!wallLoading && frequentSquares.length === 0 && (
+          <div className="ts-empty-state">
+            <b>Ancora nessuna Piazza frequentata</b>
+            <span>Le Piazze vengono create automaticamente dai Wall in cui pubblichi.</span>
+          </div>
+        )}
+
+        {!wallLoading && frequentSquares.length > 0 && (
+          <div className="ts-square-grid">
+            {frequentSquares.map((square) => (
+              <Link href={`/cities/${square.citySlug}`} className="ts-square-card" key={square.citySlug}>
+                <div>
+                  <b>{square.cityName}</b>
+                  <span>{square.region} · ultima attività {formatDate(square.lastActivity)}</span>
+                </div>
+
+                <strong>{square.posts}</strong>
+
+                <div className="ts-square-tags">
+                  {square.types.map((type) => (
+                    <em key={type}>{type}</em>
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
       <nav className="ts-mobile-nav">
         <Link href="/">⌂<span>Home</span></Link>
         <Link href="/cities">⌖<span>Città</span></Link>
@@ -287,6 +617,8 @@ export default function ProfilePage() {
         .ts-hero-card,
         .ts-profile-grid,
         .ts-public-preview,
+        .ts-wall-section,
+        .ts-square-section,
         .ts-alert {
           position: relative;
           z-index: 1;
@@ -440,6 +772,7 @@ export default function ProfilePage() {
         .ts-profile-card {
           border-radius: 26px;
           padding: 22px;
+          margin-bottom: 18px;
         }
 
         .ts-profile-summary {
@@ -523,6 +856,26 @@ export default function ProfilePage() {
 
         .ts-section-head h2 {
           font-size: 30px;
+        }
+
+        .ts-section-split {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-end;
+        }
+
+        .ts-section-split > a {
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          border-radius: 14px;
+          padding: 0 14px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          text-decoration: none;
+          font-weight: 800;
+          white-space: nowrap;
         }
 
         .ts-form-grid {
@@ -630,14 +983,16 @@ export default function ProfilePage() {
           line-height: 1.55;
         }
 
-        .ts-tags {
+        .ts-tags,
+        .ts-square-tags {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
           margin-top: 12px;
         }
 
-        .ts-tags span {
+        .ts-tags span,
+        .ts-square-tags em {
           min-height: 30px;
           display: inline-flex;
           align-items: center;
@@ -646,11 +1001,181 @@ export default function ProfilePage() {
           background: linear-gradient(135deg,#bfeeff,#62c9ff);
           color: #09202d;
           font-size: 12px;
+          font-style: normal;
+          font-weight: 800;
+        }
+
+        .ts-wall-posts {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .ts-wall-post {
+          display: grid;
+          gap: 10px;
+          border-radius: 22px;
+          padding: 16px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+        }
+
+        .ts-wall-post-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .ts-wall-post-head span {
+          min-height: 28px;
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 0 10px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .ts-wall-post-head small {
+          color: var(--ts-muted);
+          font-weight: 700;
+        }
+
+        .ts-wall-post h3 {
+          margin: 0;
+          font-size: 18px;
+          line-height: 1.15;
+          letter-spacing: -.02em;
+          font-weight: 800;
+        }
+
+        .ts-wall-post p {
+          margin: 0;
+          color: #6f6256;
+          font-size: 14px;
+          line-height: 1.45;
+        }
+
+        .ts-wall-post img,
+        .ts-wall-post video {
+          display: block;
+          width: 100%;
+          max-height: 230px;
+          object-fit: cover;
+          border-radius: 16px;
+          border: 1px solid var(--ts-line);
+        }
+
+        .ts-wall-post audio {
+          width: 100%;
+        }
+
+        .ts-wall-post > a {
+          color: #147db2;
+          text-decoration: none;
+          font-weight: 800;
+          font-size: 13px;
+        }
+
+        .ts-square-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .ts-square-card {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+          align-items: start;
+          min-height: 150px;
+          border-radius: 22px;
+          padding: 16px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+          color: var(--ts-ink);
+          text-decoration: none;
+        }
+
+        .ts-square-card b {
+          display: block;
+          font-size: 22px;
+          line-height: 1.1;
+          font-weight: 800;
+          letter-spacing: -.02em;
+        }
+
+        .ts-square-card span {
+          display: block;
+          margin-top: 6px;
+          color: var(--ts-muted);
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.35;
+        }
+
+        .ts-square-card strong {
+          min-width: 48px;
+          height: 48px;
+          display: grid;
+          place-items: center;
+          border-radius: 16px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .ts-square-tags {
+          grid-column: 1 / -1;
+          margin-top: 0;
+        }
+
+        .ts-empty-state {
+          display: grid;
+          gap: 8px;
+          border-radius: 22px;
+          padding: 20px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+        }
+
+        .ts-empty-state b {
+          font-size: 20px;
+          font-weight: 800;
+        }
+
+        .ts-empty-state span {
+          color: var(--ts-muted);
+          font-weight: 600;
+        }
+
+        .ts-empty-state a {
+          width: fit-content;
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          margin-top: 6px;
+          border-radius: 14px;
+          padding: 0 14px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          text-decoration: none;
           font-weight: 800;
         }
 
         .ts-mobile-nav {
           display: none;
+        }
+
+        @media (max-width: 980px) {
+          .ts-wall-posts,
+          .ts-square-grid {
+            grid-template-columns: repeat(2, minmax(0,1fr));
+          }
         }
 
         @media (max-width: 820px) {
@@ -663,6 +1188,8 @@ export default function ProfilePage() {
           .ts-hero-card,
           .ts-profile-grid,
           .ts-public-preview,
+          .ts-wall-section,
+          .ts-square-section,
           .ts-alert {
             width: 100%;
             border-left: 0;
@@ -703,7 +1230,9 @@ export default function ProfilePage() {
           }
 
           .ts-profile-card,
-          .ts-public-preview {
+          .ts-public-preview,
+          .ts-wall-section,
+          .ts-square-section {
             padding: 18px 12px;
           }
 
@@ -731,8 +1260,20 @@ export default function ProfilePage() {
             grid-column: 1 / -1;
           }
 
-          .ts-form-grid {
+          .ts-form-grid,
+          .ts-wall-posts,
+          .ts-square-grid {
             grid-template-columns: 1fr;
+          }
+
+          .ts-section-split {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .ts-section-split > a {
+            width: 100%;
+            justify-content: center;
           }
 
           .ts-preview-card {
