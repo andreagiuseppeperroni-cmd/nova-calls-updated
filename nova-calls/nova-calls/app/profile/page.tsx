@@ -1,40 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Navbar, Button, Card } from '@/components/ui';
-import { NovaScoreCard, ProfileOrb, useNovaProfile } from '@/components/profile-store';
-import { createBrowserSupabase } from '@/lib/supabase-browser';
-
-type UserLink = {
-  id: string;
-  requester_id: string;
-  receiver_id: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  updated_at?: string | null;
-};
-
-type PublicProfile = {
-  id: string;
-  full_name: string | null;
-  username?: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  passions: string[] | null;
-  city: string | null;
-  role?: string | null;
-  nova_points: number | null;
-  contributions: number | null;
-  calls_joined: number | null;
-  outcomes_helped: number | null;
-};
-
-type LinkItem = {
-  link: UserLink;
-  otherUserId: string;
-  profile: PublicProfile | null;
-};
+import { type ChangeEvent, useState } from 'react';
+import { ProfileOrb, useNovaProfile } from '@/components/profile-store';
 
 function splitTags(value: string) {
   return value
@@ -43,130 +11,12 @@ function splitTags(value: string) {
     .filter(Boolean);
 }
 
-function profileTags(profile: PublicProfile | null) {
-  if (!profile) return [];
-  const passions = Array.isArray(profile.passions) ? profile.passions : [];
-  const roleTags = profile.role
-    ? profile.role
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : [];
-
-  return [...passions, ...roleTags].slice(0, 8);
-}
-
-function initials(name: string) {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || 'SQ'
-  );
-}
-
 export default function ProfilePage() {
   const { profile, save, uploadAvatar, loading, syncError } = useNovaProfile();
-  const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  const [links, setLinks] = useState<LinkItem[]>([]);
-  const [linksLoading, setLinksLoading] = useState(true);
-  const [selectedPublicProfile, setSelectedPublicProfile] = useState<PublicProfile | null>(null);
-
-  const linksCount = links.length;
-  const displayName = profile.displayName || 'Andrea Perroni';
-  const city = profile.city || 'Roma';
-  const squareTitle = `${displayName.split(' ')[0] || 'La tua'}’s Square`;
-  const allTags = [...splitTags(profile.passions), ...splitTags(profile.interests)].slice(0, 10);
-
-  async function loadLinks() {
-    setLinksLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLinks([]);
-      setLinksLoading(false);
-      return;
-    }
-
-    const { data: linkRows, error: linksError } = await supabase
-      .from('user_links')
-      .select('id, requester_id, receiver_id, status, created_at, updated_at')
-      .eq('status', 'accepted')
-      .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('updated_at', { ascending: false });
-
-    if (linksError) {
-      setLocalError(linksError.message);
-      setLinks([]);
-      setLinksLoading(false);
-      return;
-    }
-
-    const acceptedLinks = (linkRows || []) as UserLink[];
-    const otherIds = Array.from(
-      new Set(acceptedLinks.map((link) => (link.requester_id === user.id ? link.receiver_id : link.requester_id)))
-    );
-
-    let profiles: PublicProfile[] = [];
-
-    if (otherIds.length > 0) {
-      const { data: profileRows, error: profilesError } = await supabase
-        .from('profiles')
-        .select(
-          'id, full_name, username, avatar_url, bio, passions, city, role, nova_points, contributions, calls_joined, outcomes_helped'
-        )
-        .in('id', otherIds);
-
-      if (profilesError) {
-        setLocalError(profilesError.message);
-      } else {
-        profiles = (profileRows || []) as PublicProfile[];
-      }
-    }
-
-    const profileMap = new Map(profiles.map((item) => [item.id, item]));
-
-    setLinks(
-      acceptedLinks.map((link) => {
-        const otherUserId = link.requester_id === user.id ? link.receiver_id : link.requester_id;
-        return {
-          link,
-          otherUserId,
-          profile: profileMap.get(otherUserId) || null,
-        };
-      })
-    );
-
-    setLinksLoading(false);
-  }
-
-  useEffect(() => {
-    let active = true;
-
-    async function start() {
-      if (!active) return;
-      await loadLinks();
-    }
-
-    start();
-
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase]);
 
   function update(field: keyof typeof profile, value: string) {
     save({ [field]: value });
@@ -198,553 +48,757 @@ export default function ProfilePage() {
     save(profile);
     setSaved(true);
     setLocalError(null);
-    setIsEditing(false);
     window.setTimeout(() => setSaved(false), 1800);
   }
 
+  const tags = [...splitTags(profile.passions), ...splitTags(profile.interests)].slice(0, 8);
+
   return (
-    <div className="min-h-screen bg-[#fffaf0] text-[#15120d]">
-      <Navbar />
+    <main className="ts-page">
+      <header className="ts-profile-topbar">
+        <Link href="/" className="ts-brand">
+          <img src="/icon-192.png" alt="The Square" />
+          <span>
+            <b>The Square</b>
+            <small>City Wall Network</small>
+          </span>
+        </Link>
 
-      <main className="mx-auto w-[min(1540px,calc(100%-28px))] pb-14 pt-5">
-        {(syncError || localError) && (
-          <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">
-            {localError || syncError}
-          </div>
-        )}
+        <nav className="ts-top-actions">
+          <Link href="/">Home</Link>
+          <Link href="/cities">Città</Link>
+          <Link href="/notifications">Notifiche</Link>
+        </nav>
+      </header>
 
-        {saved && (
-          <div className="fixed right-5 top-24 z-[120] rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_60px_rgba(22,163,74,.18)]">
-            Profilo aggiornato
-          </div>
-        )}
+      <section className="ts-hero-card">
+        <div>
+          <p className="ts-eyebrow">Profilo personale</p>
+          <h1>La tua Piazza su The Square</h1>
+          <p className="ts-lead">
+            Gestisci nome, città, biografia, interessi e presenza pubblica con lo stesso stile della nuova Home.
+          </p>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-5">
-            <section className="relative min-h-[360px] overflow-hidden rounded-[2.2rem] border border-amber-100 bg-[#f7dfae] shadow-[0_24px_80px_rgba(113,82,38,.14)]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(255,255,255,.92),transparent_21%),radial-gradient(circle_at_83%_19%,rgba(56,189,248,.22),transparent_28%),linear-gradient(90deg,rgba(255,250,240,.96),rgba(255,250,240,.66)_42%,rgba(255,250,240,.08)_100%)]" />
-              <div className="absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,transparent,rgba(248,181,73,.18))]" />
-              <div className="absolute bottom-0 right-0 h-[260px] w-[58%] opacity-70">
-                <div className="absolute bottom-0 left-[10%] h-20 w-20 rounded-t-full bg-[#ffd166]/70" />
-                <div className="absolute bottom-0 left-[24%] h-28 w-40 rounded-t-[4rem] bg-[#f6c46a]/70" />
-                <div className="absolute bottom-0 left-[46%] h-36 w-52 rounded-t-[5rem] bg-[#f1b35b]/60" />
-                <div className="absolute bottom-0 right-[3%] h-44 w-64 rounded-t-[6rem] bg-[#df9f49]/50" />
-                <div className="absolute bottom-0 left-[18%] h-[2px] w-[78%] bg-[#9b6b2c]/15" />
-              </div>
+          {loading && <p className="ts-status">Sincronizzo il profilo reale…</p>}
+        </div>
 
-              <div className="relative z-10 grid gap-6 p-7 md:p-9 lg:grid-cols-[minmax(0,1fr)_330px]">
-                <div className="flex min-h-[300px] flex-col justify-between">
-                  <div>
-                    <div className="mb-4 inline-flex rounded-full bg-amber-300/70 px-3 py-1 text-[11px] font-black uppercase tracking-[.16em] text-amber-900">
-                      Piazza permanente · {city}
-                    </div>
-                    <h1 className="max-w-2xl text-[clamp(3rem,6vw,5.9rem)] font-black leading-[.82] tracking-[-.075em] text-[#17120c]">
-                      {squareTitle}
-                      <span className="ml-3 inline-block text-amber-400">☼</span>
-                    </h1>
-                    <p className="mt-5 max-w-2xl text-base font-bold leading-7 text-[#4f4636] md:text-lg">
-                      {profile.bio ||
-                        'Una piazza permanente dove i post del creator possono generare stanze temporanee di 24 ore per conversazioni, idee e collaborazioni.'}
-                    </p>
-                  </div>
+        <div className="ts-hero-orb">
+          <ProfileOrb className="h-full w-full" />
+        </div>
+      </section>
 
-                  <div className="mt-8 flex flex-wrap gap-3">
-                    <Link
-                      href="/my-square"
-                      className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#17120c] px-5 text-sm font-black text-white shadow-[0_16px_35px_rgba(23,18,12,.18)]"
-                    >
-                      Entra nella Piazza
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-amber-300 px-5 text-sm font-black text-[#17120c] shadow-[0_16px_35px_rgba(245,158,11,.18)]"
-                    >
-                      ✎ Modifica profilo
-                    </button>
-                    <Button href="/calls/new" variant="lime">
-                      Apri stanza
-                    </Button>
-                  </div>
-                </div>
-
-                <aside className="rounded-[1.8rem] border border-white/70 bg-white/80 p-6 text-center shadow-[0_20px_70px_rgba(113,82,38,.14)] backdrop-blur-2xl">
-                  <div className="mx-auto h-28 w-28 overflow-hidden rounded-full border-4 border-white shadow-[0_16px_40px_rgba(113,82,38,.16)]">
-                    <ProfileOrb className="h-full w-full" />
-                  </div>
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <h2 className="text-2xl font-black tracking-[-.04em]">{displayName}</h2>
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-sky-500 text-[10px] font-black text-white">✓</span>
-                  </div>
-                  <p className="mt-1 text-sm font-bold text-[#746653]">{profile.interests || 'Creator · Pensatore · Costruttore di comunità'}</p>
-                  <p className="mx-auto mt-4 max-w-[260px] text-sm font-semibold leading-6 text-[#5e5344]">
-                    Creo spazi di dialogo per trasformare idee in progetti che fanno bene alle persone e alla città.
-                  </p>
-
-                  <div className="mt-6 grid grid-cols-3 border-y border-[#eadcc5] py-4 text-center">
-                    <div>
-                      <b className="block text-xl font-black">{linksLoading ? '…' : linksCount}</b>
-                      <span className="text-[11px] font-bold text-[#786b5a]">Membri</span>
-                    </div>
-                    <div>
-                      <b className="block text-xl font-black">{profile.callsJoined}</b>
-                      <span className="text-[11px] font-bold text-[#786b5a]">Stanze</span>
-                    </div>
-                    <div>
-                      <b className="block text-xl font-black">{profile.score}</b>
-                      <span className="text-[11px] font-bold text-[#786b5a]">Score</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-3 text-left">
-                    <div className="flex items-center justify-between text-sm font-bold">
-                      <span>🔔 Nuove stanze</span>
-                      <span className="h-5 w-9 rounded-full bg-emerald-400 p-1">
-                        <span className="block h-3 w-3 translate-x-4 rounded-full bg-white" />
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm font-bold">
-                      <span>🧾 Post del creator</span>
-                      <span className="h-5 w-9 rounded-full bg-emerald-400 p-1">
-                        <span className="block h-3 w-3 translate-x-4 rounded-full bg-white" />
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm font-bold">
-                      <span>☼ Riepiloghi giornalieri</span>
-                      <span className="h-5 w-9 rounded-full bg-stone-300 p-1">
-                        <span className="block h-3 w-3 rounded-full bg-white" />
-                      </span>
-                    </div>
-                  </div>
-
-                  {loading && <p className="mt-4 text-xs font-black text-amber-700">Sincronizzo il profilo reale…</p>}
-                </aside>
-              </div>
-            </section>
-
-            <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-              <article className="rounded-[1.8rem] border border-[#eadcc5] bg-white p-6 shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-                <div className="mb-4 inline-flex rounded-full bg-rose-100 px-3 py-1 text-[11px] font-black uppercase tracking-[.14em] text-rose-700">
-                  Post in evidenza
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-amber-200">
-                    <ProfileOrb className="h-full w-full" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <b className="font-black">{displayName}</b>
-                      <span className="text-sky-500">✓</span>
-                    </div>
-                    <p className="text-xs font-bold text-[#786b5a]">2 ore fa · nella sua Piazza</p>
-                  </div>
-                </div>
-                <h3 className="mt-5 text-2xl font-black leading-tight tracking-[-.04em]">
-                  Quale idea semplice può avere il massimo impatto nella tua città?
-                </h3>
-                <p className="mt-3 text-sm font-semibold leading-6 text-[#5e5344]">
-                  Parliamone insieme: aprirò alcune stanze di 24h per approfondire le idee più interessanti e trasformarle in azioni concrete.
-                </p>
-                <div className="mt-5 flex flex-wrap items-center gap-5 text-sm font-black text-[#4f4636]">
-                  <span>♥ 128</span>
-                  <span>💬 42</span>
-                  <span>↗ 23</span>
-                  <Link href="/calls/new" className="ml-auto text-[#17120c]">
-                    Vedi post completo →
-                  </Link>
-                </div>
-              </article>
-
-              <article className="rounded-[1.8rem] border border-[#eadcc5] bg-white p-6 shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-                <div className="mb-4 inline-flex rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-[.14em] text-amber-800">
-                  Stanze aperte da questo post
-                </div>
-                <div className="space-y-3">
-                  {[
-                    ['💡', 'Idee che migliorano la mobilità', '24 partecipanti'],
-                    ['🌿', 'Spazi verdi: proposte concrete', '18 partecipanti'],
-                    ['⚙️', 'Tecnologia civica al servizio di tutti', '31 partecipanti'],
-                  ].map(([icon, title, meta]) => (
-                    <Link
-                      href="/calls/new"
-                      key={title}
-                      className="flex items-center gap-3 rounded-2xl border border-[#f0e4d1] bg-[#fffaf0] p-3 transition hover:-translate-y-1 hover:bg-white"
-                    >
-                      <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-lg">{icon}</span>
-                      <span className="min-w-0 flex-1">
-                        <b className="block truncate text-sm font-black">{title}</b>
-                        <span className="text-xs font-bold text-[#857765]">{meta}</span>
-                      </span>
-                      <span className="text-sm font-black">→</span>
-                    </Link>
-                  ))}
-                </div>
-                <Link href="/calls/new" className="mt-5 inline-flex text-sm font-black text-[#17120c]">
-                  Apri una stanza da un post →
-                </Link>
-              </article>
-            </section>
-
-            <section className="rounded-[1.8rem] border border-[#eadcc5] bg-white p-6 shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[.18em] text-amber-700">Stanze temporanee</p>
-                  <h2 className="mt-1 text-3xl font-black tracking-[-.05em]">Stanze attive della Piazza</h2>
-                </div>
-                <Link href="/calls/new" className="text-sm font-black">
-                  Vedi tutte →
-                </Link>
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {[
-                  ['23h 15m rimanenti', 'Idee che migliorano la mobilità', '24 partecipanti', 'bg-lime-100', 'text-lime-700'],
-                  ['18h 42m rimanenti', 'Spazi verdi: proposte concrete', '18 partecipanti', 'bg-sky-100', 'text-sky-700'],
-                  ['12h 05m rimanenti', 'Tecnologia civica al servizio di tutti', '31 partecipanti', 'bg-rose-100', 'text-rose-700'],
-                ].map(([time, title, meta, bg, color]) => (
-                  <article key={title} className="rounded-[1.5rem] border border-[#eadcc5] bg-[#fffdf8] p-5">
-                    <span className={`inline-flex rounded-full ${bg} px-3 py-1 text-xs font-black ${color}`}>{time}</span>
-                    <h3 className="mt-4 text-xl font-black leading-tight tracking-[-.035em]">{title}</h3>
-                    <p className="mt-2 text-sm font-bold text-[#786b5a]">{meta}</p>
-                    <Link
-                      href="/calls/new"
-                      className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#17120c] px-4 py-3 text-sm font-black text-white"
-                    >
-                      Entra nella stanza
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[1.8rem] border border-[#eadcc5] bg-white p-6 shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[.18em] text-amber-700">Relazioni reciproche</p>
-                  <h2 className="mt-1 text-3xl font-black tracking-[-.05em]">Membri e legami</h2>
-                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#6d604f]">
-                    Qui trovi solo i legami accettati da entrambe le persone. Da ogni legame puoi aprire il profilo pubblico o la chat privata.
-                  </p>
-                </div>
-
-                <Button href="/notifications" variant="ghost">
-                  Richieste
-                </Button>
-              </div>
-
-              {linksLoading && (
-                <div className="mt-6 grid gap-3 md:grid-cols-2">
-                  {[1, 2].map((item) => (
-                    <div key={item} className="h-32 animate-pulse rounded-[1.5rem] border border-[#eadcc5] bg-[#fffaf0]" />
-                  ))}
-                </div>
-              )}
-
-              {!linksLoading && links.length === 0 && (
-                <div className="mt-6 rounded-[1.5rem] border border-[#eadcc5] bg-[#fffaf0] p-7 text-center">
-                  <h3 className="text-2xl font-black">Nessun legame attivo</h3>
-                  <p className="mx-auto mt-3 max-w-xl font-semibold leading-7 text-[#6d604f]">
-                    Entra nelle stanze, contribuisci e crea legami reciproci con le persone con cui nasce uno scambio utile.
-                  </p>
-                </div>
-              )}
-
-              {!linksLoading && links.length > 0 && (
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {links.map((item) => {
-                    const publicProfile = item.profile;
-                    const name = publicProfile?.full_name || 'Utente Square';
-                    const avatar = publicProfile?.avatar_url || '';
-
-                    return (
-                      <article key={item.link.id} className="rounded-[1.5rem] border border-[#eadcc5] bg-[#fffaf0] p-5">
-                        <div className="flex items-start gap-4">
-                          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-amber-300 to-sky-400 text-sm font-black text-white">
-                            {avatar ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={avatar} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              initials(name)
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <h3 className="truncate text-xl font-black">{name}</h3>
-                            <p className="text-sm font-bold text-amber-700">
-                              {publicProfile?.city || 'The Square'} · {publicProfile?.nova_points || 0} punti
-                            </p>
-                            <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[#6d604f]">
-                              {publicProfile?.bio || 'Profilo non ancora completato.'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPublicProfile(publicProfile)}
-                            className="rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 text-sm font-black text-[#17120c] hover:bg-[#fffaf0]"
-                          >
-                            Visualizza profilo
-                          </button>
-
-                          <Link
-                            href={`/messages?link=${item.link.id}`}
-                            className="rounded-2xl bg-[#17120c] px-4 py-3 text-center text-sm font-black text-white"
-                          >
-                            Apri chat
-                          </Link>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </div>
-
-          <aside className="space-y-5">
-            <Card className="border-0 bg-white p-6 text-[#17120c] shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-              <h3 className="text-xl font-black">Echo della Piazza</h3>
-              <div className="mt-4 rounded-[1.4rem] bg-[#fff7e7] p-5">
-                <p className="text-3xl text-amber-400">“</p>
-                <p className="font-semibold leading-7 text-[#5e5344]">
-                  Ogni conversazione qui dentro può essere l’inizio di qualcosa di grande.
-                </p>
-                <p className="mt-4 text-sm font-black">— {displayName.split(' ')[0] || 'Creator'}</p>
-              </div>
-            </Card>
-
-            <Card className="border-0 bg-white p-6 text-[#17120c] shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-              <h3 className="text-xl font-black">Membri attivi</h3>
-              <div className="mt-4 flex -space-x-3">
-                {['G', 'M', 'A', 'S', 'L', 'F'].map((item, index) => (
-                  <span
-                    key={`${item}-${index}`}
-                    className="grid h-11 w-11 place-items-center rounded-full border-2 border-white bg-gradient-to-br from-amber-300 to-sky-400 text-sm font-black text-white"
-                  >
-                    {item}
-                  </span>
-                ))}
-                <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-white bg-[#f4ead9] text-xs font-black text-[#5e5344]">
-                  +{linksLoading ? '…' : Math.max(linksCount, 24)}
-                </span>
-              </div>
-              <p className="mt-4 text-sm font-bold text-[#6d604f]">1.248 online ora nella rete di questa Piazza.</p>
-            </Card>
-
-            <NovaScoreCard />
-
-            <Card className="border-0 bg-white p-6 text-[#17120c] shadow-[0_18px_58px_rgba(113,82,38,.10)]">
-              <h3 className="text-xl font-black">Tag della Piazza</h3>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(allTags.length ? allTags : ['community', 'città', 'idee', 'eventi', 'collaborazioni']).map((tag) => (
-                  <span key={tag} className="rounded-full bg-[#fff3d6] px-3 py-2 text-xs font-black text-amber-800">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </Card>
-          </aside>
+      {(syncError || localError) && (
+        <section className="ts-alert">
+          {localError || syncError}
         </section>
+      )}
 
-        {isEditing && (
-          <div className="fixed inset-0 z-[130] overflow-y-auto bg-[#17120c]/55 px-4 py-8 backdrop-blur-xl">
-            <div className="mx-auto w-[min(880px,100%)] overflow-hidden rounded-[2rem] border border-white/60 bg-[#fffaf0] shadow-[0_40px_130px_rgba(23,18,12,.35)]">
-              <div className="flex items-start justify-between gap-4 border-b border-[#eadcc5] p-6">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[.18em] text-amber-700">Modifica informazioni personali</p>
-                  <h2 className="mt-1 text-3xl font-black tracking-[-.05em]">Modifica profilo</h2>
-                  <p className="mt-2 text-sm font-semibold text-[#6d604f]">
-                    Queste informazioni saranno usate per costruire la tua Piazza personale.
-                  </p>
-                </div>
+      <section className="ts-profile-grid">
+        <aside className="ts-profile-card ts-profile-summary">
+          <div className="ts-avatar-shell">
+            <ProfileOrb className="h-full w-full" />
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="grid h-11 w-11 place-items-center rounded-full bg-white text-2xl font-black text-[#17120c]"
-                  aria-label="Chiudi modifica profilo"
-                >
-                  ×
-                </button>
-              </div>
+          <div className="ts-summary-copy">
+            <h2>{profile.displayName || 'Il tuo profilo'}</h2>
+            <p>{profile.city || 'Aggiungi la tua città'}</p>
+          </div>
 
-              <div className="grid gap-6 p-6 lg:grid-cols-[260px_1fr]">
-                <div>
-                  <div className="rounded-[1.6rem] border border-[#eadcc5] bg-white p-5 text-center">
-                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full">
-                      <ProfileOrb className="h-full w-full" />
-                    </div>
+          <label className="ts-upload-button">
+            {uploading ? 'Carico immagine…' : 'Carica immagine profilo'}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              disabled={uploading}
+            />
+          </label>
 
-                    <label className="mt-5 inline-flex cursor-pointer items-center justify-center rounded-2xl border border-[#eadcc5] bg-[#fffaf0] px-5 py-3 text-sm font-black hover:bg-white">
-                      {uploading ? 'Carico immagine…' : 'Carica immagine'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                        className="hidden"
-                        disabled={uploading}
-                      />
-                    </label>
-
-                    <p className="mt-3 text-xs font-semibold text-[#786b5a]">
-                      L’immagine viene caricata su Supabase Storage e usata nella sfera profilo.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm font-black text-[#6d604f]">Nome visualizzato</span>
-                    <input
-                      value={profile.displayName}
-                      onChange={(event) => update('displayName', event.target.value)}
-                      autoComplete="name"
-                      className="mt-2 w-full rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 font-bold text-[#17120c] outline-none focus:border-amber-300"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-black text-[#6d604f]">Città / area</span>
-                    <input
-                      value={profile.city}
-                      onChange={(event) => update('city', event.target.value)}
-                      autoComplete="address-level2"
-                      className="mt-2 w-full rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 font-bold text-[#17120c] outline-none focus:border-amber-300"
-                    />
-                  </label>
-
-                  <label className="block md:col-span-2">
-                    <span className="text-sm font-black text-[#6d604f]">Biografia</span>
-                    <textarea
-                      value={profile.bio}
-                      onChange={(event) => update('bio', event.target.value)}
-                      rows={5}
-                      className="mt-2 w-full resize-none rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 font-bold leading-7 text-[#17120c] outline-none focus:border-amber-300"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-black text-[#6d604f]">Passioni</span>
-                    <textarea
-                      value={profile.passions}
-                      onChange={(event) => update('passions', event.target.value)}
-                      rows={4}
-                      placeholder="Decisioni, crescita personale, idee, community"
-                      className="mt-2 w-full resize-none rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 font-bold leading-7 text-[#17120c] outline-none focus:border-amber-300"
-                    />
-                    <span className="mt-2 block text-xs font-semibold text-[#786b5a]">Separale con una virgola.</span>
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-black text-[#6d604f]">Interessi per le stanze</span>
-                    <textarea
-                      value={profile.interests}
-                      onChange={(event) => update('interests', event.target.value)}
-                      rows={4}
-                      placeholder="Roma, lavoro, startup, relazioni, creatività"
-                      className="mt-2 w-full resize-none rounded-2xl border border-[#eadcc5] bg-white px-4 py-3 font-bold leading-7 text-[#17120c] outline-none focus:border-amber-300"
-                    />
-                    <span className="mt-2 block text-xs font-semibold text-[#786b5a]">
-                      Questi interessi aiuteranno a suggerire Piazze, stanze e persone.
-                    </span>
-                  </label>
-
-                  <div className="flex flex-wrap items-center gap-3 border-t border-[#eadcc5] pt-5 md:col-span-2">
-                    <button
-                      type="button"
-                      onClick={onSave}
-                      className="rounded-2xl bg-[#17120c] px-5 py-3 text-sm font-black text-white"
-                    >
-                      Salva profilo
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      className="rounded-2xl border border-[#eadcc5] bg-white px-5 py-3 text-sm font-black text-[#17120c]"
-                    >
-                      Annulla
-                    </button>
-
-                    {saved && <span className="text-sm font-black text-emerald-700">Profilo aggiornato</span>}
-                  </div>
-                </div>
-              </div>
+          <div className="ts-stats">
+            <div>
+              <b>{profile.score}</b>
+              <span>Punti</span>
+            </div>
+            <div>
+              <b>{profile.contributions}</b>
+              <span>Contributi</span>
+            </div>
+            <div>
+              <b>{profile.callsJoined}</b>
+              <span>Call</span>
             </div>
           </div>
-        )}
+        </aside>
 
-        {selectedPublicProfile && (
-          <div className="fixed inset-0 z-[100] grid place-items-center bg-[#17120c]/70 px-4 backdrop-blur-xl">
-            <div className="relative w-[min(560px,100%)] overflow-hidden rounded-[2rem] border border-white/40 bg-[#fffaf0] p-6 shadow-[0_0_60px_rgba(245,158,11,.18)]">
-              <button
-                type="button"
-                onClick={() => setSelectedPublicProfile(null)}
-                className="absolute right-6 top-6 grid h-10 w-10 place-items-center rounded-full bg-white text-xl font-black hover:bg-[#fff7e7]"
-                aria-label="Chiudi profilo"
-              >
-                ×
-              </button>
-
-              <div className="flex items-start gap-5 pr-12">
-                <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-[#eadcc5] bg-gradient-to-br from-amber-300 to-sky-400 text-xl font-black text-white">
-                  {selectedPublicProfile.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selectedPublicProfile.avatar_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    initials(selectedPublicProfile.full_name || 'Utente Square')
-                  )}
-                </div>
-
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[.24em] text-amber-700">Profilo pubblico</p>
-                  <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-.04em]">
-                    {selectedPublicProfile.full_name || 'Utente Square'}
-                  </h3>
-                  <p className="mt-1 text-sm font-bold text-amber-700">
-                    {selectedPublicProfile.city || 'The Square'} · {selectedPublicProfile.nova_points || 0} punti
-                  </p>
-                </div>
-              </div>
-
-              <p className="mt-5 font-semibold leading-7 text-[#5e5344]">
-                {selectedPublicProfile.bio || 'Questo utente non ha ancora completato la biografia del profilo.'}
-              </p>
-
-              {profileTags(selectedPublicProfile).length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {profileTags(selectedPublicProfile).map((tag) => (
-                    <span key={tag} className="rounded-full bg-[#fff3d6] px-3 py-1 text-xs font-black text-amber-800">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-6 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-2xl border border-[#eadcc5] bg-white p-4">
-                  <b className="text-2xl text-sky-600">{selectedPublicProfile.contributions || 0}</b>
-                  <span className="mt-1 block text-[11px] font-bold text-[#786b5a]">Messaggi utili</span>
-                </div>
-                <div className="rounded-2xl border border-[#eadcc5] bg-white p-4">
-                  <b className="text-2xl text-lime-600">{selectedPublicProfile.calls_joined || 0}</b>
-                  <span className="mt-1 block text-[11px] font-bold text-[#786b5a]">Stanze</span>
-                </div>
-                <div className="rounded-2xl border border-[#eadcc5] bg-white p-4">
-                  <b className="text-2xl text-rose-500">{selectedPublicProfile.outcomes_helped || 0}</b>
-                  <span className="mt-1 block text-[11px] font-bold text-[#786b5a]">Outcome</span>
-                </div>
-              </div>
-
-              <p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-[#9a8a73]">
-                Profilo visibile perché avete un legame reciproco.
-              </p>
-            </div>
+        <section className="ts-profile-card ts-form-card">
+          <div className="ts-section-head">
+            <p className="ts-eyebrow">Informazioni</p>
+            <h2>Modifica profilo</h2>
           </div>
-        )}
-      </main>
-    </div>
+
+          <div className="ts-form-grid">
+            <label>
+              <span>Nome visualizzato</span>
+              <input
+                value={profile.displayName}
+                onChange={(event) => update('displayName', event.target.value)}
+                autoComplete="name"
+              />
+            </label>
+
+            <label>
+              <span>Città / area</span>
+              <input
+                value={profile.city}
+                onChange={(event) => update('city', event.target.value)}
+                autoComplete="address-level2"
+              />
+            </label>
+
+            <label className="wide">
+              <span>Biografia</span>
+              <textarea
+                value={profile.bio}
+                onChange={(event) => update('bio', event.target.value)}
+                rows={5}
+                placeholder="Racconta chi sei, cosa fai e in quali conversazioni vuoi essere trovato."
+              />
+            </label>
+
+            <label>
+              <span>Passioni</span>
+              <textarea
+                value={profile.passions}
+                onChange={(event) => update('passions', event.target.value)}
+                rows={4}
+                placeholder="Decisioni, crescita personale, idee, community"
+              />
+              <small>Separale con una virgola.</small>
+            </label>
+
+            <label>
+              <span>Interessi per le Call</span>
+              <textarea
+                value={profile.interests}
+                onChange={(event) => update('interests', event.target.value)}
+                rows={4}
+                placeholder="Roma, lavoro, startup, relazioni, creatività"
+              />
+              <small>Aiutano The Square a suggerire Wall, persone e stanze.</small>
+            </label>
+          </div>
+
+          <div className="ts-form-actions">
+            <button type="button" onClick={onSave}>
+              Salva profilo
+            </button>
+
+            {saved && <span>Profilo aggiornato</span>}
+          </div>
+        </section>
+      </section>
+
+      <section className="ts-profile-card ts-public-preview">
+        <div className="ts-section-head">
+          <p className="ts-eyebrow">Anteprima pubblica</p>
+          <h2>Come ti vedranno gli altri</h2>
+        </div>
+
+        <article className="ts-preview-card">
+          <ProfileOrb className="ts-preview-orb" />
+
+          <div>
+            <h3>{profile.displayName || 'Utente The Square'}</h3>
+            <p>{profile.city || 'Italia'} · {profile.score} punti The Square</p>
+
+            <p className="ts-preview-bio">
+              {profile.bio || 'Completa la biografia per raccontare chi sei e quali conversazioni vuoi creare.'}
+            </p>
+
+            {tags.length > 0 && (
+              <div className="ts-tags">
+                {tags.map((tag) => (
+                  <span key={tag}>{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </article>
+      </section>
+
+      <nav className="ts-mobile-nav">
+        <Link href="/">⌂<span>Home</span></Link>
+        <Link href="/cities">⌖<span>Città</span></Link>
+        <Link href="/#composer" className="publish">+<span>Pubblica</span></Link>
+        <Link href="/messages">💬<span>Chat</span></Link>
+        <Link href="/profile" className="active">♙<span>Profilo</span></Link>
+      </nav>
+
+      <style jsx global>{`
+        :root {
+          --ts-bg: #fff7ec;
+          --ts-ink: #17120d;
+          --ts-muted: #7a6c5d;
+          --ts-line: rgba(120, 78, 35, .16);
+          --ts-yellow: #ffc93d;
+          --ts-orange: #ff7a2f;
+          --ts-blue: #44bfff;
+          --ts-card: rgba(255,255,255,.84);
+          --ts-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
+        html,
+        body {
+          background: #fff7ec !important;
+        }
+
+        .ts-page,
+        .ts-page * {
+          box-sizing: border-box;
+        }
+
+        .ts-page {
+          min-height: 100vh;
+          padding: 18px 18px 110px;
+          color: var(--ts-ink);
+          font-family: var(--ts-font);
+          background:
+            radial-gradient(circle at 0% 0%, rgba(255,201,61,.42), transparent 28%),
+            radial-gradient(circle at 100% 6%, rgba(68,191,255,.24), transparent 28%),
+            radial-gradient(circle at 84% 40%, rgba(255,111,97,.16), transparent 30%),
+            linear-gradient(180deg,#fffaf2 0%,#fff3e1 44%,#fff8f0 100%);
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        .ts-page::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          opacity: .34;
+          background:
+            linear-gradient(90deg, rgba(120,78,35,.08) 1px, transparent 1px),
+            linear-gradient(0deg, rgba(120,78,35,.08) 1px, transparent 1px);
+          background-size: 34px 34px;
+        }
+
+        .ts-profile-topbar,
+        .ts-hero-card,
+        .ts-profile-grid,
+        .ts-public-preview,
+        .ts-alert {
+          position: relative;
+          z-index: 1;
+          width: min(1120px, 100%);
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .ts-profile-topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 18px;
+        }
+
+        .ts-brand {
+          display: grid;
+          grid-template-columns: 54px 1fr;
+          align-items: center;
+          gap: 12px;
+          color: var(--ts-ink);
+          text-decoration: none;
+        }
+
+        .ts-brand img {
+          width: 54px;
+          height: 54px;
+          border-radius: 16px;
+          border: 2px solid rgba(255,167,38,.75);
+          box-shadow: 0 0 0 6px rgba(255,201,61,.18), 0 16px 34px rgba(255,122,47,.20);
+        }
+
+        .ts-brand b {
+          display: block;
+          font-size: 28px;
+          line-height: .96;
+          letter-spacing: -.02em;
+          font-weight: 800;
+        }
+
+        .ts-brand small {
+          display: block;
+          margin-top: 4px;
+          color: #8a745f;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .16em;
+          text-transform: uppercase;
+        }
+
+        .ts-top-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ts-top-actions a {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          border-radius: 14px;
+          padding: 0 14px;
+          color: #332319;
+          background: rgba(255,255,255,.82);
+          border: 1px solid var(--ts-line);
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .ts-hero-card,
+        .ts-profile-card,
+        .ts-alert {
+          background:
+            radial-gradient(circle at 100% 0%, rgba(68,191,255,.12), transparent 28%),
+            radial-gradient(circle at 0% 100%, rgba(255,201,61,.12), transparent 30%),
+            var(--ts-card);
+          border: 1px solid var(--ts-line);
+          box-shadow: 0 14px 34px rgba(120,78,35,.10);
+        }
+
+        .ts-hero-card {
+          display: grid;
+          grid-template-columns: 1fr 130px;
+          gap: 24px;
+          align-items: center;
+          border-radius: 28px;
+          padding: 28px;
+          margin-bottom: 18px;
+        }
+
+        .ts-eyebrow {
+          margin: 0 0 10px;
+          color: #d97016;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .18em;
+          text-transform: uppercase;
+        }
+
+        .ts-hero-card h1,
+        .ts-section-head h2 {
+          margin: 0;
+          color: var(--ts-ink);
+          font-size: clamp(30px, 5vw, 54px);
+          line-height: .98;
+          letter-spacing: -.04em;
+          font-weight: 800;
+        }
+
+        .ts-lead {
+          max-width: 620px;
+          margin: 14px 0 0;
+          color: var(--ts-muted);
+          font-size: 17px;
+          line-height: 1.55;
+          font-weight: 500;
+        }
+
+        .ts-status {
+          color: #147db2;
+          font-weight: 700;
+        }
+
+        .ts-hero-orb {
+          width: 124px;
+          height: 124px;
+          border-radius: 32px;
+          overflow: hidden;
+          background: linear-gradient(135deg,#ffc93d,#ff7a2f 52%,#44bfff);
+          padding: 4px;
+        }
+
+        .ts-alert {
+          border-radius: 18px;
+          padding: 14px 16px;
+          margin-bottom: 18px;
+          color: #9f1239;
+          font-weight: 700;
+        }
+
+        .ts-profile-grid {
+          display: grid;
+          grid-template-columns: 320px 1fr;
+          gap: 18px;
+          align-items: start;
+          margin-bottom: 18px;
+        }
+
+        .ts-profile-card {
+          border-radius: 26px;
+          padding: 22px;
+        }
+
+        .ts-profile-summary {
+          text-align: center;
+        }
+
+        .ts-avatar-shell {
+          width: 138px;
+          height: 138px;
+          margin: 0 auto 16px;
+          border-radius: 36px;
+          overflow: hidden;
+          background: linear-gradient(135deg,#ffc93d,#ff7a2f 52%,#44bfff);
+          padding: 4px;
+        }
+
+        .ts-profile-summary h2 {
+          margin: 0;
+          font-size: 26px;
+          line-height: 1.05;
+          font-weight: 800;
+          letter-spacing: -.02em;
+        }
+
+        .ts-profile-summary p {
+          margin: 8px 0 0;
+          color: var(--ts-muted);
+          font-weight: 600;
+        }
+
+        .ts-upload-button {
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          margin-top: 16px;
+          border-radius: 16px;
+          padding: 0 16px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .ts-upload-button input {
+          display: none;
+        }
+
+        .ts-stats {
+          display: grid;
+          grid-template-columns: repeat(3,1fr);
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .ts-stats div {
+          min-height: 72px;
+          display: grid;
+          place-items: center;
+          border-radius: 18px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+        }
+
+        .ts-stats b {
+          font-size: 24px;
+          font-weight: 800;
+        }
+
+        .ts-stats span {
+          color: var(--ts-muted);
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+
+        .ts-section-head {
+          margin-bottom: 18px;
+        }
+
+        .ts-section-head h2 {
+          font-size: 30px;
+        }
+
+        .ts-form-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .ts-form-grid label {
+          display: grid;
+          gap: 8px;
+        }
+
+        .ts-form-grid label.wide {
+          grid-column: 1 / -1;
+        }
+
+        .ts-form-grid span {
+          color: #6e6258;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .ts-form-grid input,
+        .ts-form-grid textarea {
+          width: 100%;
+          border: 1px solid rgba(120,78,35,.16);
+          outline: 0;
+          border-radius: 16px;
+          background: #fffaf2;
+          color: #201610;
+          padding: 13px 14px;
+          font: 600 15px var(--ts-font);
+        }
+
+        .ts-form-grid textarea {
+          resize: vertical;
+          line-height: 1.5;
+        }
+
+        .ts-form-grid small {
+          color: var(--ts-muted);
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
+        .ts-form-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 18px;
+        }
+
+        .ts-form-actions button {
+          min-height: 46px;
+          border: 0;
+          border-radius: 16px;
+          padding: 0 18px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          font: 800 14px var(--ts-font);
+          cursor: pointer;
+        }
+
+        .ts-form-actions span {
+          color: #11834f;
+          font-weight: 800;
+        }
+
+        .ts-public-preview {
+          border-radius: 26px;
+          padding: 22px;
+        }
+
+        .ts-preview-card {
+          display: grid;
+          grid-template-columns: 72px 1fr;
+          gap: 16px;
+          align-items: start;
+          border-radius: 22px;
+          padding: 18px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+        }
+
+        .ts-preview-orb {
+          width: 72px;
+          height: 72px;
+        }
+
+        .ts-preview-card h3 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 800;
+          letter-spacing: -.02em;
+        }
+
+        .ts-preview-card p {
+          margin: 6px 0 0;
+          color: var(--ts-muted);
+          font-weight: 600;
+        }
+
+        .ts-preview-bio {
+          line-height: 1.55;
+        }
+
+        .ts-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .ts-tags span {
+          min-height: 30px;
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 0 11px;
+          background: linear-gradient(135deg,#bfeeff,#62c9ff);
+          color: #09202d;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .ts-mobile-nav {
+          display: none;
+        }
+
+        @media (max-width: 820px) {
+          .ts-page {
+            padding-left: 0;
+            padding-right: 0;
+          }
+
+          .ts-profile-topbar,
+          .ts-hero-card,
+          .ts-profile-grid,
+          .ts-public-preview,
+          .ts-alert {
+            width: 100%;
+            border-left: 0;
+            border-right: 0;
+            border-radius: 0;
+          }
+
+          .ts-profile-topbar {
+            padding: 0 12px;
+          }
+
+          .ts-top-actions {
+            display: none;
+          }
+
+          .ts-hero-card {
+            grid-template-columns: 1fr 74px;
+            padding: 18px 12px;
+          }
+
+          .ts-hero-card h1 {
+            font-size: 30px;
+          }
+
+          .ts-lead {
+            font-size: 15px;
+          }
+
+          .ts-hero-orb {
+            width: 70px;
+            height: 70px;
+            border-radius: 22px;
+          }
+
+          .ts-profile-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .ts-profile-card,
+          .ts-public-preview {
+            padding: 18px 12px;
+          }
+
+          .ts-profile-summary {
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            text-align: left;
+            align-items: center;
+            gap: 14px;
+          }
+
+          .ts-avatar-shell {
+            width: 82px;
+            height: 82px;
+            margin: 0;
+            border-radius: 24px;
+          }
+
+          .ts-summary-copy {
+            min-width: 0;
+          }
+
+          .ts-upload-button,
+          .ts-stats {
+            grid-column: 1 / -1;
+          }
+
+          .ts-form-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .ts-preview-card {
+            grid-template-columns: 56px 1fr;
+          }
+
+          .ts-preview-orb {
+            width: 56px;
+            height: 56px;
+          }
+
+          .ts-mobile-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: max(0px, env(safe-area-inset-bottom));
+            z-index: 80;
+            height: 78px;
+            display: grid;
+            grid-template-columns: repeat(5,1fr);
+            align-items: center;
+            padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+            border-top: 1px solid rgba(120,78,35,.14);
+            border-radius: 22px 22px 0 0;
+            background: rgba(255,255,255,.92);
+            box-shadow: 0 -14px 36px rgba(120,78,35,.14);
+          }
+
+          .ts-mobile-nav a {
+            display: grid;
+            place-items: center;
+            gap: 5px;
+            color: #6d5e50;
+            text-decoration: none;
+            font-size: 22px;
+            font-weight: 700;
+          }
+
+          .ts-mobile-nav span {
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .ts-mobile-nav .active {
+            color: #d97016;
+          }
+
+          .ts-mobile-nav .publish {
+            width: 62px;
+            height: 62px;
+            margin: -24px auto 0;
+            border-radius: 50%;
+            color: #201610;
+            background: linear-gradient(135deg,#ffc93d,#ff9f35 48%,#ff7a2f);
+            box-shadow: 0 0 0 8px rgba(255,201,61,.18), 0 18px 38px rgba(255,122,47,.24);
+            font-size: 34px;
+          }
+
+          .ts-mobile-nav .publish span {
+            position: absolute;
+            margin-top: 78px;
+            color: #5d4d3f;
+            font-size: 11px;
+          }
+        }
+      `}</style>
+    </main>
   );
 }
