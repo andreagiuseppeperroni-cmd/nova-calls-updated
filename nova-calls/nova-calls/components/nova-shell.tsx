@@ -1686,14 +1686,36 @@ export function NovaHome() {
       )}
 
       <nav className="mobile-nav">
-        <Link href="/" className="active">⌂</Link>
-        <Link href="/cities">📍</Link>
-        <button type="button" onClick={() => openComposer('text')}>＋</button>
-        <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}>
-          💬
+        <Link href="/" className="nav-home active" aria-label="Home">
+          <span className="nav-ico">⌂</span>
+          <span className="nav-label">Home</span>
+        </Link>
+
+        <Link href="/cities" className="nav-city" aria-label="Città">
+          <span className="nav-ico">⌖</span>
+          <span className="nav-label">Città</span>
+        </Link>
+
+        <button type="button" className="nav-publish" onClick={() => openComposer('text')} aria-label="Pubblica">
+          <span className="nav-ico">＋</span>
+          <span className="nav-label">Pubblica</span>
+        </button>
+
+        <button
+          type="button"
+          className="nav-chat"
+          onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}
+          aria-label="Chat"
+        >
+          <span className="nav-ico">💬</span>
+          <span className="nav-label">Chat</span>
           {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
         </button>
-        <Link href="/profile">👤</Link>
+
+        <Link href="/profile" className="nav-profile" aria-label="Profilo">
+          <span className="nav-ico">♙</span>
+          <span className="nav-label">Profilo</span>
+        </Link>
       </nav>
 
       <style jsx global>{styles}</style>
@@ -5995,6 +6017,174 @@ const styles = `
   .pulse-empty {
     min-width: 260px;
     scroll-snap-align: start;
+  }
+}
+
+
+/* === MOBILE NAV RESTORE — publish button + updated icons === */
+@media (max-width: 980px) {
+  .mobile-nav {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: max(0px, env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+    height: 86px !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    align-items: center !important;
+    gap: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    border-top: 1px solid rgba(120,78,35,.14) !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom)) !important;
+    background: rgba(255,255,255,.94) !important;
+    box-shadow: 0 -14px 36px rgba(120,78,35,.16) !important;
+    backdrop-filter: blur(24px) saturate(1.12) !important;
+  }
+
+  .mobile-nav a,
+  .mobile-nav button {
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 64px !important;
+    display: grid !important;
+    grid-template-rows: 28px 18px !important;
+    place-items: center !important;
+    gap: 5px !important;
+    border: 0 !important;
+    border-radius: 18px !important;
+    background: transparent !important;
+    color: #6d5e50 !important;
+    text-decoration: none !important;
+    font-family: var(--font, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif) !important;
+    font-size: 0 !important;
+    font-weight: 700 !important;
+    position: relative !important;
+  }
+
+  .mobile-nav a::before,
+  .mobile-nav a::after,
+  .mobile-nav button::before,
+  .mobile-nav button::after {
+    content: none !important;
+  }
+
+  .mobile-nav .nav-ico {
+    display: grid !important;
+    place-items: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    color: inherit !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+  }
+
+  .mobile-nav .nav-label {
+    display: block !important;
+    color: inherit !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    font-weight: 800 !important;
+    letter-spacing: -.01em !important;
+  }
+
+  .mobile-nav .active {
+    color: #d97016 !important;
+    background: rgba(255,201,61,.10) !important;
+  }
+
+  .mobile-nav .nav-home .nav-ico {
+    color: #d97016 !important;
+  }
+
+  .mobile-nav .nav-city .nav-ico {
+    color: #5f6b78 !important;
+  }
+
+  .mobile-nav .nav-chat .nav-ico {
+    color: #4a3f36 !important;
+  }
+
+  .mobile-nav .nav-profile .nav-ico {
+    color: #6d5e50 !important;
+  }
+
+  .mobile-nav .nav-publish {
+    width: 70px !important;
+    height: 70px !important;
+    margin: -28px auto 0 !important;
+    border-radius: 50% !important;
+    grid-template-rows: 40px 16px !important;
+    color: #201610 !important;
+    background: linear-gradient(135deg,#ffc93d,#ff9f35 50%,#ff7a2f) !important;
+    box-shadow:
+      0 0 0 9px rgba(255,201,61,.18),
+      0 18px 38px rgba(255,122,47,.26) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .mobile-nav .nav-publish .nav-ico {
+    width: 40px !important;
+    height: 38px !important;
+    font-size: 38px !important;
+    font-weight: 900 !important;
+  }
+
+  .mobile-nav .nav-publish .nav-label {
+    position: absolute !important;
+    left: 50% !important;
+    bottom: -23px !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    color: #5d4d3f !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+  }
+
+  .mobile-badge {
+    position: absolute !important;
+    right: 16px !important;
+    top: 3px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    display: grid !important;
+    place-items: center !important;
+    border-radius: 999px !important;
+    background: #ff6f61 !important;
+    color: #fff !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    box-shadow: 0 0 0 3px rgba(255,255,255,.94) !important;
+  }
+
+  iframe[src*="onesignal"],
+  div[id*="onesignal"],
+  div[class*="onesignal"],
+  .onesignal-bell-launcher,
+  .onesignal-customlink-container,
+  .onesignal-slidedown-container,
+  .onesignal-popover-container {
+    right: 12px !important;
+    bottom: 106px !important;
+    transform: scale(.78) !important;
+    transform-origin: bottom right !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-nav .nav-label {
+    font-size: 11px !important;
+  }
+
+  .mobile-nav .nav-publish {
+    width: 66px !important;
+    height: 66px !important;
+  }
+
+  .mobile-nav .nav-publish .nav-ico {
+    font-size: 35px !important;
   }
 }
 
