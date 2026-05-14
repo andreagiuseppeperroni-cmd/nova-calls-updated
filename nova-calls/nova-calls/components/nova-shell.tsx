@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
@@ -27,6 +27,31 @@ type FeedPost = {
   accent?: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
   mediaUrl?: string;
   mediaName?: string;
+};
+
+type CityPulse = {
+  id: string;
+  city_id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  topic: string;
+  status: 'growing' | 'active' | 'room_open' | 'resolved' | 'archived';
+  intensity: number;
+  people_count: number;
+  posts_count: number;
+  audio_count: number;
+  video_count: number;
+  outcome: string | null;
+  cities?: {
+    name: string | null;
+    slug: string | null;
+  } | null;
+};
+
+type PulsePostLink = {
+  pulse_id: string;
+  post_id: string;
 };
 
 type ComposerMediaKind = 'text' | 'image' | 'audio' | 'video';
@@ -322,6 +347,9 @@ export function NovaHome() {
   const [chatLinkSearch, setChatLinkSearch] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ChatPreview | null>(null);
   const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
+  const [cityPulses, setCityPulses] = useState<CityPulse[]>([]);
+  const [linkedPulsePosts, setLinkedPulsePosts] = useState<PulsePostLink[]>([]);
+  const [pulseActionMessage, setPulseActionMessage] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(true);
   const [composerText, setComposerText] = useState('');
   const [composerMediaKind, setComposerMediaKind] = useState<ComposerMediaKind>('text');
@@ -330,7 +358,14 @@ export function NovaHome() {
   const [composerPosting, setComposerPosting] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+
   const visiblePosts = useMemo(() => {
+    const query = normalizeSearchValue(searchQuery.trim());
+
     return [...userPosts, ...feedPosts].filter((post) => {
       const cityMatch = activeCity === 'for-you' || activeCity === 'nearby' || activeCity === 'following' || post.citySlug === activeCity;
       const topicMatch =
@@ -341,9 +376,23 @@ export function NovaHome() {
         (activeTopic === 'audio' && post.kind === 'audio') ||
         (activeTopic === 'video' && post.kind === 'video');
 
-      return cityMatch && topicMatch;
+      const searchMatch =
+        !query ||
+        normalizeSearchValue(`${post.author} ${post.city} ${post.topic} ${post.title} ${post.text} ${post.wall}`).includes(query);
+
+      return cityMatch && topicMatch && searchMatch;
     });
-  }, [activeCity, activeTopic, userPosts]);
+  }, [activeCity, activeTopic, userPosts, searchQuery]);
+
+  const activeCityPulses = useMemo(() => {
+    return cityPulses
+      .filter((pulse) => {
+        const citySlug = pulse.cities?.slug || '';
+
+        return activeCity === 'for-you' || activeCity === 'nearby' || activeCity === 'following' || citySlug === activeCity;
+      })
+      .sort((a, b) => (b.intensity || 0) - (a.intensity || 0));
+  }, [activeCity, cityPulses]);
 
   const selectedChat = useMemo(() => {
     return chatPreviews.find((chat) => chat.otherUserId === selectedChatId) || chatPreviews[0] || fallbackChats[0];
@@ -376,6 +425,121 @@ export function NovaHome() {
     setComposerMediaKind(kind);
     setComposerOpen(true);
     setComposerError(null);
+
+    window.setTimeout(() => {
+      document.getElementById('composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
+
+  function openComposerWithUpload(kind: ComposerMediaKind) {
+    openComposer(kind);
+
+    window.setTimeout(() => {
+      if (kind === 'image') imageInputRef.current?.click();
+      if (kind === 'audio') audioInputRef.current?.click();
+      if (kind === 'video') videoInputRef.current?.click();
+    }, 140);
+  }
+
+  function getBestPulseForPost(post: FeedPost) {
+    const cityMatches = cityPulses.filter((pulse) => {
+      const citySlug = pulse.cities?.slug || '';
+      const topic = normalizeSearchValue(pulse.topic || '');
+      const title = normalizeSearchValue(pulse.title || '');
+      const postTopic = normalizeSearchValue(post.topic || post.topicSlug || '');
+
+      const sameCity = citySlug === post.citySlug;
+      const sameTopic = topic.includes(postTopic) || title.includes(postTopic) || postTopic.includes(topic);
+
+      return sameCity && (sameTopic || postTopic === 'all');
+    });
+
+    return cityMatches[0] || cityPulses.find((pulse) => pulse.cities?.slug === post.citySlug) || cityPulses[0] || null;
+  }
+
+  async function loadCityPulses() {
+    const { data: pulsesData, error: pulsesError } = await supabase
+      .from('city_pulses')
+      .select(`
+        id,
+        city_id,
+        title,
+        slug,
+        description,
+        topic,
+        status,
+        intensity,
+        people_count,
+        posts_count,
+        audio_count,
+        video_count,
+        outcome,
+        cities (
+          name,
+          slug
+        )
+      `)
+      .in('status', ['growing', 'active', 'room_open'])
+      .order('intensity', { ascending: false })
+      .limit(18);
+
+    if (!pulsesError) {
+      setCityPulses((pulsesData || []) as CityPulse[]);
+    }
+
+    const { data: pulsePostRows } = await supabase
+      .from('pulse_posts')
+      .select('pulse_id, post_id')
+      .limit(300);
+
+    setLinkedPulsePosts((pulsePostRows || []) as PulsePostLink[]);
+  }
+
+  async function addPostToPulse(post: FeedPost) {
+    const pulse = getBestPulseForPost(post);
+
+    if (!pulse) {
+      setPulseActionMessage('Nessun Pulse disponibile per questo Wall. Crea prima un Pulse dalla città.');
+      window.setTimeout(() => setPulseActionMessage(null), 2400);
+      return;
+    }
+
+    if (post.id.includes('-') && !post.id.startsWith('local-') && !post.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)) {
+      setPulseActionMessage('I post demo non possono essere aggiunti ai Pulse. Pubblica un post reale sul Wall.');
+      window.setTimeout(() => setPulseActionMessage(null), 2600);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setPulseActionMessage('Devi effettuare il login per aggiungere un post a un Pulse.');
+      window.setTimeout(() => setPulseActionMessage(null), 2400);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('pulse_posts')
+      .insert({
+        pulse_id: pulse.id,
+        post_id: post.id,
+        added_by: user.id,
+      });
+
+    if (error) {
+      const alreadyLinked = error.message.toLowerCase().includes('duplicate') || error.message.toLowerCase().includes('unique');
+
+      setPulseActionMessage(alreadyLinked ? 'Questo post è già dentro il Pulse.' : error.message);
+      window.setTimeout(() => setPulseActionMessage(null), 2600);
+      return;
+    }
+
+    setLinkedPulsePosts((items) => [...items, { pulse_id: pulse.id, post_id: post.id }]);
+    setPulseActionMessage(`Post aggiunto al Pulse “${pulse.title}”.`);
+    await loadCityPulses();
+    window.setTimeout(() => setPulseActionMessage(null), 2600);
   }
 
   function handleComposerFile(event: ChangeEvent<HTMLInputElement>) {
@@ -934,6 +1098,7 @@ export function NovaHome() {
     async function start() {
       if (!mounted) return;
       await loadWallPosts();
+      await loadCityPulses();
       await loadUnreadCounts();
       await loadChatPreviews();
 
@@ -1004,6 +1169,28 @@ export function NovaHome() {
             await loadWallPosts();
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'city_pulses',
+          },
+          async () => {
+            await loadCityPulses();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pulse_posts',
+          },
+          async () => {
+            await loadCityPulses();
+          }
+        )
         .subscribe();
 
       return () => {
@@ -1050,7 +1237,7 @@ export function NovaHome() {
             <Link href="/profile"><span>👤</span><b>Profilo</b></Link>
           </nav>
 
-          <Link href="#composer" className="side-post">＋ Pubblica</Link>
+          <button type="button" className="side-post" onClick={() => openComposer('text')}>＋ Pubblica</button>
 
           <section className="now-box">
             <h3>Live ora</h3>
@@ -1074,7 +1261,14 @@ export function NovaHome() {
             </div>
 
             <div className="search-row">
-              <div className="search">⌕ Cerca città, wall, creator, eventi locali...</div>
+              <label className="search" aria-label="Cerca nella Home">
+                <span>⌕</span>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Cerca città, wall, creator, eventi locali..."
+                />
+              </label>
 
               <button
                 type="button"
@@ -1124,6 +1318,45 @@ export function NovaHome() {
             </nav>
           </header>
 
+          <section className="pulse-strip" id="pulse">
+            <div className="pulse-strip-head">
+              <div>
+                <p>Pulse della città</p>
+                <h2>Il battito vivo di ciò che sta nascendo ora</h2>
+              </div>
+              <Link href="/pulse">Vedi tutti</Link>
+            </div>
+
+            {pulseActionMessage && <div className="pulse-message">{pulseActionMessage}</div>}
+
+            <div className="pulse-cards">
+              {activeCityPulses.length > 0 ? (
+                activeCityPulses.slice(0, 4).map((pulse) => (
+                  <Link href={`/pulse/${pulse.id}`} className={`pulse-card ${pulse.status}`} key={pulse.id}>
+                    <span className="pulse-city">{pulse.cities?.name || 'The Square'} · {pulse.topic}</span>
+                    <b>{pulse.title}</b>
+                    <small>{pulse.description || 'Segnale in crescita nel Wall della città.'}</small>
+
+                    <div className="pulse-meter" aria-label={`Intensità ${pulse.intensity}%`}>
+                      <i style={{ width: `${Math.min(100, Math.max(1, pulse.intensity || 1))}%` }} />
+                    </div>
+
+                    <div className="pulse-stats">
+                      <span>{pulse.intensity}% intensità</span>
+                      <span>{pulse.posts_count} post</span>
+                      <span>{pulse.people_count} persone</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="pulse-empty">
+                  <b>Nessun Pulse attivo</b>
+                  <span>Quando più post parleranno dello stesso tema, nascerà un Pulse della città.</span>
+                </div>
+              )}
+            </div>
+          </section>
+
           <section className={`composer ${composerOpen ? 'is-open' : ''}`} id="composer">
             <div className="composer-top">
               <div className="avatar">A</div>
@@ -1132,10 +1365,10 @@ export function NovaHome() {
               </button>
             </div>
             <div className="composer-actions">
-              <button type="button" onClick={() => openComposer('image')}>🖼️ Foto</button>
-              <button type="button" onClick={() => openComposer('audio')}>🎙️ Audio</button>
-              <button type="button" onClick={() => openComposer('video')}>🎬 Video</button>
-              <button type="button" onClick={() => openComposer('text')}>🧩 Stanza 24h</button>
+              <button type="button" onClick={() => openComposerWithUpload('image')}>🖼️ Foto</button>
+              <button type="button" onClick={() => openComposerWithUpload('audio')}>🎙️ Audio</button>
+              <button type="button" onClick={() => openComposerWithUpload('video')}>🎬 Video</button>
+              <Link href="/calls/new">🧩 Stanza 24h</Link>
             </div>
 
             {!composerOpen && (
@@ -1175,15 +1408,15 @@ export function NovaHome() {
                 <div className="publisher-tools">
                   <label className={composerMediaKind === 'image' ? 'active' : ''}>
                     🖼️ Immagine
-                    <input type="file" accept="image/*" onChange={handleComposerFile} />
+                    <input ref={imageInputRef} type="file" accept="image/*" onChange={handleComposerFile} />
                   </label>
                   <label className={composerMediaKind === 'audio' ? 'active' : ''}>
                     🎙️ Audio
-                    <input type="file" accept="audio/*" onChange={handleComposerFile} />
+                    <input ref={audioInputRef} type="file" accept="audio/*" onChange={handleComposerFile} />
                   </label>
                   <label className={composerMediaKind === 'video' ? 'active' : ''}>
                     🎬 Video
-                    <input type="file" accept="video/*" onChange={handleComposerFile} />
+                    <input ref={videoInputRef} type="file" accept="video/*" onChange={handleComposerFile} />
                   </label>
                   <button type="button" onClick={() => setComposerMediaKind('text')}>✍️ Solo testo</button>
                 </div>
@@ -1249,7 +1482,14 @@ export function NovaHome() {
 
           <section className="feed" id="feed">
             {visiblePosts.length ? (
-              visiblePosts.map((post) => <FeedPostCard key={post.id} post={post} />)
+              visiblePosts.map((post) => (
+                <FeedPostCard
+                  key={post.id}
+                  post={post}
+                  onAddToPulse={addPostToPulse}
+                  pulseLinked={linkedPulsePosts.some((item) => item.post_id === post.id)}
+                />
+              ))
             ) : (
               <section className="empty-feed">
                 <h2>Nessun post con questi filtri</h2>
@@ -1448,7 +1688,7 @@ export function NovaHome() {
       <nav className="mobile-nav">
         <Link href="/" className="active">⌂</Link>
         <Link href="/cities">📍</Link>
-        <Link href="#composer">＋</Link>
+        <button type="button" onClick={() => openComposer('text')}>＋</button>
         <button type="button" onClick={() => openChatThread(selectedChat?.otherUserId || drawerFilteredChats[0]?.otherUserId || chatsToShow[0]?.otherUserId)}>
           💬
           {unreadMessagesCount > 0 && <span className="mobile-badge">{unreadMessagesCount}</span>}
@@ -1474,7 +1714,7 @@ function AvatarBox({ chat, large }: { chat: ChatPreview; large?: boolean }) {
   );
 }
 
-function FeedPostCard({ post }: { post: FeedPost }) {
+function FeedPostCard({ post, onAddToPulse, pulseLinked }: { post: FeedPost; onAddToPulse: (post: FeedPost) => void; pulseLinked: boolean }) {
   return (
     <article className="post">
       <div className="post-head">
@@ -1499,7 +1739,10 @@ function FeedPostCard({ post }: { post: FeedPost }) {
         <button type="button">💬 {post.comments}</button>
         <button type="button">🎙️ {post.audioReplies}</button>
         <button type="button">↗</button>
-        <button type="button" className="primary">🧩 Stanza</button>
+        <button type="button" onClick={() => onAddToPulse(post)} className={pulseLinked ? 'pulse-linked' : ''}>
+          {pulseLinked ? '⚡ Nel Pulse' : '⚡ Pulse'}
+        </button>
+        <Link href="/calls/new" className="primary">🧩 Stanza</Link>
       </div>
 
       <div className="post-comments">
@@ -5476,6 +5719,282 @@ const styles = `
   .media {
     margin-left: -10px;
     margin-right: -10px;
+  }
+}
+
+
+/* === FUNCTIONAL BUTTONS PATCH === */
+.search {
+  display: grid !important;
+  grid-template-columns: 24px 1fr !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.search span {
+  color: #d97016;
+  font-weight: 800;
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.search input::placeholder {
+  color: inherit;
+  opacity: .86;
+}
+
+.composer-actions a {
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: #3a2a1e;
+  background: rgba(255,250,242,.74);
+  border: 0;
+  border-left: 1px solid rgba(120,78,35,.12);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.side-post {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.empty-feed {
+  padding: 24px 16px;
+  background: rgba(255,255,255,.78);
+  border-top: 1px solid rgba(120,78,35,.14);
+  border-bottom: 1px solid rgba(120,78,35,.12);
+  color: #201610;
+}
+
+.empty-feed h2,
+.empty-feed b {
+  display: block;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.empty-feed p,
+.empty-feed span {
+  display: block;
+  margin: 6px 0 0;
+  color: #7a6c5d;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
+/* === THE SQUARE PULSE UI === */
+.pulse-strip {
+  margin: 8px 0 16px;
+  padding: 16px 12px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(68,191,255,.13), transparent 28%),
+    radial-gradient(circle at 0% 100%, rgba(255,201,61,.16), transparent 30%),
+    rgba(255,255,255,.78);
+  border-top: 1px solid rgba(120,78,35,.14);
+  border-bottom: 1px solid rgba(120,78,35,.12);
+  box-shadow: 0 14px 34px rgba(120,78,35,.10);
+}
+
+.pulse-strip-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pulse-strip-head p {
+  margin: 0 0 6px;
+  color: #d97016;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.pulse-strip-head h2 {
+  margin: 0;
+  color: #201610;
+  font-size: 21px;
+  line-height: 1.05;
+  letter-spacing: -.02em;
+  font-weight: 800;
+}
+
+.pulse-strip-head a {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 13px;
+  padding: 0 12px;
+  background: linear-gradient(135deg,#bfeeff,#62c9ff);
+  color: #09202d;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pulse-message {
+  margin-bottom: 12px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fffaf2;
+  border: 1px solid rgba(120,78,35,.16);
+  color: #201610;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pulse-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+}
+
+.pulse-card,
+.pulse-empty {
+  min-height: 170px;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  border-radius: 20px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(68,191,255,.12), transparent 30%),
+    rgba(255,250,242,.82);
+  border: 1px solid rgba(120,78,35,.14);
+  color: #201610;
+  text-decoration: none;
+}
+
+.pulse-card.active,
+.pulse-card.room_open {
+  border-color: rgba(68,191,255,.42);
+  box-shadow: 0 14px 26px rgba(68,191,255,.14);
+}
+
+.pulse-city {
+  width: fit-content;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+  color: #201610;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pulse-card b,
+.pulse-empty b {
+  font-size: 17px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.pulse-card small,
+.pulse-empty span {
+  color: #7a6c5d;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.pulse-meter {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(120,78,35,.12);
+}
+
+.pulse-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg,#ffc93d,#ff7a2f,#44bfff);
+}
+
+.pulse-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pulse-stats span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 8px;
+  background: rgba(255,255,255,.72);
+  color: #6e6258;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.post-actions a.primary {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  color: #201610;
+  background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.post-actions button.pulse-linked {
+  color: #09202d;
+  background: linear-gradient(135deg,#bfeeff,#62c9ff);
+  font-weight: 800;
+}
+
+@media (max-width: 1180px) {
+  .pulse-cards {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .pulse-strip-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pulse-strip-head a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pulse-cards {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .pulse-card,
+  .pulse-empty {
+    min-width: 260px;
+    scroll-snap-align: start;
   }
 }
 
