@@ -49,6 +49,47 @@ type FrequentSquare = {
   types: string[];
 };
 
+type ActiveLinkRow = {
+  link_id?: string | null;
+  id?: string | null;
+  other_user_id?: string | null;
+  requester_id?: string | null;
+  receiver_id?: string | null;
+  full_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  city?: string | null;
+  nova_points?: number | null;
+  status?: string | null;
+  updated_at?: string | null;
+};
+
+type PrivateMessageRow = {
+  id: string;
+  link_id?: string | null;
+  sender_id?: string | null;
+  receiver_id?: string | null;
+  body?: string | null;
+  message?: string | null;
+  content?: string | null;
+  text?: string | null;
+  is_read?: boolean | null;
+  created_at?: string | null;
+};
+
+type ChatPreview = {
+  otherUserId: string;
+  linkId: string;
+  name: string;
+  username: string;
+  avatarUrl: string;
+  city: string;
+  points: number;
+  lastMessage: string;
+  lastAt: string;
+  unread: number;
+};
+
 function splitTags(value: string) {
   return value
     .split(',')
@@ -81,6 +122,27 @@ function formatDate(value: string) {
   }
 }
 
+
+function initials(name: string) {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'TS'
+  );
+}
+
+function messageText(message: PrivateMessageRow) {
+  return message.body || message.message || message.content || message.text || 'Messaggio privato';
+}
+
+function chatDisplayName(link: ActiveLinkRow) {
+  return link.full_name || link.username || 'Utente The Square';
+}
+
 export default function ProfilePage() {
   const { profile, save, uploadAvatar, loading, syncError } = useNovaProfile();
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -92,6 +154,10 @@ export default function ProfilePage() {
   const [wallPosts, setWallPosts] = useState<ProfileWallPost[]>([]);
   const [frequentSquares, setFrequentSquares] = useState<FrequentSquare[]>([]);
   const [wallLoading, setWallLoading] = useState(true);
+
+  const [activeChats, setActiveChats] = useState<ChatPreview[]>([]);
+  const [chatLoading, setChatLoading] = useState(true);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   function update(field: keyof typeof profile, value: string) {
     save({ [field]: value });
@@ -239,18 +305,184 @@ export default function ProfilePage() {
     setWallLoading(false);
   }
 
+  async function loadProfileChats() {
+    setChatLoading(true);
+    setChatError(null);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setActiveChats([]);
+      setChatLoading(false);
+      return;
+    }
+
+    let links: ActiveLinkRow[] = [];
+
+    const { data: rpcRows, error: rpcError } = await supabase.rpc('get_my_active_links');
+
+    if (!rpcError && rpcRows) {
+      links = (rpcRows as ActiveLinkRow[]).filter((link) => Boolean(link.other_user_id));
+    } else {
+      const { data: linkRows, error: linkError } = await supabase
+        .from('user_links')
+        .select('id, requester_id, receiver_id, status, updated_at')
+        .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (linkError) {
+        setChatError(linkError.message);
+        setActiveChats([]);
+        setChatLoading(false);
+        return;
+      }
+
+      const acceptedLinks = ((linkRows || []) as ActiveLinkRow[]).filter((link) => {
+        const status = String(link.status || 'accepted').toLowerCase();
+        return !['rejected', 'blocked', 'declined', 'cancelled'].includes(status);
+      });
+
+      const otherIds = Array.from(
+        new Set(
+          acceptedLinks
+            .map((link) => (link.requester_id === user.id ? link.receiver_id : link.requester_id))
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      let profileRows: ActiveLinkRow[] = [];
+
+      if (otherIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, city, nova_points')
+          .in('id', otherIds);
+
+        profileRows = (data || []) as ActiveLinkRow[];
+      }
+
+      const profileMap = new Map(profileRows.map((profile) => [profile.id || profile.other_user_id || '', profile]));
+
+      links = acceptedLinks.map((link) => {
+        const otherUserId = link.requester_id === user.id ? link.receiver_id : link.requester_id;
+        const publicProfile = otherUserId ? profileMap.get(otherUserId) : null;
+
+        return {
+          ...link,
+          link_id: link.id,
+          other_user_id: otherUserId,
+          full_name: publicProfile?.full_name || publicProfile?.username || null,
+          username: publicProfile?.username || null,
+          avatar_url: publicProfile?.avatar_url || null,
+          city: publicProfile?.city || null,
+          nova_points: publicProfile?.nova_points || 0,
+        };
+      });
+    }
+
+    const otherIds = Array.from(new Set(links.map((link) => link.other_user_id).filter(Boolean))) as string[];
+    const linkIds = Array.from(new Set(links.map((link) => link.link_id || link.id).filter(Boolean))) as string[];
+    const linkIdToOtherId = new Map(links.map((link) => [link.link_id || link.id || '', link.other_user_id || '']));
+    let messages: PrivateMessageRow[] = [];
+
+    if (linkIds.length > 0) {
+      const { data: linkedRows, error: linkedError } = await supabase
+        .from('private_messages')
+        .select('*')
+        .in('link_id', linkIds)
+        .order('created_at', { ascending: false })
+        .limit(160);
+
+      if (!linkedError) {
+        messages = (linkedRows || []) as PrivateMessageRow[];
+      } else if (otherIds.length > 0) {
+        const [{ data: sentRows, error: sentError }, { data: receivedRows, error: receivedError }] = await Promise.all([
+          supabase
+            .from('private_messages')
+            .select('*')
+            .eq('sender_id', user.id)
+            .in('receiver_id', otherIds)
+            .order('created_at', { ascending: false })
+            .limit(120),
+          supabase
+            .from('private_messages')
+            .select('*')
+            .eq('receiver_id', user.id)
+            .in('sender_id', otherIds)
+            .order('created_at', { ascending: false })
+            .limit(120),
+        ]);
+
+        if (sentError || receivedError) {
+          setChatError(linkedError.message || sentError?.message || receivedError?.message || 'Impossibile leggere i messaggi privati.');
+        } else {
+          messages = ([...(sentRows || []), ...(receivedRows || [])] as PrivateMessageRow[]).sort(
+            (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+          );
+        }
+      }
+    }
+
+    const messageMap = new Map<string, PrivateMessageRow>();
+    const unreadMap = new Map<string, number>();
+
+    for (const message of messages) {
+      const otherUserId = message.link_id
+        ? linkIdToOtherId.get(message.link_id)
+        : message.sender_id === user.id
+          ? message.receiver_id
+          : message.sender_id;
+
+      if (!otherUserId) continue;
+
+      if (!messageMap.has(otherUserId)) {
+        messageMap.set(otherUserId, message);
+      }
+
+      if (message.receiver_id === user.id && message.is_read === false) {
+        unreadMap.set(otherUserId, (unreadMap.get(otherUserId) || 0) + 1);
+      }
+    }
+
+    const previews = links
+      .filter((link) => Boolean(link.other_user_id))
+      .map((link) => {
+        const otherUserId = link.other_user_id || '';
+        const lastMessage = messageMap.get(otherUserId);
+        const name = chatDisplayName(link);
+
+        return {
+          otherUserId,
+          linkId: link.link_id || link.id || '',
+          name,
+          username: link.username || '',
+          avatarUrl: link.avatar_url || '',
+          city: link.city || 'Italia',
+          points: link.nova_points || 0,
+          lastMessage: lastMessage ? messageText(lastMessage) : 'Chat attiva: nessun messaggio recente.',
+          lastAt: lastMessage?.created_at || link.updated_at || '',
+          unread: unreadMap.get(otherUserId) || 0,
+        };
+      })
+      .sort((a, b) => new Date(b.lastAt || '').getTime() - new Date(a.lastAt || '').getTime());
+
+    setActiveChats(previews);
+    setChatLoading(false);
+  }
+
   useEffect(() => {
     let active = true;
 
     async function start() {
       if (!active) return;
-      await loadProfileWallActivity();
+      await Promise.all([loadProfileWallActivity(), loadProfileChats()]);
     }
 
     start();
 
     const channel = supabase
-      .channel('profile-wall-activity')
+      .channel('profile-page-activity')
       .on(
         'postgres_changes',
         {
@@ -271,6 +503,28 @@ export default function ProfilePage() {
         },
         async () => {
           await loadProfileWallActivity();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages',
+        },
+        async () => {
+          await loadProfileChats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_links',
+        },
+        async () => {
+          await loadProfileChats();
         }
       )
       .subscribe();
@@ -307,7 +561,7 @@ export default function ProfilePage() {
           <p className="ts-eyebrow">Profilo personale</p>
           <h1>La tua Piazza su The Square</h1>
           <p className="ts-lead">
-            Qui trovi identità, informazioni personali, post pubblicati sui Wall e Piazze che frequenti.
+            Qui trovi identità, chat attive, post pubblicati sui Wall e Piazze che frequenti.
           </p>
 
           {loading && <p className="ts-status">Sincronizzo il profilo reale…</p>}
@@ -455,6 +709,70 @@ export default function ProfilePage() {
             )}
           </div>
         </article>
+      </section>
+
+      <section className="ts-profile-card ts-chat-section">
+        <div className="ts-section-head ts-section-split">
+          <div>
+            <p className="ts-eyebrow">Messaggi privati</p>
+            <h2>Chat attive</h2>
+          </div>
+          <Link href="/messages">Apri messaggi</Link>
+        </div>
+
+        {chatLoading && (
+          <div className="ts-empty-state">
+            <b>Carico le chat…</b>
+            <span>Sto collegando i legami attivi ai messaggi privati già inviati.</span>
+          </div>
+        )}
+
+        {!chatLoading && chatError && (
+          <div className="ts-empty-state">
+            <b>Non riesco a leggere le chat</b>
+            <span>{chatError}</span>
+          </div>
+        )}
+
+        {!chatLoading && !chatError && activeChats.length === 0 && (
+          <div className="ts-empty-state">
+            <b>Nessuna chat attiva</b>
+            <span>Quando avrai legami attivi o messaggi privati, le conversazioni appariranno qui.</span>
+            <Link href="/people">Cerca legami</Link>
+          </div>
+        )}
+
+        {!chatLoading && activeChats.length > 0 && (
+          <div className="ts-chat-grid">
+            {activeChats.map((chat) => (
+              <Link
+                href={chat.linkId ? `/messages?link=${chat.linkId}` : `/messages?user=${chat.otherUserId}`}
+                className="ts-chat-card"
+                key={chat.otherUserId}
+              >
+                <div className="ts-chat-avatar">
+                  {chat.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={chat.avatarUrl} alt="" />
+                  ) : (
+                    initials(chat.name)
+                  )}
+                </div>
+
+                <div className="ts-chat-copy">
+                  <b>{chat.name}</b>
+                  <span>{chat.city} · {chat.points} punti</span>
+                  <p>{chat.lastMessage}</p>
+                </div>
+
+                <div className="ts-chat-side">
+                  <small>{formatDate(chat.lastAt)}</small>
+                  {chat.unread > 0 && <em>{chat.unread}</em>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="ts-profile-card ts-wall-section">
@@ -619,6 +937,7 @@ export default function ProfilePage() {
         .ts-public-preview,
         .ts-wall-section,
         .ts-square-section,
+        .ts-chat-section,
         .ts-alert {
           position: relative;
           z-index: 1;
@@ -1005,6 +1324,103 @@ export default function ProfilePage() {
           font-weight: 800;
         }
 
+        .ts-chat-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .ts-chat-card {
+          display: grid;
+          grid-template-columns: 58px 1fr auto;
+          gap: 12px;
+          align-items: center;
+          min-height: 104px;
+          border-radius: 22px;
+          padding: 14px;
+          background: rgba(255,250,242,.78);
+          border: 1px solid var(--ts-line);
+          color: var(--ts-ink);
+          text-decoration: none;
+        }
+
+        .ts-chat-avatar {
+          width: 54px;
+          height: 54px;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-radius: 16px;
+          background: linear-gradient(135deg,#ffc93d,#ff7a2f 52%,#44bfff);
+          color: #201610;
+          font-weight: 900;
+        }
+
+        .ts-chat-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .ts-chat-copy {
+          min-width: 0;
+        }
+
+        .ts-chat-copy b {
+          display: block;
+          color: var(--ts-ink);
+          font-size: 18px;
+          line-height: 1.1;
+          font-weight: 800;
+          letter-spacing: -.02em;
+        }
+
+        .ts-chat-copy span {
+          display: block;
+          margin-top: 4px;
+          color: var(--ts-muted);
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .ts-chat-copy p {
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          margin: 6px 0 0;
+          color: #6f6256;
+          font-size: 14px;
+          line-height: 1.35;
+          font-weight: 600;
+        }
+
+        .ts-chat-side {
+          display: grid;
+          justify-items: end;
+          gap: 8px;
+        }
+
+        .ts-chat-side small {
+          color: var(--ts-muted);
+          font-size: 11px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .ts-chat-side em {
+          min-width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+          color: #201610;
+          font-style: normal;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
         .ts-wall-posts {
           display: grid;
           grid-template-columns: repeat(3, minmax(0,1fr));
@@ -1173,7 +1589,8 @@ export default function ProfilePage() {
 
         @media (max-width: 980px) {
           .ts-wall-posts,
-          .ts-square-grid {
+          .ts-square-grid,
+          .ts-chat-grid {
             grid-template-columns: repeat(2, minmax(0,1fr));
           }
         }
@@ -1190,6 +1607,7 @@ export default function ProfilePage() {
           .ts-public-preview,
           .ts-wall-section,
           .ts-square-section,
+          .ts-chat-section,
           .ts-alert {
             width: 100%;
             border-left: 0;
@@ -1232,7 +1650,8 @@ export default function ProfilePage() {
           .ts-profile-card,
           .ts-public-preview,
           .ts-wall-section,
-          .ts-square-section {
+          .ts-square-section,
+          .ts-chat-section {
             padding: 18px 12px;
           }
 
@@ -1262,7 +1681,8 @@ export default function ProfilePage() {
 
           .ts-form-grid,
           .ts-wall-posts,
-          .ts-square-grid {
+          .ts-square-grid,
+          .ts-chat-grid {
             grid-template-columns: 1fr;
           }
 
