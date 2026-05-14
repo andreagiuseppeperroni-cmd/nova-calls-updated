@@ -76,8 +76,8 @@ function normalize(value: string) {
 }
 
 export default function MessagesPage() {
-  const supabase = useMemo(() => createBrowserSupabase(), []);
   const searchParams = useSearchParams();
+  const [supabase, setSupabase] = useState<ReturnType<typeof createBrowserSupabase> | null>(null);
   const requestedLinkId = searchParams.get('link');
 
   const [currentUserId, setCurrentUserId] = useState('');
@@ -89,6 +89,24 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setError('Configurazione Supabase mancante: verifica NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY su Netlify.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setSupabase(createBrowserSupabase());
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Impossibile inizializzare Supabase.');
+      setLoading(false);
+    }
+  }, []);
 
   const selectedChat = useMemo(() => {
     return links.find((link) => link.linkId === selectedId || link.otherUserId === selectedId) || links[0] || null;
@@ -144,6 +162,11 @@ export default function MessagesPage() {
   }, [previews, query]);
 
   async function loadMessagesPage() {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -287,7 +310,7 @@ export default function MessagesPage() {
   async function sendMessage() {
     const body = reply.trim();
 
-    if (!body || !selectedChat || !currentUserId) return;
+    if (!supabase || !body || !selectedChat || !currentUserId) return;
 
     setSending(true);
     setError(null);
@@ -323,6 +346,8 @@ export default function MessagesPage() {
   }
 
   useEffect(() => {
+    if (!supabase) return;
+
     loadMessagesPage();
 
     const channel = supabase
