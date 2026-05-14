@@ -76,7 +76,6 @@ function normalize(value: string) {
 export default function MessagesPage() {
   const [requestedLinkId, setRequestedLinkId] = useState<string | null>(null);
   const [supabase, setSupabase] = useState<any | null>(null);
-  const requestedLinkId = searchParams.get('link');
 
   const [currentUserId, setCurrentUserId] = useState('');
   const [links, setLinks] = useState<ChatLink[]>([]);
