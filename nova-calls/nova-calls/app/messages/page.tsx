@@ -2,8 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 type ChatLink = {
   linkId: string | null;
@@ -76,8 +74,8 @@ function normalize(value: string) {
 }
 
 export default function MessagesPage() {
-  const searchParams = useSearchParams();
-  const [supabase, setSupabase] = useState<ReturnType<typeof createBrowserSupabase> | null>(null);
+  const [requestedLinkId, setRequestedLinkId] = useState<string | null>(null);
+  const [supabase, setSupabase] = useState<any | null>(null);
   const requestedLinkId = searchParams.get('link');
 
   const [currentUserId, setCurrentUserId] = useState('');
@@ -91,6 +89,9 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setRequestedLinkId(params.get('link'));
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -100,12 +101,17 @@ export default function MessagesPage() {
       return;
     }
 
-    try {
-      setSupabase(createBrowserSupabase());
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Impossibile inizializzare Supabase.');
-      setLoading(false);
+    async function initSupabase() {
+      try {
+        const { createBrowserSupabase } = await import('@/lib/supabase-browser');
+        setSupabase(createBrowserSupabase());
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Impossibile inizializzare Supabase.');
+        setLoading(false);
+      }
     }
+
+    initSupabase();
   }, []);
 
   const selectedChat = useMemo(() => {
@@ -297,13 +303,18 @@ export default function MessagesPage() {
     setMessages(messageRows);
 
     const requested =
-      loadedLinks.find((link) => link.linkId === requestedLinkId)?.linkId ||
-      loadedLinks.find((link) => link.linkId === requestedLinkId)?.otherUserId ||
+      (requestedLinkId
+        ? loadedLinks.find((link) => link.linkId === requestedLinkId || link.otherUserId === requestedLinkId)
+        : null);
+
+    const requestedSelection =
+      requested?.linkId ||
+      requested?.otherUserId ||
       loadedLinks[0]?.linkId ||
       loadedLinks[0]?.otherUserId ||
       '';
 
-    setSelectedId((current) => current || requested);
+    setSelectedId((current) => current || requestedSelection);
     setLoading(false);
   }
 
