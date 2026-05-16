@@ -6,6 +6,8 @@ import { ProfileOrb } from '@/components/profile-store';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
 type FeedKind = 'text' | 'photo' | 'audio' | 'video' | 'news';
+type IntentKind = 'ask' | 'people' | 'report' | 'organize' | 'propose';
+
 
 type FeedPost = {
   id: string;
@@ -25,6 +27,8 @@ type FeedPost = {
   audioReplies: number;
   rooms: number;
   accent?: 'yellow' | 'cyan' | 'pink' | 'green' | 'blue';
+  intent?: IntentKind;
+  distanceLabel?: string;
   mediaUrl?: string;
   mediaName?: string;
 };
@@ -129,6 +133,43 @@ const topics = [
   { label: 'Video', slug: 'video', icon: '🎬' },
   { label: 'Socialità', slug: 'socialita', icon: '🤝' },
 ];
+
+
+
+const intentOptions: Array<{ key: IntentKind; icon: string; label: string; help: string; tone?: 'hot' | 'blue' | 'green' | 'pink' }> = [
+  { key: 'ask', icon: '❓', label: 'Chiedo', help: 'Cerco risposte dalla città', tone: 'hot' },
+  { key: 'people', icon: '👥', label: 'Cerco persone', help: 'Trovo compagnia o legami', tone: 'blue' },
+  { key: 'report', icon: '📍', label: 'Segnalo', help: 'Condivido qualcosa vicino', tone: 'pink' },
+  { key: 'organize', icon: '🎟️', label: 'Organizzo', help: 'Faccio nascere un gruppo', tone: 'green' },
+  { key: 'propose', icon: '💡', label: 'Propongo', help: 'Creo una missione o idea' },
+];
+
+function getIntentForPost(post: FeedPost): { key: IntentKind; icon: string; label: string; action: string; detail: string } {
+  if (post.intent) {
+    const option = intentOptions.find((item) => item.key === post.intent) || intentOptions[0];
+    return {
+      key: option.key,
+      icon: option.icon,
+      label: option.label,
+      action: option.key === 'people' ? 'Apri chat' : option.key === 'report' ? 'Confermo' : option.key === 'organize' ? 'Ci sono' : 'Contribuisci',
+      detail: option.help,
+    };
+  }
+
+  if (post.topicSlug === 'mobilita' || post.topic === 'Mobilità') {
+    return { key: 'report', icon: '📍', label: 'Segnalo', action: 'Confermo', detail: 'Segnale locale verificabile' };
+  }
+
+  if (post.topicSlug === 'audio' || post.topic === 'Eventi' || post.topicSlug === 'eventi') {
+    return { key: 'people', icon: '👥', label: 'Cerco persone', action: 'Mi interessa', detail: 'Può aprire una stanza o chat' };
+  }
+
+  if (post.topicSlug === 'lavoro' || post.topicSlug === 'food') {
+    return { key: 'ask', icon: '❓', label: 'Chiedo', action: 'Consiglia', detail: 'Può diventare lista utile' };
+  }
+
+  return { key: 'propose', icon: '💡', label: 'Propongo', action: 'Accendi', detail: 'Può diventare Missione/Pulse' };
+}
 
 const feedPosts: FeedPost[] = [
   {
@@ -335,6 +376,9 @@ export function NovaHome() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [activeCity, setActiveCity] = useState('for-you');
   const [activeTopic, setActiveTopic] = useState('all');
+  const [selectedIntent, setSelectedIntent] = useState<IntentKind>('ask');
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationLabel, setLocationLabel] = useState('Attiva zona');
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -400,6 +444,8 @@ export function NovaHome() {
 
   const chatsToShow = chatPreviews.length ? chatPreviews : fallbackChats;
 
+  const selectedIntentData = useMemo(() => intentOptions.find((item) => item.key === selectedIntent) || intentOptions[0], [selectedIntent]);
+
   const homeFilteredChats = useMemo(() => {
     const query = normalizeSearchValue(linkSearch.trim());
 
@@ -420,6 +466,58 @@ export function NovaHome() {
     );
   }, [chatsToShow, chatLinkSearch]);
 
+
+  async function enableLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocationLabel('Posizione non supportata');
+      return;
+    }
+
+    setLocationLabel('Rilevo zona...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        const accuracy = Math.round(position.coords.accuracy || 0);
+
+        setLocationEnabled(true);
+        setActiveCity('nearby');
+        setLocationLabel(`Zona attiva · ±${accuracy} m`);
+
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (user) {
+            await (supabase as any).from('user_locations').upsert(
+              {
+                user_id: user.id,
+                latitude,
+                longitude,
+                accuracy_meters: accuracy,
+                consent_given: true,
+                last_updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id' }
+            );
+          }
+        } catch {
+          // La posizione resta attiva lato browser anche se la tabella user_locations non è ancora presente.
+        }
+      },
+      () => {
+        setLocationEnabled(false);
+        setLocationLabel('Posizione non autorizzata');
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 1000 * 60 * 10,
+      }
+    );
+  }
 
   function openComposer(kind: ComposerMediaKind = 'text') {
     setComposerMediaKind(kind);
@@ -689,6 +787,8 @@ export function NovaHome() {
           audioReplies: 0,
           rooms: 0,
           accent: 'yellow',
+          intent: selectedIntent,
+          distanceLabel: locationEnabled ? locationLabel : undefined,
           mediaUrl: publicUrl || composerPreviewUrl,
           mediaName: composerFile?.name,
         },
@@ -1318,6 +1418,40 @@ export function NovaHome() {
             </nav>
           </header>
 
+          <section className="intent-geo-panel" id="intent-feed">
+            <div className="intent-geo-head">
+              <div>
+                <p>Intent Feed + Geo</p>
+                <h2>Cosa vuoi far nascere nella tua città?</h2>
+                <span>Ogni post nasce con uno scopo e può attivare Pulse, chat, stanze o missioni vicine.</span>
+              </div>
+              <button type="button" onClick={enableLocation} className={locationEnabled ? 'geo-active' : ''}>
+                📍 {locationLabel}
+              </button>
+            </div>
+
+            <div className="intent-options">
+              {intentOptions.map((intent) => (
+                <button
+                  type="button"
+                  key={intent.key}
+                  className={`intent-option ${selectedIntent === intent.key ? 'selected' : ''} ${intent.tone || ''}`}
+                  onClick={() => setSelectedIntent(intent.key)}
+                >
+                  <span>{intent.icon}</span>
+                  <b>{intent.label}</b>
+                  <small>{intent.help}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="near-pulse-row">
+              <div><b>Near Pulse</b><span>Post e persone nel raggio della tua zona</span></div>
+              <div><b>Mappa Viva</b><span>Prati · Trastevere · Centro</span></div>
+              <div><b>Bussola</b><span>Azioni consigliate in base al tuo scopo</span></div>
+            </div>
+          </section>
+
           <section className="pulse-strip" id="pulse">
             <div className="pulse-strip-head">
               <div>
@@ -1361,7 +1495,7 @@ export function NovaHome() {
             <div className="composer-top">
               <div className="avatar">A</div>
               <button type="button" className="composer-placeholder" onClick={() => openComposer('text')}>
-                Cosa vuoi dire al Wall di {['roma', 'milano', 'napoli'].includes(activeCity) ? cityTabs.find((city) => city.slug === activeCity)?.label : 'Roma'}?
+                Cosa vuoi far nascere sul Wall di {['roma', 'milano', 'napoli'].includes(activeCity) ? cityTabs.find((city) => city.slug === activeCity)?.label : 'Roma'}?
               </button>
             </div>
             <div className="composer-actions">
@@ -1369,6 +1503,15 @@ export function NovaHome() {
               <button type="button" onClick={() => openComposerWithUpload('audio')}>🎙️ Audio</button>
               <button type="button" onClick={() => openComposerWithUpload('video')}>🎬 Video</button>
               <Link href="/calls/new">🧩 Stanza 24h</Link>
+            </div>
+
+            <div className="composer-intent-strip">
+              <span>{selectedIntentData.icon}</span>
+              <div>
+                <b>Post con intenzione: {selectedIntentData.label}</b>
+                <small>{selectedIntentData.help} · azioni e suggerimenti verranno adattati</small>
+              </div>
+              <button type="button" onClick={enableLocation}>📍 {locationEnabled ? 'Zona attiva' : 'Attiva zona'}</button>
             </div>
 
             {!composerOpen && (
@@ -1382,7 +1525,7 @@ export function NovaHome() {
                 <div className="publisher-head">
                   <div>
                     <p>Pubblica sul Wall</p>
-                    <h3>Scrivi, allega foto/audio/video e pubblica sul Wall</h3>
+                    <h3>Scrivi, allega foto/audio/video e pubblica con intenzione</h3>
                   </div>
                   <button type="button" onClick={() => { resetComposer(); setComposerOpen(false); }} aria-label="Chiudi composer">×</button>
                 </div>
@@ -1754,6 +1897,14 @@ function FeedPostCard({ post, onAddToPulse, pulseLinked }: { post: FeedPost; onA
         {post.kind === 'photo' && <PhotoMedia src={post.mediaUrl} name={post.mediaName} />}
         {post.kind === 'audio' && <AudioMedia src={post.mediaUrl} />}
         {post.kind === 'video' && <VideoMedia src={post.mediaUrl} />}
+      </div>
+
+      <div className="post-intent-card">
+        <div>
+          <b>{getIntentForPost(post).icon} {getIntentForPost(post).label}</b>
+          <span>{getIntentForPost(post).detail}{post.distanceLabel ? ` · ${post.distanceLabel}` : ''}</span>
+        </div>
+        <button type="button">{getIntentForPost(post).action}</button>
       </div>
 
       <div className="post-actions">
@@ -6185,6 +6336,287 @@ const styles = `
 
   .mobile-nav .nav-publish .nav-ico {
     font-size: 35px !important;
+  }
+}
+
+
+/* === INTENT FEED + GEOLOCATION PATCH === */
+.intent-geo-panel {
+  margin: 8px 0 16px;
+  padding: 16px 12px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(68,191,255,.14), transparent 30%),
+    radial-gradient(circle at 0% 100%, rgba(255,201,61,.18), transparent 30%),
+    rgba(255,255,255,.80);
+  border-top: 1px solid rgba(120,78,35,.14);
+  border-bottom: 1px solid rgba(120,78,35,.12);
+  box-shadow: 0 14px 34px rgba(120,78,35,.10);
+}
+
+.intent-geo-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.intent-geo-head p {
+  margin: 0 0 6px;
+  color: #d97016;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.intent-geo-head h2 {
+  margin: 0;
+  color: #201610;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: -.02em;
+  font-weight: 850;
+}
+
+.intent-geo-head span {
+  display: block;
+  margin-top: 6px;
+  color: #7a6c5d;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 650;
+}
+
+.intent-geo-head button,
+.composer-intent-strip button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 12px;
+  color: #09202d;
+  background: linear-gradient(135deg,#bfeeff,#62c9ff);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.intent-geo-head button.geo-active {
+  color: #092418;
+  background: linear-gradient(135deg,#d8ffd9,#54c98a);
+}
+
+.intent-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0,1fr));
+  gap: 8px;
+}
+
+.intent-option {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  border: 1px solid rgba(120,78,35,.14);
+  border-radius: 18px;
+  background: rgba(255,250,242,.80);
+  color: #201610;
+  text-align: center;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.intent-option span {
+  font-size: 24px;
+}
+
+.intent-option b {
+  font-size: 13px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.intent-option small {
+  max-width: 112px;
+  color: #7a6c5d;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.intent-option.selected,
+.intent-option.hot.selected {
+  background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+  border-color: rgba(255,167,38,.30);
+  box-shadow: 0 14px 26px rgba(255,122,47,.18);
+}
+
+.intent-option.blue.selected {
+  background: linear-gradient(135deg,#bfeeff,#62c9ff);
+}
+
+.intent-option.green.selected {
+  background: linear-gradient(135deg,#d8ffd9,#54c98a);
+}
+
+.intent-option.pink.selected {
+  background: linear-gradient(135deg,#ffe1dc,#ff7a66);
+}
+
+.near-pulse-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.near-pulse-row div {
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid rgba(120,78,35,.12);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(255,250,242,.72);
+}
+
+.near-pulse-row b {
+  color: #201610;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.near-pulse-row span {
+  color: #7a6c5d;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.composer-intent-strip {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  border: 1px solid rgba(120,78,35,.14);
+  border-radius: 16px;
+  padding: 10px;
+  background: #fffaf2;
+}
+
+.composer-intent-strip > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: linear-gradient(135deg,#ffc93d,#ff9f35 52%,#ff7a2f);
+  font-size: 20px;
+}
+
+.composer-intent-strip b {
+  display: block;
+  color: #201610;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.composer-intent-strip small {
+  display: block;
+  margin-top: 3px;
+  color: #7a6c5d;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.post-intent-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 14px 14px;
+  border: 1px solid rgba(120,78,35,.14);
+  border-radius: 16px;
+  padding: 11px 12px;
+  background: #fffaf2;
+}
+
+.post-intent-card b {
+  display: block;
+  color: #201610;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.post-intent-card span {
+  display: block;
+  margin-top: 4px;
+  color: #7a6c5d;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 650;
+}
+
+.post-intent-card button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 13px;
+  padding: 0 12px;
+  color: #09202d;
+  background: linear-gradient(135deg,#bfeeff,#62c9ff);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .intent-geo-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .intent-geo-head button {
+    width: 100%;
+  }
+
+  .intent-options {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+
+  .intent-option {
+    min-width: 138px;
+    scroll-snap-align: start;
+  }
+
+  .near-pulse-row {
+    grid-template-columns: 1fr;
+  }
+
+  .composer-intent-strip {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .composer-intent-strip button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .post-intent-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .post-intent-card button {
+    width: 100%;
   }
 }
 
